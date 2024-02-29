@@ -10,3 +10,6 @@
 [submodule "lib/permit2"]
 	path = lib/permit2
 	url = https://github.com/Uniswap/permit2
+[submodule "lib/prb-proxy"]
+	path = lib/prb-proxy
+	url = https://github.com/PaulRBerg/prb-proxy

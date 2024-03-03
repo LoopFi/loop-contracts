@@ -13,3 +13,6 @@
 [submodule "lib/permit2"]
 	path = lib/permit2
 	url = https://github.com/Uniswap/permit2
+[submodule "lib/pendle"]
+	path = lib/pendle
+	url = git@github.com:pendle-finance/pendle-core-v2-public.git

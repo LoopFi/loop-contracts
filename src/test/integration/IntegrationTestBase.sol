@@ -28,7 +28,7 @@ contract IntegrationTestBase is TestBase {
     address internal constant ONE_INCH = 0x1111111254EEB25477B68fb85Ed929f73A960582;
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-
+    address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
     // tokens
     ERC20 constant internal DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     ERC20 constant internal USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -87,7 +87,7 @@ contract IntegrationTestBase is TestBase {
 
         prbProxyRegistry = new PRBProxyRegistry();
         swapAction = new SwapAction(balancerVault, univ3Router);
-        poolAction = new PoolAction(BALANCER_VAULT);
+        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
 
         // configure balancer pools
         stablePool = _createBalancerStablecoinPool();

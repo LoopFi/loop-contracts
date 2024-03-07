@@ -291,6 +291,59 @@ contract ChefIncentivesControllerTest is TestBase {
         assertEq(rewards[0], 0);
     }
 
+     function test_pendingRewards_hasRewards(address user) public {
+        _excludeContracts(user);
+        address vault = address(0x1);
+        uint256 totalAllocPoint = 1000;
+        incentivesController.addPool(vault, totalAllocPoint);
+
+        loopToken.mint(address(incentivesController), 1000 ether);
+        uint256 rewardAmount = 1000 ether;
+        incentivesController.registerRewardDeposit(rewardAmount);
+
+        incentivesController.start();
+
+        vm.warp(block.timestamp + 30 days);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = vault;
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(EligibilityDataProvider.isEligibleForRewards.selector, user),
+            abi.encode(true)
+        );
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
+            abi.encode(true)
+        );
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
+            abi.encode(0)
+        );
+
+        vm.expectRevert(ChefIncentivesController.NothingToVest.selector);
+        incentivesController.claim(user, vaults);
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
+            abi.encode(true)
+        );
+        vm.prank(vault);
+        incentivesController.handleActionAfter(user, 500 ether, 1000 ether);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256[] memory pendingRewards = incentivesController.pendingRewards(user, vaults);
+        assertEq(pendingRewards.length, 1);
+        assertGt(pendingRewards[0], 0);
+    }
+
     function test_claim(address user) public {
         _excludeContracts(user);
 
@@ -346,6 +399,10 @@ contract ChefIncentivesControllerTest is TestBase {
             abi.encode(true)
         );
         incentivesController.claim(user, vaults);
+
+        uint256[] memory pendingRewards = incentivesController.pendingRewards(user, vaults);
+        assertEq(pendingRewards.length, 1);
+        assertEq(pendingRewards[0], 0);
     }
 
     function test_setEligibilityExempt(address contract_, bool value) public {
@@ -368,6 +425,80 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.prank(caller2);
         // Eligibility checks for the setEligibilityExempt are skipped if the mode is not FULL
         incentivesController.setEligibilityExempt(contract_, value);
+    }
+
+    function test_manualStopEmissionsFor(address user) public {
+        _excludeContracts(user);
+        address vault = address(0x1);
+        uint256 totalAllocPoint = 1000;
+        incentivesController.addPool(vault, totalAllocPoint);
+
+        address[] memory vaults = new address[](1);
+        vaults[0] = vault;
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(EligibilityDataProvider.setDqTime.selector, user, block.timestamp),
+            abi.encode(0)
+        );
+
+        vm.prank(mockMultiFeeDistribution);
+        incentivesController.manualStopEmissionsFor(user, vaults);
+    }
+
+    function test_manualStopAllEmissionsFor(address user) public {
+        _excludeContracts(user);
+        address vault1 = address(0x1);
+        uint256 totalAllocPoint = 1000;
+        incentivesController.addPool(vault1, totalAllocPoint);
+
+        address vault2 = address(0x2);
+        incentivesController.addPool(vault2, totalAllocPoint);
+
+        address[] memory vaults = new address[](2);
+        vaults[0] = vault1;
+        vaults[1] = vault2;
+
+        vm.mockCall(
+            mockEligibilityDataProvider, 
+            abi.encodeWithSelector(EligibilityDataProvider.setDqTime.selector, user, block.timestamp),
+            abi.encode(0)
+        );
+
+        vm.prank(mockMultiFeeDistribution);
+        incentivesController.manualStopEmissionsFor(user, vaults);
+    }
+
+    function test_endRewardTime() public {
+        address vault = address(0x1);
+        uint256 totalAllocPoint = 1000;
+        incentivesController.addPool(vault, totalAllocPoint);
+
+        uint256 endTime = incentivesController.endRewardTime();
+        assertEq(endTime, 0);
+
+        uint256 lastUpdatedTime;
+        uint256 updateCadence;
+        (,lastUpdatedTime,updateCadence) = incentivesController.endingTime();
+        assertEq(lastUpdatedTime, block.timestamp);
+        vm.warp(block.timestamp + updateCadence + 1);
+
+        // no rewards, should be max uint256
+        endTime = incentivesController.endRewardTime();
+        (,lastUpdatedTime,) = incentivesController.endingTime();
+        assertEq(endTime, type(uint256).max);
+        assertEq(lastUpdatedTime, block.timestamp);
+
+
+        uint256 rewardAmount = 1000000 ether;
+        loopToken.mint(address(incentivesController), rewardAmount);
+        incentivesController.registerRewardDeposit(rewardAmount);
+        incentivesController.start();
+
+        vm.warp(block.timestamp + updateCadence + 1);
+        endTime = incentivesController.endRewardTime();
+        assertLt(endTime, type(uint256).max);
+        assertGt(endTime, block.timestamp);
     }
 
     function test_setContractAuthorization(address contract_) public {
@@ -591,6 +722,24 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.prank(address(0x1));
         vm.expectRevert("Ownable: caller is not the owner");
         incentivesController.unpause();
+    }
+
+
+    function test_setAddressWLstatus(address user, bool status) public {
+        _excludeContracts(user);
+        incentivesController.setAddressWLstatus(user, status);
+        assertEq(incentivesController.whitelist(user), status);
+        vm.prank(address(0x1));
+        vm.expectRevert("Ownable: caller is not the owner");
+        incentivesController.setAddressWLstatus(user, status);
+    }
+
+    function test_toggleWhitelist() public {
+        incentivesController.toggleWhitelist();
+        assertTrue(incentivesController.whitelistActive());
+        vm.prank(address(0x1));
+        vm.expectRevert("Ownable: caller is not the owner");
+        incentivesController.toggleWhitelist();
     }
 
 } 

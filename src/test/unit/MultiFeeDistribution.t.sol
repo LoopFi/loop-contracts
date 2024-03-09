@@ -14,7 +14,7 @@ import {MultiFeeDistribution} from "../../reward/MultiFeeDistribution.sol";
 import {IMultiFeeDistribution} from "../../reward/interfaces/IMultiFeeDistribution.sol";
 import {IPriceProvider} from "../../reward/interfaces/IPriceProvider.sol";
 import {IChefIncentivesController} from "../../reward/interfaces/IChefIncentivesController.sol";
-import {LockedBalance, Balances} from "../../reward/interfaces/LockedBalance.sol";
+import {LockedBalance, Balances, EarnedBalance} from "../../reward/interfaces/LockedBalance.sol";
 import {Reward} from "../../reward/interfaces/LockedBalance.sol";
 
 contract MultiFeeDistributionTest is TestBase {
@@ -24,6 +24,7 @@ contract MultiFeeDistributionTest is TestBase {
     ERC20Mock public loopToken;
     ERC20Mock public stakeToken;
 
+    address internal incentiveController;
     address internal mockPriceProvider;
     address internal mockLockZap;
     address internal mockDao;
@@ -34,12 +35,15 @@ contract MultiFeeDistributionTest is TestBase {
     uint256 public burnRatio = 50000; // 50%
     uint256 public vestDuration = 30 days;
 
+    uint256[] public lockDurations;
+
     function setUp() public override virtual{
         super.setUp();
 
         mockPriceProvider = vm.addr(uint256(keccak256("mockPriceProvider")));
         mockLockZap = vm.addr(uint256(keccak256("lockZap")));
         mockDao = vm.addr(uint256(keccak256("dao")));
+        incentiveController = vm.addr(uint256(keccak256("incentiveController")));
 
         loopToken = new ERC20Mock();
         stakeToken = new ERC20Mock();
@@ -59,11 +63,22 @@ contract MultiFeeDistributionTest is TestBase {
                 vestDuration
             )
         )));
+
+        vm.mockCall(
+            mockPriceProvider, 
+            abi.encodeWithSelector(IPriceProvider.update.selector), 
+            abi.encode(true)
+        );
+        
+        vm.label(address(loopToken), "loopToken");
+        vm.label(address(stakeToken), "stakeToken");
+        vm.label(address(multiFeeDistribution), "multiFeeDistribution");
+        vm.label(address(incentiveController), "incentivesController");
     }
 
     function _addLockDurations() internal returns (uint256 len) {
         len = 4;
-        uint256[] memory lockDurations = new uint256[](len);
+        lockDurations = new uint256[](len);
         uint256[] memory rewardMultipliers = new uint256[](len);
         lockDurations[0] = 2592000;
         lockDurations[1] = 7776000;
@@ -78,6 +93,39 @@ contract MultiFeeDistributionTest is TestBase {
         multiFeeDistribution.setLockTypeInfo(lockDurations, rewardMultipliers);
     }
 
+    function _stake(address user, uint256 amount, uint256 typeIndex) internal {
+        uint256[] memory locks = multiFeeDistribution.getLockDurations();
+        uint256 len = locks.length;
+        if(len == 0) {
+            len = _addLockDurations();
+        }
+        stakeToken.mint(address(this), amount);
+        multiFeeDistribution.setLPToken(address(stakeToken));
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        vm.mockCall(
+            incentiveController,
+            abi.encodeWithSelector(IChefIncentivesController.afterLockUpdate.selector, user),
+            abi.encode(true)
+        );
+
+        stakeToken.approve(address(multiFeeDistribution), amount);            
+        multiFeeDistribution.stake(amount, user, typeIndex);
+    }
+
+    function _excludeContracts(address address_) internal view {
+        vm.assume(
+            address_ != mockPriceProvider && 
+            address_ != mockLockZap &&
+            address_ != mockDao &&
+            address_ != address(loopToken) &&
+            address_ != address(stakeToken) &&
+            address_ != address(0)
+        );
+    }
+
     function test_deploy() public {
         assertNotEq(address(multiFeeDistribution), address(0));
         assertEq(address(loopToken), address(multiFeeDistribution.rdntToken()));
@@ -90,6 +138,8 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setMinters(address minter1, address minter2) public {
+        _excludeContracts(minter1);
+        _excludeContracts(minter2);
         vm.assume(minter1 != address(0) && minter2 != address(0));
         address[] memory minters = new address[](2);
         minters[0] = minter1;
@@ -109,7 +159,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setBountyManager(address bountyManager) public {
-        vm.assume(bountyManager != address(0));
+        _excludeContracts(bountyManager);
         multiFeeDistribution.setBountyManager(bountyManager);
         assertEq(bountyManager, multiFeeDistribution.bountyManager());
 
@@ -122,7 +172,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_addRewardConverter(address converter) public {
-        vm.assume(converter != address(0));
+        _excludeContracts(converter);
         multiFeeDistribution.addRewardConverter(converter);
         assertEq(multiFeeDistribution.rewardConverter(), converter);
 
@@ -137,12 +187,12 @@ contract MultiFeeDistributionTest is TestBase {
     function test_setLockTypeInfo() public {
         uint256 len = _addLockDurations();
 
-        (uint256[] memory lockDurations) = multiFeeDistribution.getLockDurations();
-        assertEq(lockDurations.length, len);
-        assertEq(lockDurations[0], 2592000);
-        assertEq(lockDurations[1], 7776000);
-        assertEq(lockDurations[2], 15552000);
-        assertEq(lockDurations[3], 31104000);
+        (uint256[] memory locks) = multiFeeDistribution.getLockDurations();
+        assertEq(locks.length, len);
+        assertEq(locks[0], 2592000);
+        assertEq(locks[1], 7776000);
+        assertEq(locks[2], 15552000);
+        assertEq(locks[3], 31104000);
 
         (uint256[] memory rewardMultipliers) = multiFeeDistribution.getLockMultipliers();
         assertEq(rewardMultipliers.length, 4);
@@ -153,7 +203,8 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setAddresses(address controller, address treasury) public {
-        vm.assume(controller != address(0) && treasury != address(0));
+        _excludeContracts(controller);
+        _excludeContracts(treasury);
         multiFeeDistribution.setAddresses(IChefIncentivesController(controller), treasury);
         assertEq(controller, address(multiFeeDistribution.incentivesController()));
         assertEq(treasury, address(multiFeeDistribution.starfleetTreasury()));
@@ -170,7 +221,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setLPToken(address lpToken) public {
-        vm.assume(lpToken != address(0));
+        _excludeContracts(lpToken);
         multiFeeDistribution.setLPToken(lpToken);
         assertEq(lpToken, multiFeeDistribution.stakingToken());
 
@@ -186,7 +237,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_addReward(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+        _excludeContracts(rewardToken);
 
         // we are not a minter
         vm.expectRevert(MultiFeeDistribution.InsufficientPermission.selector);
@@ -207,7 +258,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_addReward_updatesRewardData(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+        _excludeContracts(rewardToken);
         address[] memory minters = new address[](1);
         minters[0] = address(this);
         multiFeeDistribution.setMinters(minters);
@@ -219,7 +270,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_removeReward(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+        _excludeContracts(rewardToken);
 
         vm.expectRevert(MultiFeeDistribution.InsufficientPermission.selector);
         multiFeeDistribution.removeReward(rewardToken);
@@ -241,6 +292,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_removeReward_removesRewardData(address rewardToken) public {
+        _excludeContracts(rewardToken);
         address[] memory minters = new address[](1);
         minters[0] = address(this);
         multiFeeDistribution.setMinters(minters);
@@ -263,6 +315,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setDefaultRelockTypeIndex(address sender, uint256 index) public {
+        _excludeContracts(sender);
         uint256 len = _addLockDurations();
         index = index % len;
 
@@ -276,6 +329,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setAutocompound(address sender, bool value, uint256 slippage) public {
+        _excludeContracts(sender);
         // constant could be renamed
         uint256 minSlippage = multiFeeDistribution.MAX_SLIPPAGE();
 
@@ -300,6 +354,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setUserSlippage(address user, uint256 slippage) public {
+        _excludeContracts(user);
         uint256 minSlippage = multiFeeDistribution.MAX_SLIPPAGE();
         uint256 maxSlippage = multiFeeDistribution.PERCENT_DIVISOR()-1;
         slippage = bound(slippage, minSlippage, maxSlippage);
@@ -318,6 +373,7 @@ contract MultiFeeDistributionTest is TestBase {
     } 
 
     function test_toggleAutocompound(address sender) public {
+        _excludeContracts(sender);
         vm.prank(sender);
         multiFeeDistribution.toggleAutocompound();
         assertTrue(multiFeeDistribution.autocompoundEnabled(sender));
@@ -352,7 +408,8 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_setOperationExpenses(address receiver, uint256 expenseRatio) public {
-        vm.assume(receiver != address(0));
+        _excludeContracts(receiver);
+        
         uint256 maxRatio = multiFeeDistribution.RATIO_DIVISOR();
         expenseRatio = bound(expenseRatio, 0, maxRatio);
 
@@ -372,30 +429,17 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_stake(address onBehalfOf, uint256 typeIndex) public {
+        _excludeContracts(onBehalfOf);
+
         uint256 amount = 10 ether;
         uint256 len = _addLockDurations();
         typeIndex = typeIndex % len;
-        vm.assume(onBehalfOf != address(0));
-
-        stakeToken.mint(address(this), amount);
-        multiFeeDistribution.setLPToken(address(stakeToken));
-
-        address incentivesController = vm.addr(uint256(keccak256("incentivesController")));
-        address treasury = vm.addr(uint256(keccak256("treasury")));
-        multiFeeDistribution.setAddresses(IChefIncentivesController(incentivesController), treasury);
-
-        vm.mockCall(
-            incentivesController,
-            abi.encodeWithSelector(IChefIncentivesController.afterLockUpdate.selector, onBehalfOf),
-            abi.encode(true)
-        );
-
-        stakeToken.approve(address(multiFeeDistribution), amount);            
-        multiFeeDistribution.stake(amount, onBehalfOf, typeIndex);
+        _stake(onBehalfOf, amount, typeIndex);
     }
 
     function test_vestTokens(address user, uint256 amount, bool withPenalty) public {
-        vm.assume(user != address(0));
+        _excludeContracts(user);
+
         amount = amount % 1000 ether;
         loopToken.mint(address(this), amount);
         loopToken.approve(address(multiFeeDistribution), amount);
@@ -407,5 +451,209 @@ contract MultiFeeDistributionTest is TestBase {
         minters[0] = address(this);
         multiFeeDistribution.setMinters(minters);
         multiFeeDistribution.vestTokens(user, amount, withPenalty);
+    }
+
+    function test_withdraw_withoutPenalty(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, false);
+
+        (uint256 availableAmount, uint256 penaltyAmount, uint256 burnAmount) = multiFeeDistribution.withdrawableBalance(user);
+        assertEq(availableAmount, amount);
+        assertEq(penaltyAmount, 0);
+        assertEq(burnAmount, 0);
+
+        assertEq(loopToken.balanceOf(user), 0);
+        vm.prank(user);
+        vm.mockCall(
+            mockPriceProvider, 
+            abi.encodeWithSelector(IPriceProvider.update.selector), 
+            abi.encode(true)
+        );
+        multiFeeDistribution.withdraw(amount);
+        assertEq(loopToken.balanceOf(user), availableAmount);
+    }
+
+    function test_withdraw_withPenalty(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, true);
+        vm.warp(block.timestamp + 2 days);
+
+        (uint256 availableAmount, uint256 penaltyAmount, uint256 burnAmount) = multiFeeDistribution.withdrawableBalance(user);
+        assertLe(availableAmount, amount);
+        assertGt(penaltyAmount, 0);
+        assertGt(burnAmount, 0);
+
+        assertEq(loopToken.balanceOf(user), 0);
+        
+        vm.mockCall(
+            mockPriceProvider, 
+            abi.encodeWithSelector(IPriceProvider.update.selector), 
+            abi.encode(true)
+        );
+        vm.prank(user);
+        multiFeeDistribution.withdraw(availableAmount);
+        assertEq(loopToken.balanceOf(user), availableAmount);
+        assertEq(loopToken.balanceOf(treasury), burnAmount);
+    }
+
+    function test_individualEarlyExit_withoutClaim(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, true);
+
+        (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution.earnedBalances(user);
+        assertEq(totalVesting, amount);
+        assertEq(unlocked, 0);
+        assertEq(earnedBalances.length, 1);
+
+        uint256 unlockTime = earnedBalances[0].unlockTime;
+        vm.prank(user);
+        multiFeeDistribution.individualEarlyExit(false, unlockTime);
+
+        uint256 userExpected = amount / 10;
+        uint256 penalty = amount - userExpected;
+        assertEq(loopToken.balanceOf(user), userExpected); 
+        assertEq(loopToken.balanceOf(treasury), penalty / 2);
+        assertEq(loopToken.balanceOf(mockDao), penalty / 2);
+    }
+
+    function test_individualEarlyExit_withClaim(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, true);
+
+        (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution.earnedBalances(user);
+        assertEq(totalVesting, amount);
+        assertEq(unlocked, 0);
+        assertEq(earnedBalances.length, 1);
+
+        vm.mockCall(
+            incentiveController,
+            abi.encodeWithSelector(IChefIncentivesController.setEligibilityExempt.selector, user, true),
+            abi.encode(true)
+        );
+
+        uint256 unlockTime = earnedBalances[0].unlockTime;
+        vm.prank(user);
+        multiFeeDistribution.individualEarlyExit(true, unlockTime);
+
+        uint256 userExpected = amount / 10;
+        uint256 penalty = amount - userExpected;
+        assertEq(loopToken.balanceOf(user), userExpected); 
+        assertEq(loopToken.balanceOf(treasury), penalty / 2);
+        assertEq(loopToken.balanceOf(mockDao), penalty / 2);
+    }
+
+    function test_withdrawExpiredLocksForWithOptions(address user) public {
+        _excludeContracts(user);
+
+        _stake(user, 1000 ether, 0);
+        LockedBalance[] memory locks = multiFeeDistribution.lockInfo(user);
+        uint256 unlockTime = locks[0].unlockTime;
+        vm.warp(unlockTime + 1);
+
+        vm.prank(user);
+        multiFeeDistribution.withdrawExpiredLocksForWithOptions(user, 1, false);
+        locks = multiFeeDistribution.lockInfo(user);
+        assertEq(locks.length, 0);
+        assertEq(stakeToken.balanceOf(user), 1000 ether);
+    }
+
+    function test_exit_claimUnlockedBalances(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, true);
+
+        vm.mockCall(
+            incentiveController,
+            abi.encodeWithSelector(IChefIncentivesController.setEligibilityExempt.selector, user, true),
+            abi.encode(true)
+        );
+
+        (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution.earnedBalances(user);
+        uint256 unlockTime = earnedBalances[0].unlockTime;
+        vm.warp(unlockTime + 1);
+        vm.prank(user);
+        multiFeeDistribution.exit(true);
+
+        assertEq(loopToken.balanceOf(user), amount); 
+        assertEq(loopToken.balanceOf(treasury), 0);
+        assertEq(loopToken.balanceOf(mockDao), 0);
+    }
+
+    function test_exit_withPenalty(address user) public {
+        _excludeContracts(user);
+
+        uint256 amount = 1000 ether;
+        loopToken.mint(address(multiFeeDistribution), amount);
+
+        address treasury = vm.addr(uint256(keccak256("treasury")));
+        multiFeeDistribution.setAddresses(IChefIncentivesController(incentiveController), treasury);
+
+        address[] memory minters = new address[](1);
+        minters[0] = address(this);
+        multiFeeDistribution.setMinters(minters);
+        multiFeeDistribution.vestTokens(user, amount, true);
+
+        vm.mockCall(
+            incentiveController,
+            abi.encodeWithSelector(IChefIncentivesController.setEligibilityExempt.selector, user, true),
+            abi.encode(true)
+        );
+
+        (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution.earnedBalances(user);
+        uint256 unlockTime = earnedBalances[0].unlockTime;
+        vm.prank(user);
+        multiFeeDistribution.exit(true);
+
+        uint256 userExpected = amount / 10;
+        uint256 penalty = amount - userExpected;
+        assertEq(loopToken.balanceOf(user), userExpected); 
+        assertEq(loopToken.balanceOf(treasury), penalty / 2);
+        assertEq(loopToken.balanceOf(mockDao), penalty / 2);
     }
 }

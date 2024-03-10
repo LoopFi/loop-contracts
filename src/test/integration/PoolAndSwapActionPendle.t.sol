@@ -28,7 +28,10 @@ import { IPActionSwapPTV3} from "pendle/interfaces/IPActionSwapPTV3.sol";
 import { IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 import {Test} from "forge-std/Test.sol";
 import {ActionMarketCoreStatic} from "pendle/offchain-helpers/router-static/base/ActionMarketCoreStatic.sol";
-
+import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAction.sol";
+import {IUniswapV3Router, decodeLastToken, UniswapV3Router_decodeLastToken_invalidPath} from "../../vendor/IUniswapV3Router.sol";
+import {IVault as IBalancerVault} from "../../vendor/IBalancerVault.sol";
+import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 
 contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
     using SafeERC20 for ERC20;
@@ -55,11 +58,12 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
     
     PRBProxyRegistry internal prbProxyRegistry;
     PoolAction internal poolAction;
+    SwapAction internal swapAction;
 
 
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"), 19356381);
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 19356381); // 03/03/2024 18:18:47 UTC
         //super.setUp();
        
       ///  vm.label(BALANCER_VAULT, "balancer");
@@ -69,21 +73,20 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
         
         prbProxyRegistry = new PRBProxyRegistry();
         poolAction = new PoolAction(address(0), PENDLE_ROUTER);
-
+        swapAction = new SwapAction(IBalancerVault(address(0)),IUniswapV3Router(address(0)), IPActionAddRemoveLiqV3(PENDLE_ROUTER));
+        
         // setup user and userProxy
         userPk = 0x12341234;
         user = vm.addr(userPk);
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
-
+        deal(user, 10 ether);
         // vm.startPrank(user);
         // ERC20(wstETH).approve(address(permit2), type(uint256).max);
         // ERC20(bbaweth).approve(address(permit2), type(uint256).max);
         // vm.stopPrank();
     }
 
-    function test_join_and_exit_Pendle() public {
-        deal(user, 10 ether);
-
+    function test_join_and_exit_Pendle_Ether() public {
         PoolActionParams memory poolActionParams;
         PermitParams memory permitParams;
 
@@ -141,7 +144,90 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
 
         assertEq(ERC20(market).balanceOf(poolActionParams.recipient) , 0, "failed to redeem");
         assertGt(ERC20(weETH).balanceOf(poolActionParams.recipient) , 0, "failed to redeem");
+        assertEq(user.balance, 5 ether, "invalid user balance");
     }
+
+    function test_swap_Pendle_In_And_Out_Ether() public {
+        SwapParams memory swapParams;
+        PermitParams memory permitParams;
+
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+
+        tokenInput.netTokenIn = 5 ether;
+        
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.PENDLE_IN,
+            swapType: SwapType.EXACT_IN,
+            assetIn : address(0),
+            amount: tokenInput.netTokenIn,
+            limit: 0,
+            recipient: user,
+            deadline: 0,
+            args: abi.encode(
+                market,
+                approxParams,
+                tokenInput,
+                limitOrderData
+            )
+        });
+
+        vm.startPrank(user);
+    
+        userProxy.execute{value: 5 ether}(
+            address(swapAction),
+            abi.encodeWithSelector(
+                SwapAction.swap.selector,
+                swapParams
+            )
+        );
+
+
+        assertEq(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
+        assertEq(user.balance, 5 ether, "invalid user balance");
+ 
+        
+        uint256 lpIn = ERC20(market).balanceOf(user);
+
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.PENDLE_OUT,
+            swapType: SwapType.EXACT_IN,
+            assetIn : market,
+            amount: ERC20(market).balanceOf(user),
+            limit: 0,
+            recipient: user,
+            deadline: 0,
+            args: abi.encode(
+                market,
+                lpIn,
+                weETH
+            )
+        });
+
+
+        ERC20(market).approve(address(userProxy), type(uint256).max);
+
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(
+                SwapAction.swap.selector,
+                swapParams
+            )
+        );
+
+        assertEq(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
+        assertGt(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
+    }
+
     function getForkBlockNumber() internal virtual pure returns (uint256){
         return 19356381; 
     }

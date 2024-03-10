@@ -18,7 +18,7 @@ import {CDPVault, calculateDebt, calculateNormalDebt} from "../../CDPVault.sol";
 import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {ICurvePool} from "../../vendor/ICurvePool.sol";
-
+import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 
 /// @dev Base class for tests that use LeverActions, sets up the balancer pools and tokens and provides utility functions
 contract IntegrationTestBase is TestBase {
@@ -86,7 +86,7 @@ contract IntegrationTestBase is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router);
+        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER));
         poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
 
         // configure balancer pools

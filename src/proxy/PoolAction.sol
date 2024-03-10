@@ -44,6 +44,7 @@ contract PoolAction is TransferAction {
 
     /// @notice Balancer v2 Vault
     IVault public immutable balancerVault;
+    /// @notice Pendle Router
     IPActionAddRemoveLiqV3 public immutable pendleRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

@@ -16,3 +16,6 @@
 [submodule "lib/pendle"]
 	path = lib/pendle
 	url = git@github.com:pendle-finance/pendle-core-v2-public.git
+[submodule "lib/aave-address-book"]
+	path = lib/aave-address-book
+	url = https://github.com/bgd-labs/aave-address-book

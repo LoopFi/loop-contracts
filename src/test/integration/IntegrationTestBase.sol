@@ -82,7 +82,6 @@ contract IntegrationTestBase is TestBase {
 
     function setUp() public virtual override { 
         vm.createSelectFork(vm.rpcUrl("mainnet"), getForkBlockNumber());
-        
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
@@ -113,7 +112,7 @@ contract IntegrationTestBase is TestBase {
     }
 
     function getForkBlockNumber() internal virtual pure returns (uint256){
-        return 17055414; // 15/04/2023 20:43:00 UTC
+        return 17055414;
     }
     
     /// @dev perform balancer swap via swapParams in simulated env and return the return amount

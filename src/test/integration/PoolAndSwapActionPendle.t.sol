@@ -33,7 +33,7 @@ import {IUniswapV3Router, decodeLastToken, UniswapV3Router_decodeLastToken_inval
 import {IVault as IBalancerVault} from "../../vendor/IBalancerVault.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 
-contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
+contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     using SafeERC20 for ERC20;
 
     address wstETH_bb_a_WETH_BPTl = 0x41503C9D499ddbd1dCdf818a1b05e9774203Bf46;
@@ -48,7 +48,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
     address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee;
     // Pendle yieldContractFactory = Pendle(address(0xdF3601014686674e53d1Fa52F7602525483F9122));
     // Pendle marketContractFactory = Pendle(address(0x1A6fCc85557BC4fB7B534ed835a03EF056552D52));
-    address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
+    // address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
 
     // user
     PRBProxy userProxy;
@@ -56,15 +56,17 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
     uint256 internal userPk;
     uint256 internal constant NONCE = 0;
     
-    PRBProxyRegistry internal prbProxyRegistry;
-    PoolAction internal poolAction;
-    SwapAction internal swapAction;
+    // PRBProxyRegistry internal prbProxyRegistry;
+    // PoolAction internal poolAction;
+    // SwapAction internal swapAction;
 
+    function getForkBlockNumber() override internal pure returns (uint256) {
+        return 19356381;
+    }
 
-
-    function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"), 19356381); // 03/03/2024 18:18:47 UTC
-        //super.setUp();
+    function setUp() public virtual override {
+        usePatchedDeal = true;
+        super.setUp();
        
       ///  vm.label(BALANCER_VAULT, "balancer");
         vm.label(wstETH, "wstETH");
@@ -226,9 +228,5 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, Test {
 
         assertEq(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
         assertGt(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
-    }
-
-    function getForkBlockNumber() internal virtual pure returns (uint256){
-        return 19356381; 
     }
 }

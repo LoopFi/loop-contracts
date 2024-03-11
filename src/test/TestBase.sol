@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
+
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
@@ -15,6 +16,7 @@ import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../in
 import {IFlashlender} from "../interfaces/IFlashlender.sol";
 import {CDPVault} from "../CDPVault.sol";
 
+import {PatchedDeal} from "./utils/PatchedDeal.sol";
 import {Stablecoin, MINTER_AND_BURNER_ROLE} from "../Stablecoin.sol";
 import {CDM, getCredit, getDebt, getCreditLine, ACCOUNT_CONFIG_ROLE} from "../CDM.sol";
 import {Minter} from "../Minter.sol";
@@ -48,6 +50,9 @@ contract TestBase is Test {
 
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
+
+    PatchedDeal internal dealManager;
+    bool public usePatchedDeal = false;
 
     uint256 internal constant initialGlobalDebtCeiling = 100_000_000_000 ether;
 
@@ -223,6 +228,7 @@ contract TestBase is Test {
     }
 
     function setUp() public virtual {
+        dealManager = new PatchedDeal();
         setCurrentTimestamp(block.timestamp);
 
         createAccounts();
@@ -240,5 +246,16 @@ contract TestBase is Test {
         contracts[3] = address(buffer);
         contracts[5] = address(flashlender);
         contracts[6] = address(token);
+    }
+
+    function deal(address token_, address to, uint256 amount) virtual override internal {
+        if (usePatchedDeal) {
+            uint256 chainId = block.chainid;
+            vm.chainId(1);
+            dealManager.deal2(token_, to, amount);
+            vm.chainId(chainId);
+        } else {
+            super.deal(token_, to, amount);
+        }
     }
 }

@@ -25,10 +25,8 @@ interface IWeightedPoolFactory {
 		string memory symbol,
 		IERC20[] memory tokens,
 		uint256[] memory weights,
-		address[] memory rateProviders,
 		uint256 swapFeePercentage,
-		address owner,
-		bytes32 salt
+		address owner
 	) external returns (address);
 }
 

@@ -9,14 +9,18 @@ import {IMultiFeeDistribution} from "../../reward/interfaces/IMultiFeeDistributi
 import {IPriceProvider} from "../../reward/interfaces/IPriceProvider.sol";
 import {IChefIncentivesController} from "../../reward/interfaces/IChefIncentivesController.sol";
 import {wdiv} from "../../utils/Math.sol";
+import {IWeightedPool} from "../../vendor/IWeightedPool.sol";
 import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 import {IntegrationTestBase, IComposableStablePool} from "../integration/IntegrationTestBase.sol";
+import {IAaveOracle} from "../../reward/zap/interfaces/IAaveOracle.sol";
 import {CDPVault} from "../../CDPVault.sol";
 import {ICDPVault} from "../../interfaces/ICDPVault.sol";
 import {ChefIncentivesController} from "../../reward/ChefIncentivesController.sol";
 import {EligibilityDataProvider} from "../../reward/EligibilityDataProvider.sol";
 import {MultiFeeDistribution} from "../../reward/MultiFeeDistribution.sol";
 import {LockedBalance, EarnedBalance} from "../../reward/interfaces/LockedBalance.sol";
+import {LockZap} from "../../reward/zap/LockZap.sol";
+import {BalancerPoolHelper} from "../../reward/zap/helpers/BalancerPoolHelper.sol";
 import {VaultRegistry} from "../../VaultRegistry.sol";
 
 contract MockPriceProvider is IPriceProvider {
@@ -58,6 +62,24 @@ contract MockPriceProvider is IPriceProvider {
     }
 }
 
+contract MockAaveOracle is IAaveOracle{
+    function getAssetPrice(address /*asset*/) external pure returns (uint256){
+        return 1e18;
+    }
+
+    function getSourceOfAsset(address /*asset*/) external pure returns (address){
+        return address(0);
+    }
+
+    function BASE_CURRENCY() external pure returns (address){
+        return address(0);
+    }
+
+    function BASE_CURRENCY_UNIT() external pure returns (uint256){
+        return 1e18;
+    }
+}
+
 interface IWeightedPoolFactory {
         function create(
         string memory name,
@@ -66,7 +88,7 @@ interface IWeightedPoolFactory {
         uint256[] memory normalizedWeights,
         uint256 swapFeePercentage,
         address owner
-    ) external returns (IComposableStablePool);
+    ) external returns (IWeightedPool);
 }
 
 interface IWETH {
@@ -106,7 +128,7 @@ contract RadiantDeployHelper {
     }
 
     // Assumes we have WETH and loopToken, will join the whole balance of the contract
-    function createWeightedPool() external returns (IComposableStablePool pool_) {
+    function createWeightedPool() external returns (IWeightedPool pool_) {
         uint256[] memory maxAmountsIn = new uint256[](2);
         address[] memory assets = new address[](2);
         assets[0] = address(WETH);
@@ -173,7 +195,7 @@ contract RadiantDeployHelper {
     }
 }
 
-contract TokenomicsTest is IntegrationTestBase {
+contract RadiantTest is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
     CDPVault public vault;
@@ -186,9 +208,11 @@ contract TokenomicsTest is IntegrationTestBase {
     ERC20Mock public loopToken;
 
     RadiantDeployHelper public radiantDeployHelper;
+    BalancerPoolHelper public balancerPoolHelper;
+    LockZap public lockZap;
 
     // mocked contracts
-    address public lockZap;
+    
     address public dao;
     address public treasury;
 
@@ -203,7 +227,7 @@ contract TokenomicsTest is IntegrationTestBase {
     uint256 public rewardsPerSecond = 0.01 ether;
     uint256 public endingTimeCadence = 2 days;
 
-    IComposableStablePool internal govWeightedPool;
+    IWeightedPool internal govWeightedPool;
     bytes32 internal govWeightedPoolId;
     ERC20 internal lpToken;
 
@@ -218,13 +242,10 @@ contract TokenomicsTest is IntegrationTestBase {
         setOraclePrice(2400 ether);
 
         treasury = vm.addr(uint256(keccak256("treasury")));
-        lockZap = vm.addr(uint256(keccak256("lockZap")));
         dao = vm.addr(uint256(keccak256("dao")));
 
-        deal(address(WETH), address(radiantDeployHelper), 5_000_000 ether);
-        govWeightedPool = radiantDeployHelper.createWeightedPool();
-        govWeightedPoolId = govWeightedPool.getPoolId();
-        lpToken = ERC20(address(govWeightedPool));
+        // deploy lockZap
+        _deployLockZap();
 
         // setup the vault registry
         vaultRegistry = new VaultRegistry();
@@ -285,10 +306,63 @@ contract TokenomicsTest is IntegrationTestBase {
         vm.label(address(vaultRegistry), "vaultRegistry");
         vm.label(address(priceProvider), "priceProvider");
         vm.label(address(loopToken), "loopToken");
-        vm.label(lockZap, "lockZap");
         vm.label(dao, "dao");
         vm.label(treasury, "treasury");
         vm.label(address(lpToken), "stakingToken");
+    }
+
+    function _deployBalancerPoolHelper() internal {
+        address inToken = address(WETH);
+        address outToken = address(loopToken);
+        address balancerVault = address(BALANCER_VAULT);
+        balancerPoolHelper = BalancerPoolHelper(address(new ERC1967Proxy(
+            address(new BalancerPoolHelper()),
+            abi.encodeWithSelector(
+                BalancerPoolHelper.initialize.selector,
+                inToken,
+                outToken,
+                address(WETH),
+                balancerVault,
+                weightedPoolFactory
+            )
+        )));
+    }
+
+    function _deployLockZap() internal {
+        _deployBalancerPoolHelper();
+        address poolHelper = address(balancerPoolHelper);
+        address uniHelper = UNISWAP_V3;
+        uint256 lpRatio = 2000; //80-20 pool
+        address aaveOracle = address(new MockAaveOracle());
+
+        lockZap = LockZap(payable(new ERC1967Proxy(
+            address(new LockZap()),
+            abi.encodeWithSelector(
+                LockZap.initialize.selector,
+                poolHelper,
+                uniHelper,
+                IWETH(address(WETH)),
+                address(loopToken),
+                lpRatio,
+                aaveOracle
+            )
+        )));
+
+        balancerPoolHelper.setLockZap(address(lockZap));
+
+        deal(address(WETH), address(balancerPoolHelper), 5_000_000 ether);
+        uint256 loopAmount = 20_000_000 ether;
+        loopToken.mint(address(balancerPoolHelper), loopAmount);
+
+        balancerPoolHelper.initializePool("LOOP-WETH", "LOOP-WETH");
+        govWeightedPool = IWeightedPool(balancerPoolHelper.lpTokenAddr());
+        govWeightedPoolId = govWeightedPool.getPoolId();
+        lpToken = ERC20(address(govWeightedPool));
+
+        vm.label(address(lockZap), "lockZap");
+        vm.label(address(balancerPoolHelper), "balancerPoolHelper");
+        vm.label(address(aaveOracle), "aaveOracle");
+        vm.label(address(uniHelper), "uniHelper");
     }
 
     function _setupMultiFeeDistribution() internal {
@@ -311,6 +385,8 @@ contract TokenomicsTest is IntegrationTestBase {
         address[] memory minters = new address[](1);
         minters[0] = address(incentivesController);
         multiFeeDistribution.setMinters(minters);
+
+        lockZap.setMfd(address(multiFeeDistribution));
     }
 
     function _registerRewards(uint256 rewardAmount) internal {
@@ -360,6 +436,26 @@ contract TokenomicsTest is IntegrationTestBase {
         vm.stopPrank();
     }
 
+    function _zap(address user, uint256 amount) internal {
+        uint256 loopTokenAmount = amount;
+        uint256 wethAmount = amount * 4;
+        loopToken.mint(user, loopTokenAmount);
+        deal(address(WETH), user, wethAmount);
+
+        vm.startPrank(user);
+        loopToken.approve(address(lockZap), loopTokenAmount);
+        WETH.approve(address(lockZap), wethAmount);
+        lockZap.zap({
+            _borrow: false,
+            _asset: address(WETH),
+            _assetAmt: wethAmount,
+            _rdntAmt: loopTokenAmount,
+            _lockTypeIndex : 0,
+            _slippage: 0
+        });
+        vm.stopPrank();
+    }
+
     function test_deploy() public {
         assertNotEq(address(loopToken), address(0));
         assertNotEq(address(vaultRegistry), address(0));
@@ -401,8 +497,7 @@ contract TokenomicsTest is IntegrationTestBase {
         uint256 requiredUSD = eligibilityDataProvider.requiredUsdValue(user);
         emit log_named_uint("requiredUSD", requiredUSD);
 
-        uint256 depositNeededForReward = 2.51 ether / 2;
-        _depositInPool(user, depositNeededForReward);
+        _zap(user, 2.51 ether);
 
         uint256 balance = ERC20(address(govWeightedPool)).balanceOf(user);
         emit log_named_uint("lp balance", balance);
@@ -445,16 +540,7 @@ contract TokenomicsTest is IntegrationTestBase {
         _borrow(user, 100 ether, 50 ether);
 
         uint256 depositNeededForReward = 2.51 ether / 2;
-        _depositInPool(user, depositNeededForReward);
-
-        vm.startPrank(user);
-
-        LockedBalance[] memory lockInfo = multiFeeDistribution.lockInfo(user);
-        assertEq(lockInfo.length, 0);
-
-        uint256 balance = ERC20(address(govWeightedPool)).balanceOf(user);
-        ERC20(address(govWeightedPool)).approve(address(multiFeeDistribution), balance);
-        multiFeeDistribution.stake(balance, user, 0);
+        _zap(user, depositNeededForReward);
 
         vm.warp(block.timestamp + 30 days);
         address[] memory vaults = new address[](1);
@@ -464,7 +550,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
         vm.stopPrank();
 
-        lockInfo = multiFeeDistribution.lockInfo(user);
+        LockedBalance[] memory lockInfo = multiFeeDistribution.lockInfo(user);
         assertEq(lockInfo.length, 1);
 
         // can be called by anyone
@@ -548,7 +634,7 @@ contract TokenomicsTest is IntegrationTestBase {
             randomUser = vm.addr(uint256(keccak256(abi.encode("user",i))));
             uint256 randomUserStake = 20 ether;
             _borrow(randomUser, 1_000 ether, 500 ether);
-            _depositInPool(randomUser, randomUserStake);
+            _zap(randomUser, randomUserStake);
 
             vm.startPrank(randomUser);
             uint256 balance = ERC20(address(govWeightedPool)).balanceOf(randomUser);

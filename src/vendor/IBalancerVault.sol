@@ -107,6 +107,8 @@ struct ExitPoolRequest {
 ///@dev Entry point for all Balancer V2 swaps.
 interface IVault {
 
+	function getPoolId() external view returns (bytes32);
+
   /**
   * @dev Performs a swap with a single Pool.
   *

@@ -172,7 +172,7 @@ async function deployCore() {
   const signer = await getSignerAddress();
 
   if (hre.network.name == 'tenderly') {
-    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
+    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('1000000000').toHexString())]);
   }
 
   const cdm = await deployContract('CDM', 'CDM', false, signer, signer, signer);
@@ -415,24 +415,67 @@ async function deployRadiantDeployHelper() {
   const radiantDeployHelper = await deployContract('RadiantDeployHelper', 'RadiantDeployHelper');
   console.log(`RadiantDeployHelper deployed to: ${radiantDeployHelper.address}`);
 
-  // Send ETH to the deployed contract using the signer object
-  const deployer = (await ethers.getSigners())[0]
-  console.log(`Sending ETH to ${radiantDeployHelper.address} from ${deployer.address}...`);
-  const tx = await deployer.sendTransaction({
-    to: radiantDeployHelper.address,
-    value:  ethers.utils.parseEther("5000000")
-  });
-  await tx.wait();
-
   const loopToken = await deployLoopToken(radiantDeployHelper, '5000000');
   const priceProvider = await deployPriceProvider(radiantDeployHelper);
-  const lpTokenAddress = await deployWeighedPool(radiantDeployHelper, '5000000');
 
   console.log(`LoopToken deployed to: ${loopToken}`);
   console.log(`PriceProvider deployed to: ${priceProvider}`);
-  console.log(`WeightedPool deployed to: ${lpTokenAddress}`);
   
-  return [radiantDeployHelper.address, loopToken, priceProvider, lpTokenAddress];
+  return [radiantDeployHelper.address, loopToken, priceProvider];
+}
+
+async function deployLockZap(loopTokenAddress) {
+  console.log('Deploying LockZap...', loopTokenAddress);
+  let loopToken = await attachContract('ERC20Mock', loopTokenAddress);
+  const balancerPoolHelper = await deployProxy('BalancerPoolHelper', [], [
+    CONFIG.Tokenomics.BalancerPoolHelper.inToken,
+    loopTokenAddress,
+    CONFIG.Tokenomics.BalancerPoolHelper.weth,
+    CONFIG.Tokenomics.BalancerPoolHelper.balancerVault,
+    CONFIG.Tokenomics.BalancerPoolHelper.weightedPoolFactory
+  ]);
+
+  let aaveOracleAddress = CONFIG.Tokenomics.LockZap.aaveOracle;
+  if (!aaveOracleAddress) {
+    aaveOracleAddress = (await deployContract('MockAaveOracle')).address;
+  }
+
+  const lockZap = await deployProxy('LockZap', [], [
+    balancerPoolHelper.address,
+    CONFIG.Tokenomics.LockZap.uniHelper,
+    CONFIG.Tokenomics.LockZap.weth,
+    loopTokenAddress,
+    CONFIG.Tokenomics.LockZap.lpRatio,
+    aaveOracleAddress
+  ]);
+
+  await balancerPoolHelper.setLockZap(lockZap.address);
+
+  // initialize the balancer pool
+  const mintTx = await loopToken.mint(balancerPoolHelper.address, toWad('20000000'));// 20M
+  await mintTx.wait();
+
+  const weth = await ethers.getContractAt("src/reward/interfaces/IWETH.sol:IWETH", CONFIG.Tokenomics.LockZap.weth);
+
+  const wrapTx = await weth.deposit({ value: toWad('5000000') });
+  await wrapTx.wait();
+
+  const transferTx = await weth.transfer(balancerPoolHelper.address, toWad('5000000'));
+  await transferTx.wait();
+
+  // wrap the ETH and send it to the balancerPoolHelper
+  console.log('Initialize the balancer pool');
+  const initTx = await balancerPoolHelper.initializePool(
+    CONFIG.Tokenomics.BalancerPoolHelper.tokenName, 
+    CONFIG.Tokenomics.BalancerPoolHelper.tokenSymbol
+  );
+  await initTx.wait();
+
+  const lpTokenAddress = await balancerPoolHelper.lpTokenAddr();
+  console.log('BalancerPool initialized with LP token:', lpTokenAddress);
+  await storeContractDeployment(false, 'BalancerPool-WETH-LOOP', lpTokenAddress, 'IVault', []);
+
+  return [lockZap, lpTokenAddress];
 }
 
 async function setupMultiFeeDistribution(multiFeeDistribution, incentivesController, treasury, lpTokenAddress) {
@@ -484,23 +527,28 @@ async function registerRewards(loopTokenAddress, incentivesController, rewardAmo
 }
 
 async function deployRadiant() {
-  console.log('Deploying Radiant Contracts...');
   const signer = await getSignerAddress();
+  if (hre.network.name == 'tenderly') {
+    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('1000000000').toHexString())]);
+  }
+  console.log('Deploying Radiant Contracts...');
   
   // Deploy the RadiantDeployHelper contract and get the addresses of the LoopToken, PriceProvider, and LP Token
   [
     deployHelper,
     loopToken,
-    priceProvider,
-    lpTokenAddress
+    priceProvider
   ] = await deployRadiantDeployHelper();
+
+  console.log('Loop Token:', loopToken);
+  [lockZap, lpTokenAddress]  = await deployLockZap(loopToken);
 
   // Deploy Vault Registry
   const vaultRegistry = await deployContract('VaultRegistry');
   console.log('Vault Registry deployed to:', vaultRegistry.address);
   const multiFeeDistribution = await deployProxy('MultiFeeDistribution', [], [
     loopToken,
-    CONFIG.Tokenomics.MultiFeeDistribution.lockZap,
+    lockZap.address,
     CONFIG.Tokenomics.MultiFeeDistribution.dao,
     priceProvider,
     CONFIG.Tokenomics.MultiFeeDistribution.rewardsDuration,
@@ -538,9 +586,18 @@ async function deployRadiant() {
   await eligibilityDataProvider.setChefIncentivesController(incentivesController.address);
   console.log('Set incentives controller for eligibility data provider');
 
-  await setupMultiFeeDistribution(multiFeeDistribution, incentivesController, CONFIG.Tokenomics.MultiFeeDistribution.treasury, lpTokenAddress);
+  await setupMultiFeeDistribution(
+    multiFeeDistribution, 
+    incentivesController, 
+    CONFIG.Tokenomics.MultiFeeDistribution.treasury, 
+    lpTokenAddress
+  );
 
-  await registerRewards(loopToken, incentivesController, CONFIG.Tokenomics.IncentivesController.rewardAmount);
+  await registerRewards(
+    loopToken, 
+    incentivesController,
+    CONFIG.Tokenomics.IncentivesController.rewardAmount
+  );
 
   await incentivesController.start();
 

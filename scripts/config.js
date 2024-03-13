@@ -195,6 +195,19 @@ module.exports = {
       "rewardsPerSecond": "120000000000000000", // 0.12 in WAD
       "endingTimeCadence": "172800", // 2 days in seconds
       "rewardAmount": "10000000000000000000000000", // 10 milion in WAD
+    },
+    "BalancerPoolHelper":{
+      "tokenName": "LOOP-WETH",
+      "tokenSymbol": "LOOP-WETH",
+      "inToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "weightedPoolFactory": "0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9"
+    },
+    "LockZap": {
+      "uniHelper": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "lpRatio": 2000, // 80-20 pool
+      "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     }
   }
 };

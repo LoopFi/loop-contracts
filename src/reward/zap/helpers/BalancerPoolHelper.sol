@@ -83,7 +83,6 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 		poolFactory = _poolFactory;
 	}
 
-	event debug_init(string, uint256);
 	/**
 	 * @notice Initialize a new pool.
 	 * @param _tokenName Token name of lp token
@@ -112,8 +111,6 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 			weights[1] = RDNT_WEIGHT;
 		}
 
-		emit debug_init("amarcu pool create", 1);
-
 		lpTokenAddr = poolFactory.create(
 			_tokenName,
 			_tokenSymbol,
@@ -122,8 +119,6 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 			INITIAL_SWAP_FEE_PERCENTAGE,
 			address(this)
 		);
-
-		emit debug_init("amarcu pool create", 2);
 
 		poolId = IWeightedPool(lpTokenAddr).getPoolId();
 

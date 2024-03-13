@@ -32,6 +32,8 @@ async function main() {
     { name: 'LoopToken', path: '../out/ERC20Mock.sol/ERC20Mock.json'},
     { name: 'PriceProvider', path: '../out/Tokenomics.t.sol/MockPriceProvider.json'},
     { name: 'BalancerPool', path: '../out/IBalancerVault.sol/IVault.json'},
+    { name: 'LockZap', path: '../out/LockZap.sol/LockZap.json'},
+    { name: 'BalancerPoolHelper', path: '../out/BalancerPoolHelper.sol/BalancerPoolHelper.json'},
   ];
 
   const abis = {};

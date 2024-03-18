@@ -446,7 +446,6 @@ contract RadiantTest is IntegrationTestBase {
         loopToken.approve(address(lockZap), loopTokenAmount);
         WETH.approve(address(lockZap), wethAmount);
         lockZap.zap({
-            _borrow: false,
             _asset: address(WETH),
             _assetAmt: wethAmount,
             _rdntAmt: loopTokenAmount,

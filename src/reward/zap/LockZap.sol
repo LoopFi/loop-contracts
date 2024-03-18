@@ -34,12 +34,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	/// @notice Base Percent
 	uint256 public constant BASE_PERCENT = 100;
 
-	/// @notice Borrow rate mode
-	uint256 public constant VARIABLE_INTEREST_RATE_MODE = 2;
-
-	/// @notice We don't utilize any specific referral code for borrows perfomed via zaps
-	uint16 public constant REFERRAL_CODE = 0;
-
 	/// @notice Wrapped ETH
 	IWETH public weth;
 
@@ -70,7 +64,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	/********************** Events ***********************/
 	/// @notice Emitted when zap is done
 	event Zapped(
-		bool _borrow,
 		uint256 _ethAmt,
 		uint256 _rdntAmt,
 		address indexed _from,
@@ -229,7 +222,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 
 	/**
 	 * @notice Zap tokens to stake LP
-	 * @param _borrow option to borrow ETH
 	 * @param _asset to be used for zapping
 	 * @param _assetAmt amount of weth.
 	 * @param _rdntAmt amount of RDNT.
@@ -238,7 +230,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	 * @return LP amount
 	 */
 	function zap(
-		bool _borrow,
 		address _asset,
 		uint256 _assetAmt,
 		uint256 _rdntAmt,
@@ -246,13 +237,12 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 		uint256 _slippage
 	) public payable whenNotPaused returns (uint256) {
 		return
-			_zap(_borrow, _asset, _assetAmt, _rdntAmt, msg.sender, msg.sender, _lockTypeIndex, msg.sender, _slippage);
+			_zap(_asset, _assetAmt, _rdntAmt, msg.sender, msg.sender, _lockTypeIndex, msg.sender, _slippage);
 	}
 
 	/**
 	 * @notice Zap tokens to stake LP
 	 * @dev It will use default lock index
-	 * @param _borrow option to borrow ETH
 	 * @param _asset to be used for zapping
 	 * @param _assetAmt amount of weth.
 	 * @param _rdntAmt amount of RDNT.
@@ -261,7 +251,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	 * @return LP amount
 	 */
 	function zapOnBehalf(
-		bool _borrow,
 		address _asset,
 		uint256 _assetAmt,
 		uint256 _rdntAmt,
@@ -269,12 +258,11 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 		uint256 _slippage
 	) public payable whenNotPaused returns (uint256) {
 		uint256 duration = mfd.defaultLockIndex(_onBehalf);
-		return _zap(_borrow, _asset, _assetAmt, _rdntAmt, msg.sender, _onBehalf, duration, _onBehalf, _slippage);
+		return _zap(_asset, _assetAmt, _rdntAmt, msg.sender, _onBehalf, duration, _onBehalf, _slippage);
 	}
 
 	/**
 	 * @notice Zap tokens from vesting
-	 * @param _borrow option to borrow ETH
 	 * @param _asset to be used for zapping
 	 * @param _assetAmt amount of _asset tokens used to create dLP position
 	 * @param _lockTypeIndex lock length index. cannot be shortest option (index 0)
@@ -282,7 +270,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	 * @return LP amount
 	 */
 	function zapFromVesting(
-		bool _borrow,
 		address _asset,
 		uint256 _assetAmt,
 		uint256 _lockTypeIndex,
@@ -292,7 +279,7 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 		uint256 rdntAmt = mfd.zapVestingToLp(msg.sender);
 
 		return
-			_zap(_borrow, _asset, _assetAmt, rdntAmt, address(this), msg.sender, _lockTypeIndex, msg.sender, _slippage);
+			_zap(_asset, _assetAmt, rdntAmt, address(this), msg.sender, _lockTypeIndex, msg.sender, _slippage);
 	}
 
 	/**
@@ -308,7 +295,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 
 	/**
 	 * @notice Zap into LP
-	 * @param _borrow option to borrow ETH
 	 * @param _asset that will be used to zap.
 	 * @param _assetAmt amount of assets to be zapped
 	 * @param _rdntAmt amount of RDNT.
@@ -320,7 +306,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 	 * @return liquidity LP amount
 	 */
 	function _zap(
-		bool _borrow,
 		address _asset,
 		uint256 _assetAmt,
 		uint256 _rdntAmt,
@@ -344,7 +329,6 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 		// Handle pure ETH
 		if (msg.value > 0) {
 			if (!isAssetWeth) revert ReceivedETHOnAlternativeAssetZap();
-			if (_borrow) revert InvalidZapETHSource();
 			_assetAmt = msg.value;
 			weth_.deposit{value: _assetAmt}();
 		}
@@ -352,16 +336,7 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 		uint256 assetAmountValueUsd = (_assetAmt * aaveOracle.getAssetPrice(_asset)) /
 			(10 ** IERC20Metadata(_asset).decimals());
 
-		// Handle borrowing logic
-		if (_borrow) {
-			// Borrow the asset on the users behalf
-			// lendingPool.borrow(_asset, _assetAmt, VARIABLE_INTEREST_RATE_MODE, REFERRAL_CODE, msg.sender);
-
-			// If asset isn't WETH, swap for WETH
-			if (!isAssetWeth) {
-				_assetAmt = UniV2Helper._swap(uniRouter, _asset, address(weth_), _assetAmt);
-			}
-		} else if (msg.value == 0) {
+		if (msg.value == 0) {
 			// Transfer asset from user
 			IERC20(_asset).safeTransferFrom(msg.sender, address(this), _assetAmt);
 			if (!isAssetWeth) {
@@ -390,7 +365,7 @@ contract LockZap is Initializable, OwnableUpgradeable, PausableUpgradeable, Dust
 
 		IERC20(poolHelper.lpTokenAddr()).forceApprove(address(mfd), liquidity);
 		mfd.stake(liquidity, _onBehalf, _lockTypeIndex);
-		emit Zapped(_borrow, _assetAmt, _rdntAmt, _from, _onBehalf, _lockTypeIndex);
+		emit Zapped(_assetAmt, _rdntAmt, _from, _onBehalf, _lockTypeIndex);
 
 		_refundDust(rdntAddr, _asset, _refundAddress);
 	}

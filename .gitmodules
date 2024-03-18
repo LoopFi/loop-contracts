@@ -16,3 +16,6 @@
 [submodule "lib/core-v3"]
 	path = lib/core-v3
 	url = https://github.com/Gearbox-protocol/core-v3
+[submodule "lib/core-v2"]
+	path = lib/core-v2
+	url = https://github.com/Gearbox-protocol/core-v2

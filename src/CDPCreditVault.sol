@@ -21,7 +21,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
 import {ILinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
-import {IPoolV3} from "./vendor/IPoolV3.sol";
+import {ICDPCreditVault} from "./interfaces/ICDPCreditVault.sol";
 
 // LIBS & TRAITS
 import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts/traits/ACLNonReentrantTrait.sol";
@@ -43,7 +43,7 @@ struct DebtParams {
 /// @title CDPCreditVault
 /// @notice Based on Gearbox Protocol Pool V3 contract
 /// @notice Pool shares implement EIP-2612 permits
-contract CDPCreditVault is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
+contract CDPCreditVault is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, ICDPCreditVault {
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;

@@ -38,12 +38,6 @@ interface IPoolV3Events {
 
     /// @notice Emitted when new withdrawal fee is set
     event SetWithdrawFee(uint256 fee);
-
-	/// @notice Emitter when redeeming Underlying tokens for internal credit
-	event Enter(address indexed user, uint256 amount);
-
-	/// @notice Emitter when redeeming internal credit for Underlying tokens
-    event Exit(address indexed user, uint256 amount);
 }
 
 /// @title Pool V3 interface
@@ -53,8 +47,6 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);
-
-	function cdm() external view returns (address);
 
     function withdrawFee() external view returns (uint16);
 
@@ -77,8 +69,6 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
         returns (uint256 assets);
 
 
-	function enter(address user, uint256 amount) external;
-	function exit(address user, uint256 amount) external;
 
     // ------------- //
     // INTEREST RATE //

@@ -36,7 +36,9 @@ contract IntegrationTestBase is TestBase {
     ERC20 constant internal WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 constant internal OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
     ERC20 constant internal WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-
+    ERC20 constant internal PENDLE_LP_STETH = ERC20(0xC374f7eC85F8C7DE3207a10bB1978bA104bdA3B2); // st-ETH 25DEC25
+    
+    address constant internal pendleLP_STETH_Holder = 0x3300eebeEA8239b90a435e403B130a853A0d7DfF;
     address constant internal USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address constant internal USDT_CHAINLINK_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
     address constant internal DAI_CHAINLINK_FEED = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;

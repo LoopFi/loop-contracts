@@ -377,8 +377,22 @@ contract CDPCreditVault is ERC4626, ERC20Permit, ACLNonReentrantTrait, Contracts
         return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
     }
 
+    // --------- //
+    // BORROWING //
+    // --------- //
+
+    /// @notice Total borrowed amount (principal only)
+    function totalBorrowed() external view override returns (uint256) {
+        return _totalDebt.borrowed;
+    }
+
+    /// @notice Total debt limit, `type(uint256).max` means no limit
+    function totalDebtLimit() external view override returns (uint256) {
+        return _convertToU256(_totalDebt.limit);
+    }
+
     /*//////////////////////////////////////////////////////////////
-                       CREDIT AND Underlying tokens REDEMPTION
+                       CREDIT AND UNDERLYING TOKENS REDEMPTION
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Redeems Underlying tokens for internal credit

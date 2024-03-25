@@ -68,7 +68,13 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
         external
         returns (uint256 assets);
 
+    // --------- //
+    // BORROWING //
+    // --------- //
 
+    function totalBorrowed() external view returns (uint256);
+
+    function totalDebtLimit() external view returns (uint256);
 
     // ------------- //
     // INTEREST RATE //

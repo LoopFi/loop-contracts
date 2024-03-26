@@ -780,14 +780,14 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.prank(address(userProxy));
         ERC20(PENDLE_LP_ETHERFI).approve(address(positionAction), depositAmount);
 
-        address[] memory targets = new address[](1);
+        address[] memory targets = new address[](2);
         targets[0] = address(swapAction);
-       // targets[1] = address(positionAction);
+        targets[1] = address(positionAction);
         // targets[2] = address(pendleVault_STETH);
 
-        bytes[] memory data = new bytes[](1);
+        bytes[] memory data = new bytes[](2);
         data[0] = abi.encodeWithSelector(SwapAction.swap.selector, swapParams);
-        //data[1] = abi.encodeWithSelector(positionAction.deposit.selector, address(userProxy), pendleVault_weETH, collateralParams, emptyPermitParams);
+        data[1] = abi.encodeWithSelector(positionAction.deposit.selector, address(userProxy), pendleVault_weETH, collateralParams, emptyPermitParams);
         // data[2] = abi.encodeWithSelector(
         //     pendleVault_STETH.modifyCollateralAndDebt.selector,
         //     address(userProxy),
@@ -797,9 +797,9 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         //     toInt256(100 ether)
         // );
 
-        bool[] memory delegateCall = new bool[](1);
+        bool[] memory delegateCall = new bool[](2);
         delegateCall[0] = false;
-        // delegateCall[1] = true;
+        delegateCall[1] = true;
         // delegateCall[2] = false;
 
         vm.prank(user);

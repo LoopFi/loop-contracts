@@ -98,9 +98,12 @@ contract PoolAction is TransferAction {
                         ++i;
                     }
                 }
-            } else {
-                revert PoolAction__transferAndJoin_unsupportedProtocol();
-            }
+            } else if(poolActionParams.protocol == Protocol.PENDLE) {
+                (, ApproxParams memory guessPtReceivedFromSy, TokenInput memory input, LimitOrderData memory limit) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
+                if (input.tokenIn != address(0)) {
+                    _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
+                }
+            } else  revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
         join(poolActionParams);

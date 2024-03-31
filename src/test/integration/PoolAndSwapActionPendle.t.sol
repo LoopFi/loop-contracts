@@ -32,7 +32,10 @@ import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAc
 import {IUniswapV3Router, decodeLastToken, UniswapV3Router_decodeLastToken_invalidPath} from "../../vendor/IUniswapV3Router.sol";
 import {IVault as IBalancerVault} from "../../vendor/IBalancerVault.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
-
+import {SwapData, SwapType as SwapTypePendle} from "pendle/router/swap-aggregator/IPSwapAggregator.sol";
+interface IWETH {
+    function deposit() external payable;
+}
 contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     using SafeERC20 for ERC20;
 
@@ -45,10 +48,10 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     // PENDLE
     address market = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
     address pendleOwner = 0x1FcCC097db89A86Bfc474A1028F93958295b1Fb7;
-    address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee;
+    address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee; // etherfi staked eth
     // Pendle yieldContractFactory = Pendle(address(0xdF3601014686674e53d1Fa52F7602525483F9122));
     // Pendle marketContractFactory = Pendle(address(0x1A6fCc85557BC4fB7B534ed835a03EF056552D52));
-    // address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
+    //address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
 
     // user
     PRBProxy userProxy;
@@ -149,6 +152,130 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         assertEq(user.balance, 5 ether, "invalid user balance");
     }
 
+    function test_join_with_WETH_and_exit_Pendle() public {
+        PoolActionParams memory poolActionParams;
+        PermitParams memory permitParams;
+
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+        SwapData memory swapData;
+        swapData.swapType = SwapTypePendle.ETH_WETH;
+        
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.netTokenIn = 5 ether;
+        tokenInput.swapData = swapData;
+        
+        poolActionParams = PoolActionParams({
+            protocol: Protocol.PENDLE,
+            minOut: 0,
+            recipient: user,
+            args: abi.encode(
+                market,
+                approxParams,
+                tokenInput,
+                limitOrderData
+            )
+        });
+
+        vm.startPrank(user);
+        IWETH(address(WETH)).deposit{value: 5 ether}();
+        assertEq(WETH.balanceOf(address(user)),5 ether, "invalid WETH balance");
+        WETH.transfer(address(userProxy), 5 ether);
+    
+        userProxy.execute(
+            address(poolAction),
+            abi.encodeWithSelector(
+                PoolAction.join.selector,
+                poolActionParams
+            )
+        );
+  
+    
+       assertGt(ERC20(market).balanceOf(poolActionParams.recipient) , 0 , "failed to join");
+       assertEq(ERC20(weETH).balanceOf(poolActionParams.recipient) , 0, "invalid weETH balance");
+       
+       poolActionParams.args = abi.encode(market,ERC20(market).balanceOf(poolActionParams.recipient),weETH);
+
+       ERC20(market).approve(address(userProxy), type(uint256).max);
+
+       userProxy.execute(
+            address(poolAction),
+            abi.encodeWithSelector(
+                PoolAction.exit.selector,
+                poolActionParams
+            )
+        );
+
+        assertEq(ERC20(market).balanceOf(poolActionParams.recipient) , 0, "failed to redeem");
+        assertGt(ERC20(weETH).balanceOf(poolActionParams.recipient) , 0, "failed to redeem");
+        assertEq(user.balance, 5 ether, "invalid user balance");
+    }
+
+    function test_transferAndJoin_with_WETH_Pendle() public {
+        PoolActionParams memory poolActionParams;
+        PermitParams memory permitParams;
+
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+        SwapData memory swapData;
+        swapData.swapType = SwapTypePendle.ETH_WETH;
+        
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.netTokenIn = 5 ether;
+        tokenInput.swapData = swapData;
+        
+        poolActionParams = PoolActionParams({
+            protocol: Protocol.PENDLE,
+            minOut: 0,
+            recipient: user,
+            args: abi.encode(
+                market,
+                approxParams,
+                tokenInput,
+                limitOrderData
+            )
+        });
+
+        vm.startPrank(user);
+        IWETH(address(WETH)).deposit{value: 5 ether}();
+        assertEq(WETH.balanceOf(address(user)),5 ether, "invalid WETH balance");
+        WETH.approve(address(userProxy), type(uint256).max);
+    
+        PermitParams[] memory permitParamsArray = new PermitParams[](1);
+        permitParamsArray[0] = permitParams;
+
+        userProxy.execute(
+            address(poolAction),
+            abi.encodeWithSelector(
+                PoolAction.transferAndJoin.selector,
+                user,
+                permitParamsArray,
+                poolActionParams
+            )
+        );
+  
+    
+       assertGt(ERC20(market).balanceOf(poolActionParams.recipient) , 0 , "failed to join");
+       assertEq(ERC20(weETH).balanceOf(poolActionParams.recipient) , 0, "invalid weETH balance");
+    
+    }
+
     function test_swap_Pendle_In_And_Out_Ether() public {
         SwapParams memory swapParams;
         PermitParams memory permitParams;
@@ -228,5 +355,118 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
         assertEq(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
         assertGt(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
+    }
+
+    function test_swap_Pendle_In_WETH() public {
+         SwapParams memory swapParams;
+        PermitParams memory permitParams;
+
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+        SwapData memory swapData;
+        swapData.swapType = SwapTypePendle.ETH_WETH;
+
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+
+        tokenInput.netTokenIn = 5 ether;
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.swapData = swapData;
+
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.PENDLE_IN,
+            swapType: SwapType.EXACT_IN,
+            assetIn : address(0),
+            amount: tokenInput.netTokenIn,
+            limit: 0,
+            recipient: user,
+            deadline: 0,
+            args: abi.encode(
+                market,
+                approxParams,
+                tokenInput,
+                limitOrderData
+            )
+        });
+
+        vm.startPrank(user);
+        IWETH(address(WETH)).deposit{value: 5 ether}();
+        WETH.approve(address(userProxy), type(uint256).max);
+        WETH.transfer(address(userProxy), 5 ether);
+
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(
+                SwapAction.swap.selector,
+                swapParams
+            )
+        );
+
+
+        assertEq(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
+        assertGt(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
+    }
+
+    function test_transferAndSwap_Pendle_In_WETH() public {
+         SwapParams memory swapParams;
+        PermitParams memory permitParams;
+
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+        SwapData memory swapData;
+        swapData.swapType = SwapTypePendle.ETH_WETH;
+
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+
+        tokenInput.netTokenIn = 5 ether;
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.swapData = swapData;
+
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.PENDLE_IN,
+            swapType: SwapType.EXACT_IN,
+            assetIn : address(WETH),
+            amount: tokenInput.netTokenIn,
+            limit: 0,
+            recipient: user,
+            deadline: 0,
+            args: abi.encode(
+                market,
+                approxParams,
+                tokenInput,
+                limitOrderData
+            )
+        });
+
+        vm.startPrank(user);
+        IWETH(address(WETH)).deposit{value: 5 ether}();
+        WETH.approve(address(userProxy), type(uint256).max);
+
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(
+                SwapAction.transferAndSwap.selector,
+                user,
+                permitParams,
+                swapParams
+            )
+        );
+
+
+        assertEq(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
+        assertGt(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
     }
 }

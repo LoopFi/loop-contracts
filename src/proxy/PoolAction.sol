@@ -99,7 +99,8 @@ contract PoolAction is TransferAction {
                     }
                 }
             } else if(poolActionParams.protocol == Protocol.PENDLE) {
-                (, ApproxParams memory guessPtReceivedFromSy, TokenInput memory input, LimitOrderData memory limit) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
+                (, , TokenInput memory input,) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
+                
                 if (input.tokenIn != address(0)) {
                     _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
                 }

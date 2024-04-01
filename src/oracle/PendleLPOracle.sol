@@ -32,6 +32,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     uint32 public immutable twapWindow;
     /// @notice Pendle Pt Oracle
     IPPtOracle public immutable ptOracle;
+
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -44,7 +45,6 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
 
     error PendleLPOracle__spot_invalidValue();
     error PendleLPOracle__authorizeUpgrade_validStatus();
-
     error PendleLPOracle__validatePtOracle_invalidValue();
 
     /*//////////////////////////////////////////////////////////////
@@ -132,13 +132,15 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
         if(status) return _validatePtOracle();
     }
 
+    /// @notice Validates the PT oracle
+    /// @return isValid Whether the PT oracle is valid for this market and twap window
     function _validatePtOracle() internal view returns (bool isValid) {
         try ptOracle.getOracleState(address(market), twapWindow) returns (
             bool increaseCardinalityRequired,
             uint16,
             bool oldestObservationSatisfied
         ) {
-            if(!increaseCardinalityRequired && oldestObservationSatisfied) return true; 
+            if(!increaseCardinalityRequired || oldestObservationSatisfied) return true; 
         } 
         catch {
             // return default value on failure

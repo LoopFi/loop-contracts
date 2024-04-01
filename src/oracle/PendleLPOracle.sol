@@ -7,13 +7,14 @@ import "pendle/oracles/PendleLpOracleLib.sol";
 
 import {AggregatorV3Interface} from "../vendor/AggregatorV3Interface.sol";
 
-import {wdiv} from "../utils/Math.sol";
+import {wdiv, wmul} from "../utils/Math.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
+import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
 
 /// The oracle is upgradable if the current implementation does not return a valid price
-contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
+contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     using PendleLpOracleLib for IPMarket;
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
@@ -29,6 +30,8 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     IPMarket public immutable market;
     /// @notice TWAP window in seconds
     uint32 public immutable twapWindow;
+    /// @notice Pendle Pt Oracle
+    IPPtOracle public immutable ptOracle;
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -39,8 +42,10 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error ChainlinkOracle__spot_invalidValue();
-    error ChainlinkOracle__authorizeUpgrade_validStatus();
+    error PendleLPOracle__spot_invalidValue();
+    error PendleLPOracle__authorizeUpgrade_validStatus();
+
+    error PendleLPOracle__validatePtOracle_invalidValue();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -48,12 +53,13 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
 
-    constructor(address market_, uint32 twap_, AggregatorV3Interface aggregator_, uint256 stalePeriod_) initializer {
+    constructor(address ptOracle_, address market_, uint32 twap_, AggregatorV3Interface aggregator_, uint256 stalePeriod_) initializer {
         aggregator = aggregator_;
         stalePeriod = stalePeriod_;
         aggregatorScale = 10 ** uint256(aggregator.decimals());
         market = IPMarket(market_);
         twapWindow = twap_;
+        ptOracle = IPPtOracle(ptOracle_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -76,7 +82,7 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
     function _authorizeUpgrade(address /*implementation*/) internal override virtual onlyRole(MANAGER_ROLE){
-        if(_getStatus()) revert ChainlinkOracle__authorizeUpgrade_validStatus();
+        if(_getStatus()) revert PendleLPOracle__authorizeUpgrade_validStatus();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,9 +103,11 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     function spot(address /* token */) external view virtual override returns (uint256 price) {
         bool isValid;
         (isValid, price) = _fetchAndValidate();
-        if (!isValid) revert ChainlinkOracle__spot_invalidValue();
-        uint lpRate = market.getLpToAssetRate(twapWindow);
-        price = price * lpRate / 1e18;
+        if (!isValid) revert PendleLPOracle__spot_invalidValue();
+        bool isValidPtOracle = _validatePtOracle();
+        if (!isValidPtOracle) revert PendleLPOracle__validatePtOracle_invalidValue();
+        uint256 lpRate = market.getLpToAssetRate(twapWindow);
+        price = wmul(price, lpRate);
     }
 
     /// @notice Fetches and validates the latest price from Chainlink
@@ -121,6 +129,20 @@ contract PendleOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @dev The status is valid if the price is validated and not stale
     function _getStatus() private view returns (bool status){
         (status,) = _fetchAndValidate();
+        if(status) return _validatePtOracle();
     }
 
+    function _validatePtOracle() internal view returns (bool isValid) {
+        try ptOracle.getOracleState(address(market), twapWindow) returns (
+            bool increaseCardinalityRequired,
+            uint16,
+            bool oldestObservationSatisfied
+        ) {
+            if(!increaseCardinalityRequired && oldestObservationSatisfied) return true; 
+        } 
+        catch {
+            // return default value on failure
+        }
+       
+    }
 }

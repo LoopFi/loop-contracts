@@ -32,7 +32,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     uint32 public immutable twapWindow;
     /// @notice Pendle Pt Oracle
     IPPtOracle public immutable ptOracle;
-
+    
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -140,7 +140,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
             uint16,
             bool oldestObservationSatisfied
         ) {
-            if(!increaseCardinalityRequired || oldestObservationSatisfied) return true; 
+            if(!increaseCardinalityRequired && oldestObservationSatisfied) return true; 
         } 
         catch {
             // return default value on failure

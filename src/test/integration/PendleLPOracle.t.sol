@@ -13,6 +13,7 @@ import {PendleLPOracle} from "../../oracle/PendleLPOracle.sol";
 
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
+import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
 
 contract PendleLPOracleTest is IntegrationTestBase {
     using PendleLpOracleLib for IPMarket;
@@ -57,6 +58,17 @@ contract PendleLPOracleTest is IntegrationTestBase {
     function test_getStatus_returnsFalseOnStaleValue() public {
         vm.warp(block.timestamp + staleTime + 1);
         assertTrue(pendleOracle.getStatus(address(0)) == false);
+    }
+
+    function test_getStatus_returnsFalseOnPendleInvalidValue() public {
+        vm.mockCall(ptOracle, abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180), abi.encode(true, 0, true));
+        assertTrue(pendleOracle.getStatus(address(0)) == false);
+
+        vm.mockCall(ptOracle, abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180), abi.encode(false, 0, false));
+        assertTrue(pendleOracle.getStatus(address(0)) == false);
+
+        vm.mockCall(ptOracle, abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180), abi.encode(false, 0, true));
+        assertTrue(pendleOracle.getStatus(address(0)));
     }
 
     function test_spot_revertsOnStaleValue(address token) public {

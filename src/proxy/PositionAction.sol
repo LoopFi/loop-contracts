@@ -314,13 +314,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address[] calldata targets,
         bytes[] calldata data,
         bool[] calldata delegateCall
-    ) external payable onlyDelegatecall {
+    ) external onlyDelegatecall {
         uint256 totalTargets = targets.length;
         for (uint256 i; i < totalTargets;) {
             if (delegateCall[i]) {
                 _delegateCall(targets[i], data[i]);
             } else {
-                (bool success, bytes memory response) = targets[i].call{value:address(this).balance}(data[i]);
+                (bool success, bytes memory response) = targets[i].call(data[i]);
                 if (!success) _revertBytes(response);
             }
             unchecked { ++i; }

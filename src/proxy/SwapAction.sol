@@ -22,7 +22,8 @@ enum SwapProtocol {
     BALANCER,
     UNIV3,
     PENDLE_IN,
-    PENDLE_OUT
+    PENDLE_OUT,
+    PENDLE_MIX_IN
 }
 
 /// @notice The type of swap to perform
@@ -133,9 +134,21 @@ contract SwapAction is TransferAction {
             retAmount = pendleJoin(swapParams.recipient, swapParams.limit, swapParams.args);
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_OUT) {
             retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
-        } else {
-            revert SwapAction__swap_notSupported();
-        }
+        } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_MIX_IN) {
+            (bytes32[] memory poolIds, address[] memory assetPath, uint256 limitPendle, bytes memory pendleArgs) = abi.decode(swapParams.args,(bytes32[], address[], uint256, bytes));
+            balancerSwap(
+                swapParams.swapType,
+                swapParams.assetIn,
+                poolIds,
+                assetPath,
+                swapParams.amount,
+                swapParams.limit,
+                swapParams.recipient,
+                swapParams.deadline
+            );
+
+            retAmount = pendleJoin(swapParams.recipient, limitPendle, pendleArgs);
+        } else revert SwapAction__swap_notSupported();
 
         // Transfer any remaining tokens to the recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
@@ -337,8 +350,8 @@ contract SwapAction is TransferAction {
             LimitOrderData memory limit
         ) = abi.decode(data, (address, ApproxParams, TokenInput , LimitOrderData));
         
-        
         if (input.tokenIn != address(0)) {
+                input.netTokenIn = IERC20(input.tokenIn).balanceOf(address(this));
                 IERC20(input.tokenIn).forceApprove(address(pendleRouter),input.netTokenIn);
             }
 

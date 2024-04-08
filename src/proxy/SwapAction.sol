@@ -14,7 +14,7 @@ import {IStandardizedYield} from "pendle/interfaces/IStandardizedYield.sol";
 import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {toInt256, abs} from "../utils/Math.sol";
-
+import {console} from "forge-std/console.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
 
 /// @notice The swap protocol to use
@@ -23,7 +23,8 @@ enum SwapProtocol {
     UNIV3,
     PENDLE_IN,
     PENDLE_OUT,
-    PENDLE_MIX_IN
+    PENDLE_MIX_IN,
+    PENDLE_MIX_OUT
 }
 
 /// @notice The type of swap to perform
@@ -148,8 +149,22 @@ contract SwapAction is TransferAction {
             );
 
             retAmount = pendleJoin(swapParams.recipient, limitPendle, pendleArgs);
+        } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_MIX_OUT) {
+            (bytes memory pendleArgs, bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(swapParams.args,(bytes, bytes32[], address[]));
+            retAmount = pendleExit(swapParams.recipient, 0, pendleArgs);
+ 
+            retAmount = balancerSwap(
+                swapParams.swapType,
+                swapParams.assetIn,
+                poolIds,
+                assetPath,
+                swapParams.amount,
+                retAmount,
+                swapParams.recipient,
+                swapParams.deadline
+            );
+       
         } else revert SwapAction__swap_notSupported();
-
         // Transfer any remaining tokens to the recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
             IERC20(swapParams.assetIn).safeTransfer(swapParams.recipient, swapParams.limit - retAmount);
@@ -365,7 +380,11 @@ contract SwapAction is TransferAction {
             
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
-        IPMarket(market).transferFrom(recipient, market, netLpIn);
+        if(recipient != address(this)){
+            IPMarket(market).transferFrom(recipient, market, netLpIn);
+        } else {
+            IPMarket(market).transfer(market, netLpIn);
+        }
 
         uint256 netSyToRedeem;
 

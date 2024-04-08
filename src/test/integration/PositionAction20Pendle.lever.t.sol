@@ -42,12 +42,15 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
     PermitParams emptyPermitParams;
     SwapParams emptySwap;
     bytes32[] stablePoolIdArray;
-    bytes32[] pendlePoolIdArray;
+    bytes32[] pendlePoolIdArrayIn;
+    bytes32[] pendlePoolIdArrayOut;
 
     address PENDLE_LP_ETHERFI = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
     address pendleOwner = 0x1FcCC097db89A86Bfc474A1028F93958295b1Fb7;
     address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee;
- 
+    address wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    bytes32 wstETHPoolId = 0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2; // wstETH/WETH
+
     function setUp() public virtual override {
         usePatchedDeal = true;
         super.setUp();
@@ -90,8 +93,13 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
         // deploy position actions
         positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
 
-        pendlePoolIdArray.push(stablePoolId);
-        pendlePoolIdArray.push(wethDaiPoolId);
+        pendlePoolIdArrayIn.push(stablePoolId);
+        pendlePoolIdArrayIn.push(wethDaiPoolId);
+
+        pendlePoolIdArrayOut.push(stablePoolId);
+        pendlePoolIdArrayOut.push(wethDaiPoolId);
+        pendlePoolIdArrayOut.push(wstETHPoolId);
+        
         // give minter credit to cover interest
         createCredit(address(minter), 5_000_000 ether);
 
@@ -146,7 +154,7 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
                 limit: 0,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(pendlePoolIdArray, assets, 0, abi.encode(
+                args: abi.encode(pendlePoolIdArrayIn, assets, 0, abi.encode(
                 address(PENDLE_LP_STETH),
                 approxParams,
                 tokenInput,
@@ -192,6 +200,153 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
 
         // No WETH left in positionAction
         assertEq(WETH.balanceOf(address(positionAction)), 0);
+    }
+
+     function test_decreaseLever() public {
+        // Lever Position First
+        uint256 upFrontUnderliers = 100 ether;
+        uint256 borrowAmount = 17600 ether;
+        console.log(address(swapAction),"Swap Action");
+        vm.prank(pendleLP_STETH_Holder);
+        PENDLE_LP_STETH.transfer(user, upFrontUnderliers);
+
+        // build increase lever params
+        address[] memory assets = new address[](3);
+        assets[0] = address(stablecoin);
+        assets[1] = address(DAI);
+        assets[2] = address(WETH);
+
+        SwapParams memory auxSwapParams;
+        ApproxParams memory approxParams;
+        TokenInput memory tokenInput;
+        LimitOrderData memory limitOrderData;
+        SwapData memory swapData;
+        swapData.swapType = SwapTypePendle.ETH_WETH;
+
+        approxParams = ApproxParams({
+            guessMin: 0,
+            guessMax: 15519288115338392367,
+            guessOffchain: 0,
+            maxIteration: 12,
+            eps: 10000000000000000
+        });
+
+        tokenInput.netTokenIn = 5 ether; // if it's not native ETH will be updated with the exact amount from balancer
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.swapData = swapData;
+        
+        LeverParams memory leverParams = LeverParams({
+            position: address(userProxy),
+            vault: address(pendleVault_STETH),
+            collateralToken: address(PENDLE_LP_STETH),
+            primarySwap: SwapParams({
+                swapProtocol: SwapProtocol.PENDLE_MIX_IN,
+                swapType: SwapType.EXACT_IN,
+                assetIn : address(stablecoin),
+                amount: borrowAmount,
+                limit: 0,
+                recipient: address(positionAction),
+                deadline: block.timestamp + 100,
+                args: abi.encode(pendlePoolIdArrayIn, assets, 0, abi.encode(
+                address(PENDLE_LP_STETH),
+                approxParams,
+                tokenInput,
+                limitOrderData
+            ) )
+            }),
+            auxSwap: emptySwap,
+            auxAction: emptyJoin
+        });
+
+        vm.startPrank(user);
+        PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
+        
+        // call increaseLever
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.increaseLever.selector,
+                leverParams,
+                address(PENDLE_LP_STETH),
+                upFrontUnderliers,
+                address(user),
+                emptyPermitParams
+            )
+        );
+     
+
+        // NOW we can decrease the lever
+        (uint256 initialCollateral, uint256 initialNormalDebt) = pendleVault_STETH.positions(address(userProxy));
+
+        // build decrease lever params
+       // uint256 amountOut = 5_000 ether;
+        uint256 maxAmountIn = 3 ether; // max wsETH to pay
+
+        assets = new address[](4);
+        assets[0] = address(stablecoin);
+        assets[1] = address(DAI);
+        assets[2] = address(WETH);
+        assets[3] = address(wstETH);
+        
+        leverParams = LeverParams({
+            position: address(userProxy),
+            vault: address(pendleVault_STETH),
+            collateralToken: address(wstETH),
+            primarySwap: SwapParams({
+                swapProtocol: SwapProtocol.PENDLE_MIX_OUT,
+                swapType: SwapType.EXACT_OUT,
+                assetIn: address(wstETH),
+                amount: 5000 ether, // exact amount of stablecoin to receive
+                limit: maxAmountIn, // max amount of wsETH to pay
+                recipient: address(positionAction),
+                deadline: block.timestamp + 100,
+                args: abi.encode(abi.encode(address(PENDLE_LP_STETH), maxAmountIn, address(wstETH)), pendlePoolIdArrayOut, assets)
+            }),
+            auxSwap: emptySwap,
+            auxAction: emptyJoin
+        });
+        vm.stopPrank();
+       
+        vm.prank(address(positionAction));
+        PENDLE_LP_STETH.approve(address(0x0B01F6613f1b7c5bd1a9cB24908E6c383778C25C), type(uint256).max);
+        console.log(address(positionAction),"Position Action");
+        console.log(address(userProxy),"User Proxy");
+        console.log(address(swapAction),"Swap Action");
+        console.log(address(pendleVault_STETH),"Vault");
+        console.log(user,"User");
+        vm.prank(address(userProxy));
+        PENDLE_LP_STETH.approve(address(PENDLE_LP_STETH), type(uint256).max);
+     //   uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
+        vm.prank(user);
+        PENDLE_LP_STETH.approve(address(PENDLE_LP_STETH), type(uint256).max);
+        // call decreaseLever
+        vm.startPrank(user);
+        PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.decreaseLever.selector, // function
+                leverParams, // lever params
+                maxAmountIn, // collateral to decrease by
+                address(userProxy) // residualRecipient
+            )
+        );
+
+        (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
+
+        // assert new collateral amount is the same as initialCollateral minus the amount of PENDLE LP we swapped for stablecoin
+        assertEq(collateral, initialCollateral - maxAmountIn);
+
+        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
+        assertEq(normalDebt, initialNormalDebt - 5000 ether);
+
+        // assert that the left over was transfered to the user proxy
+        //assertEq(maxAmountIn, PENDLE_LP_STETH.balanceOf(address(userProxy)));
+
+        // ensure there isn't any left over debt or collateral from using leverAction
+        (uint256 lcollateral, uint256 lnormalDebt) = pendleVault_STETH.positions(address(positionAction));
+        assertEq(lcollateral, 0);
+        assertEq(lnormalDebt, 0);
     }
 
     function getForkBlockNumber() override internal pure returns (uint256) {

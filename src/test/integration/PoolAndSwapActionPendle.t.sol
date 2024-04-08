@@ -357,7 +357,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         assertGt(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
     }
 
-    function test_swap_Pendle_In_WETH() public {
+    function test_swap_Pendle_In_And_Out_WETH() public {
          SwapParams memory swapParams;
         PermitParams memory permitParams;
 
@@ -411,6 +411,38 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
         assertEq(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
         assertGt(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/join");
+
+
+        uint256 lpIn = ERC20(market).balanceOf(user);
+
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.PENDLE_OUT,
+            swapType: SwapType.EXACT_IN,
+            assetIn : market,
+            amount: ERC20(market).balanceOf(user),
+            limit: 0,
+            recipient: user,
+            deadline: 0,
+            args: abi.encode(
+                market,
+                lpIn,
+                weETH
+            )
+        });
+
+
+        ERC20(market).approve(address(userProxy), type(uint256).max);
+
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(
+                SwapAction.swap.selector,
+                swapParams
+            )
+        );
+
+        assertEq(ERC20(market).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
+        assertGt(ERC20(weETH).balanceOf(swapParams.recipient) , 0, "failed to swap/redeem");
     }
 
     function test_transferAndSwap_Pendle_In_WETH() public {

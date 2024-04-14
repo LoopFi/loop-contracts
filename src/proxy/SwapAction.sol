@@ -135,35 +135,6 @@ contract SwapAction is TransferAction {
             retAmount = pendleJoin(swapParams.recipient, swapParams.limit, swapParams.args);
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_OUT) {
             retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
-        } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_MIX_IN) {
-            (bytes32[] memory poolIds, address[] memory assetPath, uint256 limitPendle, bytes memory pendleArgs) = abi.decode(swapParams.args,(bytes32[], address[], uint256, bytes));
-            balancerSwap(
-                swapParams.swapType,
-                swapParams.assetIn,
-                poolIds,
-                assetPath,
-                swapParams.amount,
-                swapParams.limit,
-                swapParams.recipient,
-                swapParams.deadline
-            );
-
-            retAmount = pendleJoin(swapParams.recipient, limitPendle, pendleArgs);
-        } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_MIX_OUT) {
-            (bytes memory pendleArgs, bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(swapParams.args,(bytes, bytes32[], address[]));
-            retAmount = pendleExit(swapParams.recipient, 0, pendleArgs);
- 
-            retAmount = balancerSwap(
-                swapParams.swapType,
-                swapParams.assetIn,
-                poolIds,
-                assetPath,
-                swapParams.amount,
-                retAmount,
-                swapParams.recipient,
-                swapParams.deadline
-            );
-       
         } else revert SwapAction__swap_notSupported();
         // Transfer any remaining tokens to the recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {

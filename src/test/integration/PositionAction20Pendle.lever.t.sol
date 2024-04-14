@@ -17,13 +17,13 @@ import {BaseAction} from "../../proxy/BaseAction.sol";
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAction.sol";
 import {PositionAction, CollateralParams, CreditParams, LeverParams} from "../../proxy/PositionAction.sol";
-import {PositionAction20} from "../../proxy/PositionAction20.sol";
-
+import {PositionActionPendle} from "../../proxy/PositionActionPendle.sol";
+import {PoolAction, Protocol, PoolActionParams} from "../../proxy/PoolAction.sol";
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
 import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
 import {SwapData, SwapType as SwapTypePendle} from "pendle/router/swap-aggregator/IPSwapAggregator.sol";
 import {console} from "forge-std/console.sol";
-contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
+contract PositionActionPendle_Lever_Test is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
     // user
@@ -36,7 +36,7 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
     CDPVault pendleVault_weETH;
 
     // actions
-    PositionAction20 positionAction;
+    PositionActionPendle positionAction;
 
     // common variables as state variables to help with stack too deep
     PermitParams emptyPermitParams;
@@ -91,7 +91,7 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
         deal(user, 10 ether);
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionActionPendle(address(flashlender), address(swapAction), address(poolAction));
 
         pendlePoolIdArrayIn.push(stablePoolId);
         pendlePoolIdArrayIn.push(wethDaiPoolId);
@@ -138,37 +138,44 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
             eps: 10000000000000000
         });
 
-        tokenInput.netTokenIn = 5 ether; // if it's not native ETH will be updated with the exact amount from balancer
-        tokenInput.tokenIn = address(WETH);
-        tokenInput.swapData = swapData;
-        
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
             vault: address(pendleVault_STETH),
             collateralToken: address(PENDLE_LP_STETH),
             primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.PENDLE_MIX_IN,
+                swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_IN,
                 assetIn : address(stablecoin),
                 amount: borrowAmount,
                 limit: 0,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(pendlePoolIdArrayIn, assets, 0, abi.encode(
-                address(PENDLE_LP_STETH),
-                approxParams,
-                tokenInput,
-                limitOrderData
-            ) )
+                args: abi.encode(pendlePoolIdArrayIn, assets)
             }),
             auxSwap: emptySwap,
             auxAction: emptyJoin
         });
 
+        // Update recipient to simulate the swap
         leverParams.primarySwap.recipient = address(swapAction);
         uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-        console.log(expectedAmountOut,"Expected amount out");
+        // Re-update recipient 
         leverParams.primarySwap.recipient = address(positionAction);
+        // Update tokenIn (WETH) with the exact amount
+        tokenInput.netTokenIn = expectedAmountOut;
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.swapData = swapData;
+
+        leverParams.auxAction = PoolActionParams(
+                Protocol.PENDLE,
+                0,
+                address(positionAction),
+                abi.encode(
+                address(PENDLE_LP_STETH),
+                approxParams,
+                tokenInput,
+                limitOrderData
+            ));
 
         vm.startPrank(user);
         PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
@@ -187,11 +194,8 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
         );
         (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
 
-        // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
-        assertEq(collateral, upFrontUnderliers + expectedAmountOut);
-
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
+        assertEq(normalDebt, borrowAmount, "Not correct normal debt amount");
 
         // assert leverAction position is empty
         (uint256 lcollateral, uint256 lnormalDebt) = pendleVault_STETH.positions(address(positionAction));
@@ -199,14 +203,14 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
          assertEq(lnormalDebt, 0);
 
         // No WETH left in positionAction
-        assertEq(WETH.balanceOf(address(positionAction)), 0);
+        assertEq(WETH.balanceOf(address(positionAction)), 0, 'WETH left in position action');
     }
 
      function test_decreaseLever() public {
         // Lever Position First
         uint256 upFrontUnderliers = 100 ether;
         uint256 borrowAmount = 17600 ether;
-        console.log(address(swapAction),"Swap Action");
+    
         vm.prank(pendleLP_STETH_Holder);
         PENDLE_LP_STETH.transfer(user, upFrontUnderliers);
 
@@ -216,10 +220,9 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
         assets[1] = address(DAI);
         assets[2] = address(WETH);
 
-        SwapParams memory auxSwapParams;
+    
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
-        LimitOrderData memory limitOrderData;
         SwapData memory swapData;
         swapData.swapType = SwapTypePendle.ETH_WETH;
 
@@ -231,32 +234,36 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
             eps: 10000000000000000
         });
 
-        tokenInput.netTokenIn = 5 ether; // if it's not native ETH will be updated with the exact amount from balancer
-        tokenInput.tokenIn = address(WETH);
-        tokenInput.swapData = swapData;
         
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
             vault: address(pendleVault_STETH),
             collateralToken: address(PENDLE_LP_STETH),
             primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.PENDLE_MIX_IN,
+                swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_IN,
                 assetIn : address(stablecoin),
                 amount: borrowAmount,
                 limit: 0,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(pendlePoolIdArrayIn, assets, 0, abi.encode(
-                address(PENDLE_LP_STETH),
-                approxParams,
-                tokenInput,
-                limitOrderData
-            ) )
+                args: abi.encode(pendlePoolIdArrayIn, assets)
             }),
             auxSwap: emptySwap,
             auxAction: emptyJoin
         });
+
+
+        // Update recipient to simulate the swap
+        leverParams.primarySwap.recipient = address(swapAction);
+        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
+        // Re-update recipient 
+        leverParams.primarySwap.recipient = address(positionAction);
+        // Update tokenIn (WETH) with the exact amount
+        tokenInput.netTokenIn = expectedAmountOut;
+        tokenInput.tokenIn = address(WETH);
+        tokenInput.swapData = swapData;
+
 
         vm.startPrank(user);
         PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
@@ -280,8 +287,9 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
 
         // build decrease lever params
        // uint256 amountOut = 5_000 ether;
-        uint256 maxAmountIn = 3 ether; // max wsETH to pay
-
+        uint256 maxLPAmountIn = 3 ether; // max LP AMOUNT IN
+        //wsETH to pay
+        
         assets = new address[](4);
         assets[0] = address(stablecoin);
         assets[1] = address(DAI);
@@ -293,32 +301,31 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
             vault: address(pendleVault_STETH),
             collateralToken: address(wstETH),
             primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.PENDLE_MIX_OUT,
+                swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_OUT,
                 assetIn: address(wstETH),
                 amount: 5000 ether, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of wsETH to pay
+                limit: maxLPAmountIn, //  TODO: use proper value
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(abi.encode(address(PENDLE_LP_STETH), maxAmountIn, address(wstETH)), pendlePoolIdArrayOut, assets)
+                args: abi.encode(pendlePoolIdArrayOut, assets)
             }),
             auxSwap: emptySwap,
-            auxAction: emptyJoin
+            auxAction: PoolActionParams(
+                Protocol.PENDLE,
+                0,
+                address(positionAction),
+                abi.encode(address(PENDLE_LP_STETH), maxLPAmountIn, address(wstETH))
+            )
         });
         vm.stopPrank();
-       
+        uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
+
         vm.prank(address(positionAction));
         PENDLE_LP_STETH.approve(address(0x0B01F6613f1b7c5bd1a9cB24908E6c383778C25C), type(uint256).max);
-        console.log(address(positionAction),"Position Action");
-        console.log(address(userProxy),"User Proxy");
-        console.log(address(swapAction),"Swap Action");
-        console.log(address(pendleVault_STETH),"Vault");
-        console.log(user,"User");
-        vm.prank(address(userProxy));
-        PENDLE_LP_STETH.approve(address(PENDLE_LP_STETH), type(uint256).max);
-     //   uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-        vm.prank(user);
-        PENDLE_LP_STETH.approve(address(PENDLE_LP_STETH), type(uint256).max);
+       
+        assertEq(0, ERC20(wstETH).balanceOf(address(userProxy)));
+
         // call decreaseLever
         vm.startPrank(user);
         PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
@@ -327,7 +334,7 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.decreaseLever.selector, // function
                 leverParams, // lever params
-                maxAmountIn, // collateral to decrease by
+                maxLPAmountIn, // collateral to decrease by
                 address(userProxy) // residualRecipient
             )
         );
@@ -335,14 +342,22 @@ contract PositionAction20Pendle_Lever_Test is IntegrationTestBase {
         (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
 
         // assert new collateral amount is the same as initialCollateral minus the amount of PENDLE LP we swapped for stablecoin
-        assertEq(collateral, initialCollateral - maxAmountIn);
+        assertEq(collateral, initialCollateral - maxLPAmountIn);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
         assertEq(normalDebt, initialNormalDebt - 5000 ether);
 
         // assert that the left over was transfered to the user proxy
-        //assertEq(maxAmountIn, PENDLE_LP_STETH.balanceOf(address(userProxy)));
+        assertGt(ERC20(wstETH).balanceOf(address(userProxy)),0);
+        assertEq(ERC20(wstETH).balanceOf(address(positionAction)),0);
+        assertEq(ERC20(wstETH).balanceOf(address(user)),0);
+        assertEq(ERC20(wstETH).balanceOf(address(pendleVault_STETH)),0);
+        assertEq(ERC20(wstETH).balanceOf(address(poolAction)),0);
+        assertEq(ERC20(wstETH).balanceOf(address(swapAction)),0);
 
+        // TODO: use a preview from Penlde for this
+        assertEq(5359934115792901125-expectedAmountIn,ERC20(wstETH).balanceOf(address(userProxy)));
+            
         // ensure there isn't any left over debt or collateral from using leverAction
         (uint256 lcollateral, uint256 lnormalDebt) = pendleVault_STETH.positions(address(positionAction));
         assertEq(lcollateral, 0);

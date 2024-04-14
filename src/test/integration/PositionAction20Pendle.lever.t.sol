@@ -272,8 +272,8 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         // NOW we can decrease the lever
         (uint256 initialCollateral, uint256 initialNormalDebt) = pendleVault_STETH.positions(address(userProxy));
 
-        uint256 lpToRedeem = 3 ether; // max LP AMOUNT IN
-        //wsETH to pay
+        uint256 repayAmount = 5000 ether; // amount of stablecoin to repay
+        uint256 lpToRedeem = 3 ether; // LP AMOUNT to Redeem for underlying and sell it for stablecoin
         
         assets = new address[](4);
         assets[0] = address(stablecoin);
@@ -289,8 +289,8 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_OUT,
                 assetIn: address(wstETH),
-                amount: 5000 ether, // exact amount of stablecoin to receive
-                limit: lpToRedeem, //  TODO: use proper value
+                amount: repayAmount, // exact amount of stablecoin to receive
+                limit: lpToRedeem, // exact amount of PENDLE LP to redeem
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(pendlePoolIdArrayOut, assets)
@@ -327,7 +327,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - lpToRedeem);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
-        assertEq(normalDebt, initialNormalDebt - 5000 ether);
+        assertEq(normalDebt, initialNormalDebt - repayAmount);
 
         // assert that the left over was transfered to the user proxy
         assertGt(ERC20(wstETH).balanceOf(address(userProxy)),0);

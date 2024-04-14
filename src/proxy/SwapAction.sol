@@ -22,9 +22,7 @@ enum SwapProtocol {
     BALANCER,
     UNIV3,
     PENDLE_IN,
-    PENDLE_OUT,
-    PENDLE_MIX_IN,
-    PENDLE_MIX_OUT
+    PENDLE_OUT
 }
 
 /// @notice The type of swap to perform

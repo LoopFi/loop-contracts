@@ -69,21 +69,8 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
             BASE_RATE_1_005 // base rate
         );
 
-        // pendleVault_weETH = createCDPVault(
-        //     ERC20(PENDLE_LP_ETHERFI), // token
-        //     5_000_000 ether, // debt ceiling
-        //     0, // debt floor
-        //     1.25 ether, // liquidation ratio
-        //     1.0 ether, // liquidation penalty
-        //     1.05 ether, // liquidation discount
-        //     BASE_RATE_1_005 // base rate
-        // );
         // configure oracle spot prices
         oracle.updateSpot(address(PENDLE_LP_STETH), 3500 ether);
-      //  oracle.updateSpot(address(PENDLE_LP_ETHERFI), 3500 ether);
-        // configure vaults
-        cdm.setParameter(address(pendleVault_STETH), "debtCeiling", 5_000_000 ether);
-     //   cdm.setParameter(address(pendleVault_weETH), "debtCeiling", 5_000_000 ether);
 
         // setup user and userProxy
         user = vm.addr(0x12341234);
@@ -285,9 +272,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         // NOW we can decrease the lever
         (uint256 initialCollateral, uint256 initialNormalDebt) = pendleVault_STETH.positions(address(userProxy));
 
-        // build decrease lever params
-       // uint256 amountOut = 5_000 ether;
-        uint256 maxLPAmountIn = 3 ether; // max LP AMOUNT IN
+        uint256 lpToRedeem = 3 ether; // max LP AMOUNT IN
         //wsETH to pay
         
         assets = new address[](4);
@@ -305,7 +290,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 swapType: SwapType.EXACT_OUT,
                 assetIn: address(wstETH),
                 amount: 5000 ether, // exact amount of stablecoin to receive
-                limit: maxLPAmountIn, //  TODO: use proper value
+                limit: lpToRedeem, //  TODO: use proper value
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(pendlePoolIdArrayOut, assets)
@@ -315,14 +300,11 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 Protocol.PENDLE,
                 0,
                 address(positionAction),
-                abi.encode(address(PENDLE_LP_STETH), maxLPAmountIn, address(wstETH))
+                abi.encode(address(PENDLE_LP_STETH), lpToRedeem, address(wstETH))
             )
         });
         vm.stopPrank();
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-
-        vm.prank(address(positionAction));
-        PENDLE_LP_STETH.approve(address(0x0B01F6613f1b7c5bd1a9cB24908E6c383778C25C), type(uint256).max);
        
         assertEq(0, ERC20(wstETH).balanceOf(address(userProxy)));
 
@@ -334,7 +316,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.decreaseLever.selector, // function
                 leverParams, // lever params
-                maxLPAmountIn, // collateral to decrease by
+                lpToRedeem, // collateral to decrease by
                 address(userProxy) // residualRecipient
             )
         );
@@ -342,7 +324,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
 
         // assert new collateral amount is the same as initialCollateral minus the amount of PENDLE LP we swapped for stablecoin
-        assertEq(collateral, initialCollateral - maxLPAmountIn);
+        assertEq(collateral, initialCollateral - lpToRedeem);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
         assertEq(normalDebt, initialNormalDebt - 5000 ether);

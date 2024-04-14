@@ -290,7 +290,6 @@ contract PoolAction is TransferAction {
             
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
-        //IPMarket(market).transferFrom(poolActionParams.recipient, market, netLpIn);
         if(poolActionParams.recipient != address(this)){
             IPMarket(market).transferFrom(poolActionParams.recipient, market, netLpIn);
         } else {

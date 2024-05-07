@@ -28,7 +28,8 @@ contract PositionAction4626Test is IntegrationTestBase {
     PositionAction4626 positionAction;
 
     // tokens
-    ERC4626 constant maDAI = ERC4626(0x36F8d0D0573ae92326827C4a82Fe4CE4C244cAb6);
+    ERC4626 constant maDAI =
+        ERC4626(0x36F8d0D0573ae92326827C4a82Fe4CE4C244cAb6);
 
     // common variables as state variables to help with stack too deep
     PermitParams emptyPermitParams;
@@ -61,15 +62,20 @@ contract PositionAction4626Test is IntegrationTestBase {
 
         // setup user and userProxy
         user = vm.addr(0x12341234);
-        userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
+        userProxy = PRBProxy(
+            payable(address(prbProxyRegistry.deployFor(user)))
+        );
 
         // deploy position actions
-        positionAction = new PositionAction4626(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction4626(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction)
+        );
 
         // set up variables to avoid stack too deep
         stablePoolIdArray.push(stablePoolId);
     }
-
 
     function test_deposit() public {
         uint256 depositAmount = 10_000 ether;
@@ -98,7 +104,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -132,7 +140,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedCollateral);
         assertEq(normalDebt, 0);
@@ -159,14 +169,16 @@ contract PositionAction4626Test is IntegrationTestBase {
                 swapType: SwapType.EXACT_IN,
                 assetIn: address(USDC),
                 amount: depositAmount,
-                limit: depositAmount * 1e12 / 100,
+                limit: (depositAmount * 1e12) / 100,
                 recipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
             })
         });
 
-        uint256 expectedAmountOut = maDAI.previewDeposit(_simulateBalancerSwap(collateralParams.auxSwap));
+        uint256 expectedAmountOut = maDAI.previewDeposit(
+            _simulateBalancerSwap(collateralParams.auxSwap)
+        );
 
         vm.prank(user);
         USDC.approve(address(userProxy), depositAmount);
@@ -183,7 +195,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedAmountOut);
         assertEq(normalDebt, 0);
@@ -213,11 +227,13 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(maDAI.balanceOf(user), initialDeposit);
@@ -249,11 +265,13 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(DAI.balanceOf(user), initialDepositInDai);
@@ -281,14 +299,16 @@ contract PositionAction4626Test is IntegrationTestBase {
                 swapType: SwapType.EXACT_IN,
                 assetIn: address(DAI),
                 amount: initialDeposit,
-                limit: initialDeposit * 99 / 100e12,
+                limit: (initialDeposit * 99) / 100e12,
                 recipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
             })
         });
 
-        uint256 expectedAmountOut = _simulateBalancerSwap(collateralParams.auxSwap);
+        uint256 expectedAmountOut = _simulateBalancerSwap(
+            collateralParams.auxSwap
+        );
 
         vm.prank(user);
         userProxy.execute(
@@ -301,11 +321,13 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(USDC.balanceOf(user), expectedAmountOut);
@@ -341,7 +363,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             auxAction: emptyJoin
         });
 
-        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
+        uint256 expectedAmountOut = _simulateBalancerSwap(
+            leverParams.primarySwap
+        );
         uint256 expectedDeposit = maDAI.previewDeposit(expectedAmountOut);
 
         vm.prank(user);
@@ -361,7 +385,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
         assertEq(collateral, expectedDeposit + upFrontUnderliers);
@@ -370,7 +396,9 @@ contract PositionAction4626Test is IntegrationTestBase {
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = maDaiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = maDaiVault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -405,8 +433,12 @@ contract PositionAction4626Test is IntegrationTestBase {
             auxAction: emptyJoin
         });
 
-        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-        uint256 expectedCollateral = maDAI.previewDeposit(expectedAmountOut + upFrontUnderliers);
+        uint256 expectedAmountOut = _simulateBalancerSwap(
+            leverParams.primarySwap
+        );
+        uint256 expectedCollateral = maDAI.previewDeposit(
+            expectedAmountOut + upFrontUnderliers
+        );
 
         vm.prank(user);
         DAI.approve(address(userProxy), upFrontUnderliers);
@@ -425,7 +457,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
         assertEq(collateral, expectedCollateral);
@@ -434,7 +468,9 @@ contract PositionAction4626Test is IntegrationTestBase {
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = maDaiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = maDaiVault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -474,7 +510,7 @@ contract PositionAction4626Test is IntegrationTestBase {
                 swapType: SwapType.EXACT_IN,
                 assetIn: address(USDC),
                 amount: upFrontUnderliers,
-                limit: upFrontUnderliers * 99e12 / 100,
+                limit: (upFrontUnderliers * 99e12) / 100,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(stablePoolIdArray, auxAssets)
@@ -483,7 +519,13 @@ contract PositionAction4626Test is IntegrationTestBase {
         });
 
         // get expected return amounts
-        (uint256 auxExpectedAmountOut, uint256 expectedAmountOut) = _simulateBalancerSwapMulti(leverParams.auxSwap, leverParams.primarySwap);
+        (
+            uint256 auxExpectedAmountOut,
+            uint256 expectedAmountOut
+        ) = _simulateBalancerSwapMulti(
+                leverParams.auxSwap,
+                leverParams.primarySwap
+            );
 
         vm.prank(user);
         USDC.approve(address(userProxy), upFrontUnderliers);
@@ -502,16 +544,24 @@ contract PositionAction4626Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
-        assertEq(collateral, maDAI.previewDeposit(expectedAmountOut) + maDAI.previewDeposit(auxExpectedAmountOut));
+        assertEq(
+            collateral,
+            maDAI.previewDeposit(expectedAmountOut) +
+                maDAI.previewDeposit(auxExpectedAmountOut)
+        );
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = maDaiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = maDaiVault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -525,7 +575,13 @@ contract PositionAction4626Test is IntegrationTestBase {
             50_000 ether, // borrowAmount
             49_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = maDaiVault.positions(address(userProxy));
+        (
+            uint256 initialCollateral,
+            uint256 initialNormalDebt,
+            ,
+            ,
+
+        ) = maDaiVault.positions(address(userProxy));
 
         // build decrease lever params
         uint256 amountOut = 5_000 ether; // stablecoin
@@ -554,7 +610,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             auxAction: emptyJoin
         });
 
-        uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
+        uint256 expectedAmountIn = _simulateBalancerSwap(
+            leverParams.primarySwap
+        );
 
         // call decreaseLever
         vm.startPrank(user);
@@ -569,7 +627,9 @@ contract PositionAction4626Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
         assertEq(collateral, initialCollateral - subCollateral);
@@ -578,10 +638,15 @@ contract PositionAction4626Test is IntegrationTestBase {
         assertEq(normalDebt, initialNormalDebt - amountOut);
 
         // assert that the left over was transfered to the user proxy
-        assertEq(DAI.balanceOf(address(userProxy)), maxAmountIn - expectedAmountIn);
+        assertEq(
+            DAI.balanceOf(address(userProxy)),
+            maxAmountIn - expectedAmountIn
+        );
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = maDaiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = maDaiVault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -595,7 +660,13 @@ contract PositionAction4626Test is IntegrationTestBase {
             50_000 ether, // borrowAmount
             49_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = maDaiVault.positions(address(userProxy));
+        (
+            uint256 initialCollateral,
+            uint256 initialNormalDebt,
+            ,
+            ,
+
+        ) = maDaiVault.positions(address(userProxy));
 
         // build decrease lever params
         uint256 auxExpectedAmountOut;
@@ -640,11 +711,16 @@ contract PositionAction4626Test is IntegrationTestBase {
 
         // first simulate the primary swap to calculate values for aux swap
         expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-        leverParams.auxSwap.amount = maDAI.previewDeposit(maDAI.previewWithdraw(maxAmountIn)) - expectedAmountIn;
-        leverParams.auxSwap.limit = leverParams.auxSwap.amount * 99 / 100e12;
+        leverParams.auxSwap.amount =
+            maDAI.previewDeposit(maDAI.previewWithdraw(maxAmountIn)) -
+            expectedAmountIn;
+        leverParams.auxSwap.limit = (leverParams.auxSwap.amount * 99) / 100e12;
 
         // get expected return amounts
-        (auxExpectedAmountOut, expectedAmountIn) = _simulateBalancerSwapMulti(leverParams.auxSwap, leverParams.primarySwap);
+        (auxExpectedAmountOut, expectedAmountIn) = _simulateBalancerSwapMulti(
+            leverParams.auxSwap,
+            leverParams.primarySwap
+        );
 
         // call decreaseLever
         vm.startPrank(user);
@@ -659,23 +735,33 @@ contract PositionAction4626Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 normalDebt) = maDaiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = maDaiVault.positions(
+            address(userProxy)
+        );
 
         // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
-        assertEq(collateral, initialCollateral - maDAI.previewDeposit(maxAmountIn));
+        assertEq(
+            collateral,
+            initialCollateral - maDAI.previewDeposit(maxAmountIn)
+        );
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping DAI
         assertEq(normalDebt, initialNormalDebt - amountOut);
 
         // assert that the left over was transfered to the user proxy, assert always more or equal than expected
-        assertApproxEqRel(USDC.balanceOf(address(user)), auxExpectedAmountOut, 5e15); // shouldnt be more than .5% diff
+        assertApproxEqRel(
+            USDC.balanceOf(address(user)),
+            auxExpectedAmountOut,
+            5e15
+        ); // shouldnt be more than .5% diff
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = maDaiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = maDaiVault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
-
 
     // HELPER FUNCTIONS
 
@@ -724,8 +810,9 @@ contract PositionAction4626Test is IntegrationTestBase {
             assets[1] = address(upFrontToken);
 
             // mint directly to swap actions for simplicity
-            if (upFrontUnderliers > 0) deal(upFrontToken, address(proxy), upFrontUnderliers);
-            
+            if (upFrontUnderliers > 0)
+                deal(upFrontToken, address(proxy), upFrontUnderliers);
+
             leverParams = LeverParams({
                 position: address(proxy),
                 vault: address(vault),
@@ -759,5 +846,4 @@ contract PositionAction4626Test is IntegrationTestBase {
         );
         vm.stopPrank();
     }
-
 }

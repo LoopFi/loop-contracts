@@ -20,7 +20,10 @@ function getDebt(int256 balance) pure returns (uint256) {
     return (balance > 0) ? 0 : uint256(-balance);
 }
 
-function getCreditLine(int256 balance, uint256 debtCeiling) pure returns (uint256) {
+function getCreditLine(
+    int256 balance,
+    uint256 debtCeiling
+) pure returns (uint256) {
     int256 minBalance = -int256(debtCeiling);
     return (balance < minBalance) ? 0 : uint256(-(minBalance - balance));
 }
@@ -28,7 +31,6 @@ function getCreditLine(int256 balance, uint256 debtCeiling) pure returns (uint25
 /// @title CDM
 /// @notice Global accounting for credit and debt in the system
 contract CDM is Permission, AccessControl, ICDM {
-
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -44,6 +46,7 @@ contract CDM is Permission, AccessControl, ICDM {
         int256 balance; // [wad]
         uint256 debtCeiling; // [wad]
     }
+
     /// @notice Map of accounts with their own balance (+ credit, - debt) and debt ceiling
     mapping(address => Account) public accounts;
 
@@ -52,7 +55,11 @@ contract CDM is Permission, AccessControl, ICDM {
     //////////////////////////////////////////////////////////////*/
 
     event SetParameter(bytes32 indexed parameter, uint256 data);
-    event SetParameter(address indexed account, bytes32 indexed parameter, uint256 data);
+    event SetParameter(
+        address indexed account,
+        bytes32 indexed parameter,
+        uint256 data
+    );
     event ModifyBalance(
         address indexed from,
         address indexed to,
@@ -92,12 +99,15 @@ contract CDM is Permission, AccessControl, ICDM {
     /// @dev Sender has to be allowed to call this method
     /// @param parameter Name of the variable to set
     /// @param data New value to set for the variable [wad]
-    function setParameter(bytes32 parameter, uint256 data) external onlyRole(CONFIG_ROLE) {
+    function setParameter(
+        bytes32 parameter,
+        uint256 data
+    ) external onlyRole(CONFIG_ROLE) {
         if (parameter == "globalDebtCeiling") {
-            if (data > uint256(type(int256).max)) revert CDM__setParameter_debtCeilingExceedsMax();
+            if (data > uint256(type(int256).max))
+                revert CDM__setParameter_debtCeilingExceedsMax();
             globalDebtCeiling = data;
-        }
-        else revert CDM__setParameter_unrecognizedParameter();
+        } else revert CDM__setParameter_unrecognizedParameter();
         emit SetParameter(parameter, data);
     }
 
@@ -105,12 +115,16 @@ contract CDM is Permission, AccessControl, ICDM {
     /// @dev Sender has to be allowed to call this method
     /// @param parameter Name of the variable to set
     /// @param data New value to set for the variable [wad]
-    function setParameter(address debtor, bytes32 parameter, uint256 data) external onlyRole(ACCOUNT_CONFIG_ROLE) {
+    function setParameter(
+        address debtor,
+        bytes32 parameter,
+        uint256 data
+    ) external onlyRole(ACCOUNT_CONFIG_ROLE) {
         if (parameter == "debtCeiling") {
-            if (data > uint256(type(int256).max)) revert CDM__setParameter_debtCeilingExceedsMax();
+            if (data > uint256(type(int256).max))
+                revert CDM__setParameter_debtCeilingExceedsMax();
             accounts[debtor].debtCeiling = data;
-        }
-        else revert CDM__setParameter_unrecognizedParameter();
+        } else revert CDM__setParameter_unrecognizedParameter();
         emit SetParameter(debtor, parameter, data);
     }
 
@@ -127,40 +141,59 @@ contract CDM is Permission, AccessControl, ICDM {
     }
 
     /// @notice Transfers credit from one account to another. If the `from` account's positive balance (credit) isn't
-    /// sufficient to cover the transfer, its balance can go negative (debt) up to the debt ceiling. 
+    /// sufficient to cover the transfer, its balance can go negative (debt) up to the debt ceiling.
     /// @dev Sender has to have the permit of `from` to call this method
     /// @param from Address of the account to transfer credit from
     /// @param to Address of the account to transfer credit to
     /// @param amount Amount of credit to transfer [wad]
     function modifyBalance(address from, address to, uint256 amount) public {
-        if (!hasPermission(from, msg.sender)) revert CDM__modifyBalance_noPermission();
+        if (!hasPermission(from, msg.sender))
+            revert CDM__modifyBalance_noPermission();
         Account memory debtorFrom = accounts[from];
         Account memory debtorTo = accounts[to];
         int256 debtorFromBalanceBefore = debtorFrom.balance;
         int256 debtorToBalanceBefore = debtorTo.balance;
-        
+
         debtorFrom.balance -= toInt256(amount);
         debtorTo.balance += toInt256(amount);
-    
-        if (debtorFrom.balance + toInt256(debtorFrom.debtCeiling) < 0) revert CDM__modifyBalance_debtCeilingExceeded();
-        
+
+        if (debtorFrom.balance + toInt256(debtorFrom.debtCeiling) < 0)
+            revert CDM__modifyBalance_debtCeilingExceeded();
+
         if (
-            debtorFrom.balance < 0 || debtorFromBalanceBefore < 0 || debtorTo.balance < 0 || debtorToBalanceBefore < 0
+            debtorFrom.balance < 0 ||
+            debtorFromBalanceBefore < 0 ||
+            debtorTo.balance < 0 ||
+            debtorToBalanceBefore < 0
         ) {
             uint256 globalDebtBefore = globalDebt;
             uint256 globalDebt_ = globalDebtBefore;
             if (debtorFrom.balance < 0 || debtorFromBalanceBefore < 0)
-                globalDebt_ = globalDebt_ + abs(min(0, debtorFrom.balance)) - abs(min(0, debtorFromBalanceBefore));
+                globalDebt_ =
+                    globalDebt_ +
+                    abs(min(0, debtorFrom.balance)) -
+                    abs(min(0, debtorFromBalanceBefore));
             if (debtorTo.balance < 0 || debtorToBalanceBefore < 0)
-                globalDebt_ = globalDebt_ + abs(min(0, debtorTo.balance)) - abs(min(0, debtorToBalanceBefore));
-            if (globalDebt_ > globalDebtBefore && globalDebt_ > globalDebtCeiling)
-                revert CDM__modifyBalance_globalDebtCeilingExceeded();
+                globalDebt_ =
+                    globalDebt_ +
+                    abs(min(0, debtorTo.balance)) -
+                    abs(min(0, debtorToBalanceBefore));
+            if (
+                globalDebt_ > globalDebtBefore &&
+                globalDebt_ > globalDebtCeiling
+            ) revert CDM__modifyBalance_globalDebtCeilingExceeded();
             globalDebt = globalDebt_;
         }
-        
+
         accounts[from] = debtorFrom;
         accounts[to] = debtorTo;
-        
-        emit ModifyBalance(from, to, debtorFrom.balance, debtorTo.balance, globalDebt);
+
+        emit ModifyBalance(
+            from,
+            to,
+            debtorFrom.balance,
+            debtorTo.balance,
+            globalDebt
+        );
     }
 }

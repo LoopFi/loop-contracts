@@ -15,10 +15,10 @@ import {WAD, min, wdiv, wmul, mul} from "../../../utils/Math.sol";
 
 contract LiquidateHandler is BaseHandler {
     uint256 internal constant COLLATERAL_PER_POSITION = 1_000_000 ether;
-    
+
     uint256 public immutable creditReserve = 100_000_000_000_000 ether;
     uint256 public immutable collateralReserve = 100_000_000_000_000 ether;
-    
+
     uint256 public immutable maxCreateUserAmount = 1;
     uint256 public immutable minLiquidateUserAmount = 1;
 
@@ -40,18 +40,24 @@ contract LiquidateHandler is BaseHandler {
     uint256 internal immutable liquidationDiscount;
     uint64 internal immutable liquidationPenalty;
 
-    function liquidationPrice(uint256 collateral, uint256 normalDebt) internal view returns (uint256 spotPrice) {
-        spotPrice = wmul(wdiv(wmul(normalDebt, uint256(liquidationRatio)), collateral), uint256(0.9 ether));
+    function liquidationPrice(
+        uint256 collateral,
+        uint256 normalDebt
+    ) internal view returns (uint256 spotPrice) {
+        spotPrice = wmul(
+            wdiv(wmul(normalDebt, uint256(liquidationRatio)), collateral),
+            uint256(0.9 ether)
+        );
     }
 
     constructor(
-        CDPVaultWrapper vault_, 
-        InvariantTestBase testContract_, 
+        CDPVaultWrapper vault_,
+        InvariantTestBase testContract_,
         GhostVariableStorage ghostStorage_,
         uint64 positionLiquidationRatio_,
         uint64 targetHealthFactor_,
         uint64 liquidationPenalty_
-    ) BaseHandler ("LiquidateHandler", testContract_, ghostStorage_) {
+    ) BaseHandler("LiquidateHandler", testContract_, ghostStorage_) {
         vault = vault_;
         cdm = CDM(address(vault_.cdm()));
         buffer = address(vault_.buffer());
@@ -59,10 +65,16 @@ contract LiquidateHandler is BaseHandler {
         liquidationRatio = positionLiquidationRatio_;
         liquidationPenalty = liquidationPenalty_;
         targetHealthFactor = targetHealthFactor_;
-        ( ,liquidationDiscount) = vault.liquidationConfig(); 
+        (, liquidationDiscount) = vault.liquidationConfig();
     }
 
-    function getTargetSelectors() public pure virtual override returns (bytes4[] memory selectors, string[] memory names) {
+    function getTargetSelectors()
+        public
+        pure
+        virtual
+        override
+        returns (bytes4[] memory selectors, string[] memory names)
+    {
         selectors = new bytes4[](2);
         names = new string[](2);
         selectors[0] = this.createPositions.selector;
@@ -72,10 +84,13 @@ contract LiquidateHandler is BaseHandler {
         names[1] = "liquidateRandom";
     }
 
-    function createPositions(uint256 seed, uint256 healthFactorSeed) public useCurrentTimestamp {
+    function createPositions(
+        uint256 seed,
+        uint256 healthFactorSeed
+    ) public useCurrentTimestamp {
         trackCallStart(msg.sig);
 
-        // reset state 
+        // reset state
         liquidatedPosition = address(0);
         preLiquidationDebt = 0;
         postLiquidationDebt = 0;
@@ -83,12 +98,18 @@ contract LiquidateHandler is BaseHandler {
         accruedBadDebt = 0;
 
         for (uint256 i = 0; i < maxCreateUserAmount; i++) {
-            address user = address(uint160(uint256(keccak256(abi.encode(msg.sender, seed, i)))));
+            address user = address(
+                uint160(uint256(keccak256(abi.encode(msg.sender, seed, i))))
+            );
             addActor(USERS_CATEGORY, user);
 
             // bound the health factor and calculate collateral and debt, randomize the health factor seed
             uint256 minCollateralRatio = liquidationRatio;
-            uint256 collateralRatio = bound(uint256(keccak256(abi.encode(healthFactorSeed, user))), minCollateralRatio, maxCollateralRatio);
+            uint256 collateralRatio = bound(
+                uint256(keccak256(abi.encode(healthFactorSeed, user))),
+                minCollateralRatio,
+                maxCollateralRatio
+            );
             uint256 collateral = COLLATERAL_PER_POSITION;
             uint256 debt = wdiv(collateral, collateralRatio);
             vault.modifyPermission(user, true);
@@ -96,9 +117,9 @@ contract LiquidateHandler is BaseHandler {
             // create the position
             vm.startPrank(user);
             vault.modifyCollateralAndDebt({
-                owner:user, 
-                collateralizer: address(this), 
-                creditor: user, 
+                owner: user,
+                collateralizer: address(this),
+                creditor: user,
                 deltaCollateral: int256(collateral),
                 deltaNormalDebt: int256(debt)
             });
@@ -112,13 +133,17 @@ contract LiquidateHandler is BaseHandler {
         trackCallStart(msg.sig);
 
         address user = getRandomActor(USERS_CATEGORY, randomSeed);
-        if(user == address(0)) return;
+        if (user == address(0)) return;
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(user);
-        if(collateral == 0 || normalDebt == 0) return;
- 
-        uint256 repayAmount = bound(randomSeed, minLiquidateUserAmount, normalDebt * 2);
-        if(repayAmount == 0) return;
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(user);
+        if (collateral == 0 || normalDebt == 0) return;
+
+        uint256 repayAmount = bound(
+            randomSeed,
+            minLiquidateUserAmount,
+            normalDebt * 2
+        );
+        if (repayAmount == 0) return;
 
         _liquidatePosition(user, repayAmount);
 
@@ -130,50 +155,77 @@ contract LiquidateHandler is BaseHandler {
     function getPositionHealth(
         address position
     ) public view returns (uint256 prevHealth, uint256 currentHealth) {
-        (bytes32 prevHealthBytes, bytes32 currentHealthBytes) = getTrackedValue(keccak256(abi.encodePacked("positionHealth", position)));
+        (bytes32 prevHealthBytes, bytes32 currentHealthBytes) = getTrackedValue(
+            keccak256(abi.encodePacked("positionHealth", position))
+        );
         return (uint256(prevHealthBytes), uint256(currentHealthBytes));
     }
 
     function getPositionDebt(
         address position
     ) public view returns (uint256 prevDebt, uint256 currentDebt) {
-        (bytes32 prevDebtBytes, bytes32 currentDebtBytes) = getTrackedValue(keccak256(abi.encodePacked("positionDebt", position)));
+        (bytes32 prevDebtBytes, bytes32 currentDebtBytes) = getTrackedValue(
+            keccak256(abi.encodePacked("positionDebt", position))
+        );
         return (uint256(prevDebtBytes), uint256(currentDebtBytes));
     }
 
-    function getRepayAmount(address position) public view returns (uint256 amount) {
-        return uint256(getGhostValue(keccak256(abi.encodePacked("repayAmount", position))));
+    function getRepayAmount(
+        address position
+    ) public view returns (uint256 amount) {
+        return
+            uint256(
+                getGhostValue(
+                    keccak256(abi.encodePacked("repayAmount", position))
+                )
+            );
     }
 
-    function _trackPositionHealth(address position, uint256 spot) private returns (uint256 currentHealth){
-        (uint256 collateral, uint256 normalDebt) = vault.positions(position);
+    function _trackPositionHealth(
+        address position,
+        uint256 spot
+    ) private returns (uint256 currentHealth) {
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            position
+        );
         uint64 rateAccumulator = vault.virtualRateAccumulator();
 
         uint256 debt = calculateDebt(normalDebt, rateAccumulator);
         if (collateral == 0 || normalDebt == 0) {
             currentHealth = type(uint256).max;
         } else {
-            currentHealth = wdiv(wdiv(wmul(collateral, spot), debt), liquidationRatio);
+            currentHealth = wdiv(
+                wdiv(wmul(collateral, spot), debt),
+                liquidationRatio
+            );
         }
-        trackValue(keccak256(abi.encodePacked("positionHealth", position)), bytes32(currentHealth));
+        trackValue(
+            keccak256(abi.encodePacked("positionHealth", position)),
+            bytes32(currentHealth)
+        );
     }
 
-    function _trackPositionNormalDebt(address position) private returns (uint256 normalDebt) {
-        ( , normalDebt) = vault.positions(position);
-        trackValue(keccak256(abi.encodePacked("positionDebt", position)), bytes32(normalDebt));
+    function _trackPositionNormalDebt(
+        address position
+    ) private returns (uint256 normalDebt) {
+        (, normalDebt, , , ) = vault.positions(position);
+        trackValue(
+            keccak256(abi.encodePacked("positionDebt", position)),
+            bytes32(normalDebt)
+        );
     }
 
     function _setRepayAmount(address position, uint256 repayAmount) private {
-        setGhostValue(keccak256(abi.encodePacked("repayAmount", position)), bytes32(repayAmount));
+        setGhostValue(
+            keccak256(abi.encodePacked("repayAmount", position)),
+            bytes32(repayAmount)
+        );
     }
 
     /// ======== Liquidation helper functions ======== ///
 
-    function _liquidatePosition(
-        address position, uint256 repayAmount
-    ) private {
-
-        uint256 newSpotPrice =  _getLiquidationPrice(position);
+    function _liquidatePosition(address position, uint256 repayAmount) private {
+        uint256 newSpotPrice = _getLiquidationPrice(position);
         testContract.setOraclePrice(newSpotPrice);
         liquidatedPosition = position;
 
@@ -182,7 +234,7 @@ contract LiquidateHandler is BaseHandler {
         uint64 rateAccumulator = vault.virtualRateAccumulator();
         uint256 debt = calculateDebt(normalDebt, rateAccumulator);
         preLiquidationDebt = debt;
-        
+
         _trackPositionHealth(position, newSpotPrice);
 
         _setRepayAmount(position, repayAmount);
@@ -205,12 +257,18 @@ contract LiquidateHandler is BaseHandler {
         } else {
             accruedBadDebt = 0;
         }
-        
+
         testContract.setOraclePrice(WAD);
     }
 
-    function _getBadDebt(address position, uint256 spotPrice, uint256 repayAmount) view internal returns (uint256 badDebt) {
-        (uint256 collateral, uint256 normalDebt) = vault.positions(position);
+    function _getBadDebt(
+        address position,
+        uint256 spotPrice,
+        uint256 repayAmount
+    ) internal view returns (uint256 badDebt) {
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            position
+        );
         uint256 discountedPrice = wmul(spotPrice, liquidationDiscount);
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
 
@@ -228,15 +286,17 @@ contract LiquidateHandler is BaseHandler {
         if (deltaDebt > takeCollateral) {
             badDebt = deltaDebt - takeCollateral;
         }
-    } 
+    }
 
     function _getLiquidationPrice(
         address position
     ) private view returns (uint256 liquidationPrice_) {
         liquidationPrice_ = WAD;
-        (uint256 collateral, uint256 normalDebt) = vault.positions(position);
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            position
+        );
         uint256 currentLiqPrice = liquidationPrice(collateral, normalDebt);
-        if(liquidationPrice_ > currentLiqPrice) {
+        if (liquidationPrice_ > currentLiqPrice) {
             liquidationPrice_ = currentLiqPrice;
         }
 

@@ -19,31 +19,46 @@ import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/
 import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {ICurvePool} from "../../vendor/ICurvePool.sol";
 
-
 /// @dev Base class for tests that use LeverActions, sets up the balancer pools and tokens and provides utility functions
 contract IntegrationTestBase is TestBase {
     using SafeERC20 for ERC20;
 
     // swap protocols
-    address internal constant ONE_INCH = 0x1111111254EEB25477B68fb85Ed929f73A960582;
-    address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address internal constant ONE_INCH =
+        0x1111111254EEB25477B68fb85Ed929f73A960582;
+    address internal constant BALANCER_VAULT =
+        0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+    address internal constant UNISWAP_V3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // tokens
-    ERC20 constant internal DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    ERC20 constant internal USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    ERC20 constant internal USDT = ERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    ERC20 constant internal WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ERC20 constant internal OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
-    ERC20 constant internal WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    ERC20 internal constant DAI =
+        ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    ERC20 internal constant USDC =
+        ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    ERC20 internal constant USDT =
+        ERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    ERC20 internal constant WETH =
+        ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ERC20 internal constant OHM =
+        ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
+    ERC20 internal constant WSTETH =
+        ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
-    address constant internal USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
-    address constant internal USDT_CHAINLINK_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
-    address constant internal DAI_CHAINLINK_FEED = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;
-    address constant internal LUSD_CHAINLINK_FEED = 0x3D7aE7E594f2f2091Ad8798313450130d0Aba3a0;
-    address constant internal STETH_CHAINLINK_FEED = 0xCfE54B5cD566aB89272946F602D76Ea879CAb4a8;
-    address constant internal ETH_CHAINLINK_FEED = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
-    address constant internal BAL_CHAINLINK_FEED = 0xdF2917806E30300537aEB49A7663062F4d1F2b5F;
+    address internal constant USDC_CHAINLINK_FEED =
+        0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+    address internal constant USDT_CHAINLINK_FEED =
+        0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
+    address internal constant DAI_CHAINLINK_FEED =
+        0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;
+    address internal constant LUSD_CHAINLINK_FEED =
+        0x3D7aE7E594f2f2091Ad8798313450130d0Aba3a0;
+    address internal constant STETH_CHAINLINK_FEED =
+        0xCfE54B5cD566aB89272946F602D76Ea879CAb4a8;
+    address internal constant ETH_CHAINLINK_FEED =
+        0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    address internal constant BAL_CHAINLINK_FEED =
+        0xdF2917806E30300537aEB49A7663062F4d1F2b5F;
 
     // action contracts
     PRBProxyRegistry internal prbProxyRegistry;
@@ -51,38 +66,48 @@ contract IntegrationTestBase is TestBase {
     PoolAction internal poolAction;
 
     // curve 3Pool
-    ICurvePool curve3Pool = ICurvePool(0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7);
+    ICurvePool curve3Pool =
+        ICurvePool(0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7);
 
     // univ3
     IUniswapV3Router univ3Router = IUniswapV3Router(UNISWAP_V3);
 
     // balancer parameters
-    IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
-    IComposableStablePoolFactory internal constant stablePoolFactory = IComposableStablePoolFactory(0x8df6EfEc5547e31B0eb7d1291B511FF8a2bf987c);
+    IBalancerVault internal constant balancerVault =
+        IBalancerVault(BALANCER_VAULT);
+    IComposableStablePoolFactory internal constant stablePoolFactory =
+        IComposableStablePoolFactory(
+            0x8df6EfEc5547e31B0eb7d1291B511FF8a2bf987c
+        );
     IComposableStablePool internal stablePool;
 
-    IWeightedPoolFactory internal constant weightedPoolFactory = IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
+    IWeightedPoolFactory internal constant weightedPoolFactory =
+        IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
     IComposableStablePool internal weightedPool;
 
     bytes32 internal weightedPoolId;
-    
-    bytes32 internal constant daiOhmPoolId = 0x76fcf0e8c7ff37a47a799fa2cd4c13cde0d981c90002000000000000000003d2;
-    bytes32 internal constant wethOhmPoolId = 0xd1ec5e215e8148d76f4460e4097fd3d5ae0a35580002000000000000000003d3;
-    bytes32 internal constant wethDaiPoolId = 0x0b09dea16768f0799065c475be02919503cb2a3500020000000000000000001a;
-    bytes32 internal constant wstEthWethPoolId = 0x32296969ef14eb0c6d29669c550d4a0449130230000200000000000000000080;
+
+    bytes32 internal constant daiOhmPoolId =
+        0x76fcf0e8c7ff37a47a799fa2cd4c13cde0d981c90002000000000000000003d2;
+    bytes32 internal constant wethOhmPoolId =
+        0xd1ec5e215e8148d76f4460e4097fd3d5ae0a35580002000000000000000003d3;
+    bytes32 internal constant wethDaiPoolId =
+        0x0b09dea16768f0799065c475be02919503cb2a3500020000000000000000001a;
+    bytes32 internal constant wstEthWethPoolId =
+        0x32296969ef14eb0c6d29669c550d4a0449130230000200000000000000000080;
     bytes32 internal stablePoolId;
 
     // Empty join params
     PoolActionParams emptyJoin;
 
     // base rates
-    uint256 constant internal BASE_RATE_1_0 = 1 ether; // 0% base rate
-    uint256 constant internal BASE_RATE_1_005 = 1000000000157721789; // 0.5% base rate
-    uint256 constant internal BASE_RATE_1_025 = 1000000000780858271; // 2.5% base rate
+    uint256 internal constant BASE_RATE_1_0 = 1 ether; // 0% base rate
+    uint256 internal constant BASE_RATE_1_005 = 1000000000157721789; // 0.5% base rate
+    uint256 internal constant BASE_RATE_1_025 = 1000000000780858271; // 2.5% base rate
 
-    function setUp() public virtual override { 
+    function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("mainnet"), getForkBlockNumber());
-        
+
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
@@ -112,22 +137,24 @@ contract IntegrationTestBase is TestBase {
         vm.label(address(LUSD_CHAINLINK_FEED), "LUSD Chainlink Feed");
     }
 
-    function getForkBlockNumber() internal virtual pure returns (uint256){
+    function getForkBlockNumber() internal pure virtual returns (uint256) {
         return 17055414; // 15/04/2023 20:43:00 UTC
     }
-    
+
     /// @dev perform balancer swap via swapParams in simulated env and return the return amount
-    function _simulateBalancerSwap(SwapParams memory swapParams) internal returns (uint256 retAmount) {
+    function _simulateBalancerSwap(
+        SwapParams memory swapParams
+    ) internal returns (uint256 retAmount) {
         uint256 snapshot = vm.snapshot();
         retAmount = _balancerSwap(swapParams);
         vm.revertTo(snapshot);
     }
 
     /// @dev perform multiple balancer swaps via swapParams in simulated env and return the return amounts
-    function _simulateBalancerSwapMulti(SwapParams memory swap1, SwapParams memory swap2) internal returns (
-        uint256 retAmount1,
-        uint256 retAmount2
-    ) {
+    function _simulateBalancerSwapMulti(
+        SwapParams memory swap1,
+        SwapParams memory swap2
+    ) internal returns (uint256 retAmount1, uint256 retAmount2) {
         uint256 snapshot = vm.snapshot();
         retAmount1 = _balancerSwap(swap1);
         retAmount2 = _balancerSwap(swap2);
@@ -135,8 +162,12 @@ contract IntegrationTestBase is TestBase {
     }
 
     /// @dev perform balancer swap via swapParams
-    function _balancerSwap(SwapParams memory swapParams) internal returns (uint256 retAmount) {
-        uint256 amount = swapParams.swapType == SwapType.EXACT_IN ? swapParams.amount : swapParams.limit;
+    function _balancerSwap(
+        SwapParams memory swapParams
+    ) internal returns (uint256 retAmount) {
+        uint256 amount = swapParams.swapType == SwapType.EXACT_IN
+            ? swapParams.amount
+            : swapParams.limit;
 
         // mint assetIn to leverActions so we can execute the swap
         deal(swapParams.assetIn, address(swapAction), amount);
@@ -145,8 +176,10 @@ contract IntegrationTestBase is TestBase {
     }
 
     /// @dev create a Stablecoin, USDC, DAI stable pool on Balancer with deep liquidity
-    function _createBalancerStablecoinPool() internal returns (IComposableStablePool stablePool_) {
-
+    function _createBalancerStablecoinPool()
+        internal
+        returns (IComposableStablePool stablePool_)
+    {
         // mint the liquidity
         deal(address(DAI), address(this), 5_000_000 * 1e18);
         deal(address(USDC), address(this), 5_000_000 * 1e6);
@@ -164,19 +197,16 @@ contract IntegrationTestBase is TestBase {
         address tempAsset;
         for (uint256 i; i < assets.length; i++) {
             if (!stablecoinPlaced) {
-
                 // check if we can to insert stablecoin at this position
                 if (uint160(assets[i]) > uint160(address(stablecoin))) {
                     // insert stablecoin into list
                     stablecoinPlaced = true;
                     tempAsset = assets[i];
                     assets[i] = address(stablecoin);
-
                 } else if (i == assets.length - 1) {
                     // stablecoin still not inserted, but we are at the end of the list, insert it here
                     assets[i] = address(stablecoin);
                 }
-
             } else {
                 // stablecoin has been inserted, move every asset index up
                 address placeholder = assets[i];
@@ -188,7 +218,10 @@ contract IntegrationTestBase is TestBase {
         // set maxAmountIn and approve balancer vault
         for (uint256 i; i < assets.length; i++) {
             maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
-            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+            ERC20(assets[i]).safeApprove(
+                address(balancerVault),
+                maxAmountsIn[i]
+            );
         }
 
         // create the pool
@@ -215,8 +248,14 @@ contract IntegrationTestBase is TestBase {
         );
     }
 
-    function _createBalancerStablecoinWeightedPool() internal returns (IComposableStablePool pool_) {
-        uint256 wethLiquidityAmt = wdiv(uint256(5_000_000_000 ether),_getWETHRateInUSD());
+    function _createBalancerStablecoinWeightedPool()
+        internal
+        returns (IComposableStablePool pool_)
+    {
+        uint256 wethLiquidityAmt = wdiv(
+            uint256(5_000_000_000 ether),
+            _getWETHRateInUSD()
+        );
         deal(address(WSTETH), address(this), wethLiquidityAmt);
         stablecoin.mint(address(this), 5_000_000_000 * 1e18);
 
@@ -232,19 +271,16 @@ contract IntegrationTestBase is TestBase {
         address tempAsset;
         for (uint256 i; i < assets.length; i++) {
             if (!stablecoinPlaced) {
-
                 // check if we can to insert stablecoin at this position
                 if (uint160(assets[i]) > uint160(address(stablecoin))) {
                     // insert stablecoin into list
                     stablecoinPlaced = true;
                     tempAsset = assets[i];
                     assets[i] = address(stablecoin);
-
                 } else if (i == assets.length - 1) {
                     // stablecoin still not inserted, but we are at the end of the list, insert it here
                     assets[i] = address(stablecoin);
                 }
-
             } else {
                 // stablecoin has been inserted, move every asset index up
                 address placeholder = assets[i];
@@ -256,7 +292,10 @@ contract IntegrationTestBase is TestBase {
         // set maxAmountIn and approve balancer vault
         for (uint256 i; i < assets.length; i++) {
             maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
-            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+            ERC20(assets[i]).safeApprove(
+                address(balancerVault),
+                maxAmountsIn[i]
+            );
         }
 
         // create the pool
@@ -281,12 +320,14 @@ contract IntegrationTestBase is TestBase {
                 fromInternalBalance: false
             })
         );
-    } 
+    }
 
     /// @dev add liquidity to DAI/WETH balancer pool
-    function _addLiquidityToWethDaiPool() internal  {
-        uint256 daiLiquidityAmt = 2_000_000*1e18; // 40%
-        uint256 wethLiquidityAmt = (daiLiquidityAmt * _getDaiRateInWeth() * 15 / 1e19); // 60%
+    function _addLiquidityToWethDaiPool() internal {
+        uint256 daiLiquidityAmt = 2_000_000 * 1e18; // 40%
+        uint256 wethLiquidityAmt = ((daiLiquidityAmt *
+            _getDaiRateInWeth() *
+            15) / 1e19); // 60%
         deal(address(DAI), address(this), daiLiquidityAmt);
         deal(address(WETH), address(this), wethLiquidityAmt);
 
@@ -297,7 +338,7 @@ contract IntegrationTestBase is TestBase {
         uint256[] memory maxAmountsIn = new uint256[](2);
         maxAmountsIn[0] = daiLiquidityAmt;
         maxAmountsIn[1] = wethLiquidityAmt;
-        
+
         DAI.approve(address(balancerVault), daiLiquidityAmt);
         WETH.approve(address(balancerVault), wethLiquidityAmt);
 
@@ -308,35 +349,54 @@ contract IntegrationTestBase is TestBase {
             JoinPoolRequest({
                 assets: assets,
                 maxAmountsIn: maxAmountsIn,
-                userData: abi.encode(JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT, maxAmountsIn),
+                userData: abi.encode(
+                    JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT,
+                    maxAmountsIn
+                ),
                 fromInternalBalance: false
             })
         );
-
     }
-    
+
     /// @dev returns the current rate of DAI to WETH in the balancer pool in 1e18
     function _getWethRateInDai() internal view returns (uint256) {
-        uint256 daiToWeth = uint256(PriceFeed(0x773616E4d11A78F511299002da57A0a94577F1f4).latestAnswer());
-        return 1e18 * 1e18 / daiToWeth;
+        uint256 daiToWeth = uint256(
+            PriceFeed(0x773616E4d11A78F511299002da57A0a94577F1f4).latestAnswer()
+        );
+        return (1e18 * 1e18) / daiToWeth;
     }
 
     function _getDaiRateInWeth() internal view returns (uint256) {
-        return uint256(PriceFeed(0x773616E4d11A78F511299002da57A0a94577F1f4).latestAnswer());
+        return
+            uint256(
+                PriceFeed(0x773616E4d11A78F511299002da57A0a94577F1f4)
+                    .latestAnswer()
+            );
     }
 
     function _getWstETHRateInUSD() internal view returns (uint256) {
         uint256 wstethAmount = IWSTETH(address(WSTETH)).tokensPerStEth();
-        uint256 stEthPrice = wdiv(uint256(PriceFeed(STETH_CHAINLINK_FEED).latestAnswer()), 10**ERC20(STETH_CHAINLINK_FEED).decimals());
+        uint256 stEthPrice = wdiv(
+            uint256(PriceFeed(STETH_CHAINLINK_FEED).latestAnswer()),
+            10 ** ERC20(STETH_CHAINLINK_FEED).decimals()
+        );
         return wmul(wstethAmount, stEthPrice);
     }
 
     function _getWETHRateInUSD() internal view returns (uint256) {
-        return wdiv(uint256(PriceFeed(ETH_CHAINLINK_FEED).latestAnswer()), 10**ERC20(ETH_CHAINLINK_FEED).decimals());
+        return
+            wdiv(
+                uint256(PriceFeed(ETH_CHAINLINK_FEED).latestAnswer()),
+                10 ** ERC20(ETH_CHAINLINK_FEED).decimals()
+            );
     }
 
     function _getBALRateInUSD() internal view returns (uint256) {
-        return wdiv(uint256(PriceFeed(BAL_CHAINLINK_FEED).latestAnswer()), 10**ERC20(BAL_CHAINLINK_FEED).decimals());
+        return
+            wdiv(
+                uint256(PriceFeed(BAL_CHAINLINK_FEED).latestAnswer()),
+                10 ** ERC20(BAL_CHAINLINK_FEED).decimals()
+            );
     }
 
     function _getStablecoinRateInUSD() internal returns (uint256) {
@@ -347,12 +407,16 @@ contract IntegrationTestBase is TestBase {
         assets[0] = address(stablecoin);
         assets[1] = address(DAI);
 
-        address user = vm.addr(uint256(keccak256("DummyUser"))); 
-        PRBProxy userProxy = PRBProxy(payable(address(prbProxyRegistry.getProxy(user)))); 
-        if(address(userProxy) == address(0)){
-            userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
+        address user = vm.addr(uint256(keccak256("DummyUser")));
+        PRBProxy userProxy = PRBProxy(
+            payable(address(prbProxyRegistry.getProxy(user)))
+        );
+        if (address(userProxy) == address(0)) {
+            userProxy = PRBProxy(
+                payable(address(prbProxyRegistry.deployFor(user)))
+            );
         }
-            
+
         vm.startPrank(user);
         deal(address(stablecoin), address(userProxy), 1e18);
         SwapParams memory swapParams = SwapParams({
@@ -373,12 +437,18 @@ contract IntegrationTestBase is TestBase {
         vm.stopPrank();
         uint256 amountOut = abi.decode(response, (uint256));
 
-        uint256 daiPrice = wdiv(uint256(PriceFeed(DAI_CHAINLINK_FEED).latestAnswer()), 10**ERC20(DAI_CHAINLINK_FEED).decimals());
+        uint256 daiPrice = wdiv(
+            uint256(PriceFeed(DAI_CHAINLINK_FEED).latestAnswer()),
+            10 ** ERC20(DAI_CHAINLINK_FEED).decimals()
+        );
         return wmul(amountOut, daiPrice);
     }
 
-    function _virtualDebt(CDPVault vault, address position) internal view returns (uint256) {
-        (, uint256 normalDebt) = vault.positions(position);
+    function _virtualDebt(
+        CDPVault vault,
+        address position
+    ) internal view returns (uint256) {
+        (, uint256 normalDebt, , , ) = vault.positions(position);
         uint64 rateAccumulator = vault.virtualRateAccumulator();
         return wmul(rateAccumulator, normalDebt);
     }
@@ -392,7 +462,10 @@ contract IntegrationTestBase is TestBase {
         if (calculateDebt(normalDebt, rateAccumulator) < debt) normalDebt += 1;
     }
 
-    function _normalDebtToDebt(address vault, uint256 normalDebt) internal view returns (uint256) {
+    function _normalDebtToDebt(
+        address vault,
+        uint256 normalDebt
+    ) internal view returns (uint256) {
         uint64 rateAccumulator = CDPVault(vault).virtualRateAccumulator();
         return calculateDebt(normalDebt, rateAccumulator);
     }
@@ -431,7 +504,7 @@ interface IComposableStablePoolFactory {
 }
 
 interface IWeightedPoolFactory {
-        function create(
+    function create(
         string memory name,
         string memory symbol,
         address[] memory tokens,

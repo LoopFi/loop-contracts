@@ -21,12 +21,11 @@ import {CDPVaultWrapper} from "./CDPVaultWrapper.sol";
 /// @title InvariantTestBase
 /// @notice Base test contract with common logic needed by all invariant test contracts.
 contract InvariantTestBase is TestBase {
+    uint256 internal constant EPSILON = 500;
 
-    uint256 constant internal EPSILON = 500;
-
-    uint64 constant internal BASE_RATE_1_0 = 1 ether; // 0% base rate
-    uint64 constant internal BASE_RATE_1_005 = 1000000000157721789; // 0.5% base rate
-    uint64 constant internal BASE_RATE_1_025 = 1000000000780858271; // 2.5% base rate
+    uint64 internal constant BASE_RATE_1_0 = 1 ether; // 0% base rate
+    uint64 internal constant BASE_RATE_1_005 = 1000000000157721789; // 0.5% base rate
+    uint64 internal constant BASE_RATE_1_025 = 1000000000780858271; // 2.5% base rate
 
     /// ======== Storage ======== ///
 
@@ -35,7 +34,7 @@ contract InvariantTestBase is TestBase {
         handler.printCallReport();
     }
 
-    function setUp() public override virtual{
+    function setUp() public virtual override {
         super.setUp();
         filterSenders();
     }
@@ -53,13 +52,16 @@ contract InvariantTestBase is TestBase {
     }
 
     // Invariant B: conservation of `Stablecoin` is maintained
-    function assert_invariant_Stablecoin_B(uint256 mintAccumulator, uint256 burnAccumulator) public {
+    function assert_invariant_Stablecoin_B(
+        uint256 mintAccumulator,
+        uint256 burnAccumulator
+    ) public {
         uint256 stablecoinInExistence = mintAccumulator - burnAccumulator;
         assertEq(stablecoin.totalSupply(), stablecoinInExistence);
     }
 
     /// ======== PSM Invariant Asserts ======== ///
-        /*
+    /*
     PSM Invariants:
         - Invariant A: `totalSupply` of `Stablecoin` is equal to `globalDebt` and is equal to the collateral balance of the PSM
     */
@@ -99,7 +101,7 @@ contract InvariantTestBase is TestBase {
         uint256 totalUserCredit = 0;
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (int256 balance,) = cdm.accounts(user);
+            (int256 balance, ) = cdm.accounts(user);
             totalUserCredit += getCredit(balance);
         }
 
@@ -144,14 +146,17 @@ contract InvariantTestBase is TestBase {
     */
 
     // Invariant A: `balanceOf` collateral `token`'s of a `CDPVault` is greater or equal to the sum of all the `CDPVault`'s `Position`'s `collateral` amounts and the sum of all `cash` balances
-    function assert_invariant_CDPVault_A(CDPVault vault, BaseHandler handler) public {
+    function assert_invariant_CDPVault_A(
+        CDPVault vault,
+        BaseHandler handler
+    ) public {
         uint256 totalCollateralBalance = 0;
         uint256 totalCashBalance = 0;
 
         uint256 userCount = handler.count(USERS_CATEGORY);
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (uint256 collateral, ) = vault.positions(user);
+            (uint256 collateral, , , , ) = vault.positions(user);
             totalCollateralBalance += collateral;
             totalCashBalance += vault.cash(user);
         }
@@ -162,13 +167,16 @@ contract InvariantTestBase is TestBase {
     }
 
     // Invariant B: sum of `normalDebt` of all `Positions` is equal to `totalNormalDebt`
-    function assert_invariant_CDPVault_B(CDPVault vault, BaseHandler handler) public {
+    function assert_invariant_CDPVault_B(
+        CDPVault vault,
+        BaseHandler handler
+    ) public {
         uint256 totalNormalDebt = 0;
 
         uint256 userCount = handler.count(USERS_CATEGORY);
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (, uint256 normalDebt) = vault.positions(user);
+            (, uint256 normalDebt, , , ) = vault.positions(user);
             totalNormalDebt += normalDebt;
         }
 
@@ -176,13 +184,16 @@ contract InvariantTestBase is TestBase {
     }
 
     // Invariant C: `debt` for all `Positions` is greater than `debtFloor` or zero
-    function assert_invariant_CDPVault_C(CDPVault vault, BaseHandler handler) public {
+    function assert_invariant_CDPVault_C(
+        CDPVault vault,
+        BaseHandler handler
+    ) public {
         (uint128 debtFloor, ) = vault.vaultConfig();
 
         uint256 userCount = handler.count(USERS_CATEGORY);
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (, uint256 normalDebt) = vault.positions(user);
+            (, uint256 normalDebt, , , ) = vault.positions(user);
             if (normalDebt != 0) {
                 assertGe(normalDebt, debtFloor);
             }
@@ -190,13 +201,18 @@ contract InvariantTestBase is TestBase {
     }
 
     // - Invariant D: all `Positions` are safe
-    function assert_invariant_CDPVault_D(CDPVault vault, BaseHandler handler) public {
+    function assert_invariant_CDPVault_D(
+        CDPVault vault,
+        BaseHandler handler
+    ) public {
         uint256 userCount = handler.count(USERS_CATEGORY);
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (uint256 collateral, uint256 normalDebt) = vault.positions(user);
+            (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+                user
+            );
             // ensure that the position is safe (i.e. collateral * liquidationPrice >= normalDebt)
-            assertGe(wmul(collateral, liquidationPrice(vault)) ,normalDebt);
+            assertGe(wmul(collateral, liquidationPrice(vault)), normalDebt);
         }
     }
 
@@ -209,34 +225,41 @@ contract InvariantTestBase is TestBase {
         - Invariant C: `virtualRateAccumulator` is equal to `rateAccumulator` post update
     */
 
-
     // - Invariant A: 1 <= `rateAccumulator`
     function assert_invariant_IRM_A(CDPVault vault) public {
-        (CDPVault.IRS memory irs) = vault.getIRS();
+        CDPVault.IRS memory irs = vault.getIRS();
         assertGe(irs.rateAccumulator, WAD);
     }
 
     // - Invariant B: `rateAccumulator` at block x <= `rateAccumulator` at block y, if x < y and specifically if `rateAccumulator` was updated in between the blocks x and y
     function assert_invariant_IRM_B(BaseHandler handler) public {
         uint256 userCount = handler.count(USERS_CATEGORY);
-        
+
         for (uint256 i = 0; i < userCount; ++i) {
             address user = handler.getActor(USERS_CATEGORY, i);
-            (bytes32 prevValue, bytes32 value) = handler.getTrackedValue(getValueKey(user, RATE_ACCUMULATOR));
+            (bytes32 prevValue, bytes32 value) = handler.getTrackedValue(
+                getValueKey(user, RATE_ACCUMULATOR)
+            );
             assertGe(uint256(value), uint256(prevValue));
         }
     }
 
     // - Invariant C: `virtualRateAccumulator` is equal to `rateAccumulator` post update
-    function assert_invariant_IRM_C(CDPVaultWrapper vault, BaseHandler handler) public {
+    function assert_invariant_IRM_C(
+        CDPVaultWrapper vault,
+        BaseHandler handler
+    ) public {
         uint256 userCount = handler.count(USERS_CATEGORY);
-        if(userCount == 0) return;
+        if (userCount == 0) return;
         uint64 rateAccumulator = vault.virtualRateAccumulator();
         address user = handler.getActor(USERS_CATEGORY, 0);
-        vault.modifyCollateralAndDebt(user,user,user,0,0);
+        vault.modifyCollateralAndDebt(user, user, user, 0, 0);
         CDPVault.IRS memory irs = vault.getIRS();
-        assertApproxEqAbs(uint256(rateAccumulator), uint256(irs.rateAccumulator), 100);
-
+        assertApproxEqAbs(
+            uint256(rateAccumulator),
+            uint256(irs.rateAccumulator),
+            100
+        );
     }
 
     /// ======== Liquidation Invariant Asserts ======== ///
@@ -259,7 +282,10 @@ contract InvariantTestBase is TestBase {
     }
 
     // - Invariant B: credit paid should never be larger than `debt` / `liquidationPenalty`
-    function assert_invariant_Liquidation_B(CDPVaultWrapper vault, LiquidateHandler handler) public {
+    function assert_invariant_Liquidation_B(
+        CDPVaultWrapper vault,
+        LiquidateHandler handler
+    ) public {
         (uint64 liquidationPenalty, ) = vault.liquidationConfig();
         uint256 totalDebt = handler.preLiquidationDebt();
         uint256 creditPaid = handler.creditPaid();
@@ -267,9 +293,12 @@ contract InvariantTestBase is TestBase {
     }
 
     // - Invariant C: `position.collateral` should be zero if `position.normalDebt` is zero for a liquidated position
-    function assert_invariant_Liquidation_C(CDPVaultWrapper vault, LiquidateHandler handler) public {
+    function assert_invariant_Liquidation_C(
+        CDPVaultWrapper vault,
+        LiquidateHandler handler
+    ) public {
         address user = handler.liquidatedPosition();
-        (uint256 collateral, uint256 normalDebt) = vault.positions(user);
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(user);
         if (collateral == 0) {
             assertEq(normalDebt, 0);
         }
@@ -283,15 +312,23 @@ contract InvariantTestBase is TestBase {
     }
 
     // - Invariant E: delta debt should be equal to credit paid * `liquidationPenalty` + badDebt
-    function assert_invariant_Liquidation_E(CDPVaultWrapper vault, LiquidateHandler handler) public {
+    function assert_invariant_Liquidation_E(
+        CDPVaultWrapper vault,
+        LiquidateHandler handler
+    ) public {
         (uint64 liquidationPenalty, ) = vault.liquidationConfig();
         uint256 creditPaid = handler.creditPaid();
-        uint256 deltaDebt = handler.preLiquidationDebt() - handler.postLiquidationDebt();
+        uint256 deltaDebt = handler.preLiquidationDebt() -
+            handler.postLiquidationDebt();
         uint256 accruedBadDebt = handler.accruedBadDebt();
 
-        assertApproxEqAbs(deltaDebt , wmul(creditPaid,liquidationPenalty) + accruedBadDebt , EPSILON);
+        assertApproxEqAbs(
+            deltaDebt,
+            wmul(creditPaid, liquidationPenalty) + accruedBadDebt,
+            EPSILON
+        );
     }
-    
+
     /// ======== Helper Functions ======== ///
 
     function filterSenders() internal virtual {
@@ -318,7 +355,7 @@ contract InvariantTestBase is TestBase {
             oracle: oracle,
             buffer: buffer,
             token: token_,
-            tokenScale: 10**IERC20Metadata(address(token_)).decimals()
+            tokenScale: 10 ** IERC20Metadata(address(token_)).decimals()
         });
 
         CDPVaultConfig memory configs = CDPVaultConfig({
@@ -335,7 +372,11 @@ contract InvariantTestBase is TestBase {
         vault = new CDPVaultWrapper(constants, configs);
 
         if (debtCeiling > 0) {
-            constants.cdm.setParameter(address(vault), "debtCeiling", debtCeiling);
+            constants.cdm.setParameter(
+                address(vault),
+                "debtCeiling",
+                debtCeiling
+            );
         }
 
         cdm.modifyPermission(address(vault), true);

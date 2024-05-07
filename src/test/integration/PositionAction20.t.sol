@@ -89,10 +89,16 @@ contract PositionAction20Test is IntegrationTestBase {
 
         // setup user and userProxy
         user = vm.addr(0x12341234);
-        userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
+        userProxy = PRBProxy(
+            payable(address(prbProxyRegistry.deployFor(user)))
+        );
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction20(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction)
+        );
 
         // set up variables to avoid stack too deep
         stablePoolIdArray.push(stablePoolId);
@@ -123,7 +129,6 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.prank(user);
         DAI.approve(address(userProxy), depositAmount);
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -136,7 +141,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -144,7 +151,7 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_DAI_vault_with_entry_swap_from_USDC() public {
         uint256 depositAmount = 10_000 * 1e6;
-        uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; // convert 6 decimals to 18 and add 1% slippage
+        uint256 amountOutMin = (depositAmount * 1e12 * 98) / 100; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, depositAmount);
 
@@ -172,11 +179,12 @@ contract PositionAction20Test is IntegrationTestBase {
             })
         });
 
-        uint256 expectedCollateral = _simulateBalancerSwap(collateralParams.auxSwap);
+        uint256 expectedCollateral = _simulateBalancerSwap(
+            collateralParams.auxSwap
+        );
 
         vm.prank(user);
         USDC.approve(address(userProxy), depositAmount);
-
 
         vm.prank(user);
         userProxy.execute(
@@ -190,7 +198,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedCollateral);
         assertEq(normalDebt, 0);
@@ -198,10 +208,9 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_USDC_vault_with_entry_swap_from_DAI() public {
         uint256 depositAmount = 10_000 ether;
-        uint256 amountOutMin = depositAmount * 99 / 100e12; // convert 18 decimals to 6 and add 1% slippage
+        uint256 amountOutMin = (depositAmount * 99) / 100e12; // convert 18 decimals to 6 and add 1% slippage
 
         deal(address(DAI), user, depositAmount);
-
 
         // build increase collateral params
         bytes32[] memory poolIds = new bytes32[](1);
@@ -228,11 +237,12 @@ contract PositionAction20Test is IntegrationTestBase {
         });
 
         // USDC out converted to DAI decimals
-        uint256 expectedCollateral = _simulateBalancerSwap(collateralParams.auxSwap)*1e12;
+        uint256 expectedCollateral = _simulateBalancerSwap(
+            collateralParams.auxSwap
+        ) * 1e12;
 
         vm.prank(user);
         DAI.approve(address(userProxy), depositAmount);
-
 
         vm.prank(user);
         userProxy.execute(
@@ -246,7 +256,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = usdcVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedCollateral);
         assertEq(normalDebt, 0);
@@ -264,7 +276,6 @@ contract PositionAction20Test is IntegrationTestBase {
             auxSwap: emptySwap
         });
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -277,17 +288,20 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
     }
 
     function test_deposit_to_an_unrelated_position() public {
-
         // create 2nd position
         address alice = vm.addr(0x45674567);
-        PRBProxy aliceProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(alice))));
+        PRBProxy aliceProxy = PRBProxy(
+            payable(address(prbProxyRegistry.deployFor(alice)))
+        );
 
         uint256 depositAmount = 10_000 ether;
 
@@ -303,7 +317,6 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.prank(user);
         DAI.approve(address(userProxy), depositAmount);
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -316,7 +329,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(aliceProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(aliceProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -324,8 +339,8 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_EXACT_OUT() public {
         uint256 depositAmount = 10_000 ether;
-        //uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; 
-        uint256 amountInMax = depositAmount * 101 / 100e12; // convert 6 decimals to 18 and add 1% slippage
+        //uint256 amountOutMin = depositAmount * 1e12 * 98 / 100;
+        uint256 amountInMax = (depositAmount * 101) / 100e12; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, amountInMax);
 
@@ -353,11 +368,12 @@ contract PositionAction20Test is IntegrationTestBase {
             })
         });
 
-        uint256 expectedAmountIn = _simulateBalancerSwap(collateralParams.auxSwap);
+        uint256 expectedAmountIn = _simulateBalancerSwap(
+            collateralParams.auxSwap
+        );
 
         vm.startPrank(user);
         USDC.approve(address(userProxy), amountInMax);
-
 
         userProxy.execute(
             address(positionAction),
@@ -371,7 +387,9 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -380,7 +398,7 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_InvalidAuxSwap() public {
         uint256 depositAmount = 10_000 * 1e6;
-        uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; // convert 6 decimals to 18 and add 1% slippage
+        uint256 amountOutMin = (depositAmount * 1e12 * 98) / 100; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, depositAmount);
 
@@ -413,7 +431,9 @@ contract PositionAction20Test is IntegrationTestBase {
 
         // trigger PositionAction__deposit_InvalidAuxSwap
         collateralParams.auxSwap.recipient = user;
-        vm.expectRevert(PositionAction.PositionAction__deposit_InvalidAuxSwap.selector);
+        vm.expectRevert(
+            PositionAction.PositionAction__deposit_InvalidAuxSwap.selector
+        );
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -452,11 +472,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
     }
 
@@ -485,7 +507,7 @@ contract PositionAction20Test is IntegrationTestBase {
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(DAI),
                     amount: initialDeposit,
-                    limit: initialDeposit/1e12 * 99/100,
+                    limit: ((initialDeposit / 1e12) * 99) / 100,
                     recipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
@@ -505,11 +527,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
-        
-        (int256 balance,) = cdm.accounts(address(userProxy));
+
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
         assertEq(USDT.balanceOf(address(user)), expectedAmountOut);
     }
@@ -532,14 +556,14 @@ contract PositionAction20Test is IntegrationTestBase {
 
             collateralParams = CollateralParams({
                 targetToken: address(DAI),
-                amount: initialDeposit*1e12,
+                amount: initialDeposit * 1e12,
                 collateralizer: address(user),
                 auxSwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(USDT),
                     amount: initialDeposit,
-                    limit: initialDeposit*1e12 * 99/100,
+                    limit: (initialDeposit * 1e12 * 99) / 100,
                     recipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
@@ -559,11 +583,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = usdcVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(DAI.balanceOf(address(user)), expectedAmountOut);
@@ -575,7 +601,7 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(daiVault), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether;
+        uint256 borrowAmount = 500 * 1 ether;
         deal(address(DAI), user, borrowAmount);
 
         // build borrow params
@@ -596,11 +622,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, initialDeposit);
         assertEq(normalDebt, borrowAmount);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
         assertEq(stablecoin.balanceOf(user), borrowAmount);
     }
@@ -611,15 +639,25 @@ contract PositionAction20Test is IntegrationTestBase {
 
         uint256 depositAmount = 10_000 ether;
         uint256 borrowAmount = 5_000 ether;
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
         assertEq(collateral, depositAmount);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, _debtToNormalDebt(address(daiVault), borrowAmount));
+        assertEq(
+            normalDebt,
+            _debtToNormalDebt(address(daiVault), borrowAmount)
+        );
 
         // assert that debt is minted to the user
         assertEq(stablecoin.balanceOf(user), borrowAmount);
@@ -631,8 +669,8 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(daiVault), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether;
-        uint256 minAmountOut = borrowAmount * 99 / 100e12; // convert from stablecoin to usdc decimals
+        uint256 borrowAmount = 500 * 1 ether;
+        uint256 minAmountOut = (borrowAmount * 99) / 100e12; // convert from stablecoin to usdc decimals
         uint256 expectedAmountOut;
         deal(address(DAI), user, borrowAmount);
 
@@ -645,7 +683,6 @@ contract PositionAction20Test is IntegrationTestBase {
             address[] memory assets = new address[](2);
             assets[0] = address(stablecoin);
             assets[1] = address(USDC);
-
 
             // build borrow params
             creditParams = CreditParams({
@@ -676,11 +713,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, initialDeposit);
         assertEq(normalDebt, borrowAmount);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(stablecoin.balanceOf(user), 0);
@@ -693,8 +732,8 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(daiVault), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether/1e12;
-        uint256 maxAmountIn = borrowAmount * 101e12/100; // convert from stablecoin to usdc decimals
+        uint256 borrowAmount = (500 * 1 ether) / 1e12;
+        uint256 maxAmountIn = (borrowAmount * 101e12) / 100; // convert from stablecoin to usdc decimals
         uint256 expectedAmountIn;
 
         // build borrow params
@@ -706,7 +745,6 @@ contract PositionAction20Test is IntegrationTestBase {
             address[] memory assets = new address[](2);
             assets[0] = address(USDC);
             assets[1] = address(stablecoin);
-
 
             // build borrow params
             creditParams = CreditParams({
@@ -737,11 +775,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, initialDeposit);
         assertEq(normalDebt, maxAmountIn);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(stablecoin.balanceOf(user), maxAmountIn - expectedAmountIn); // ensure left over stablecoin is sent to user
@@ -753,7 +793,7 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(daiVault), depositAmount);
 
         uint256 borrowAmount = 5_000 ether; // borrow 5k stablecoin
-        uint256 minAmountOut = borrowAmount * 99 / 100e12; // convert from stablecoin to usdc decimals
+        uint256 minAmountOut = (borrowAmount * 99) / 100e12; // convert from stablecoin to usdc decimals
 
         bytes32[] memory poolIds = new bytes32[](1);
         poolIds[0] = stablePoolId;
@@ -790,7 +830,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, borrowAmount);
@@ -803,7 +845,7 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(usdcVault), depositAmount);
 
         uint256 borrowAmount = 5_000 ether; // borrow 5k stablecoin
-        uint256 minAmountOut = borrowAmount * 99 / 100;
+        uint256 minAmountOut = (borrowAmount * 99) / 100;
 
         bytes32[] memory poolIds = new bytes32[](1);
         poolIds[0] = stablePoolId;
@@ -840,9 +882,11 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = usdcVault.positions(
+            address(userProxy)
+        );
 
-        assertEq(collateral, depositAmount*1e12);
+        assertEq(collateral, depositAmount * 1e12);
         assertEq(normalDebt, borrowAmount);
 
         assertEq(DAI.balanceOf(user), expectedAmountOut);
@@ -851,7 +895,9 @@ contract PositionAction20Test is IntegrationTestBase {
     function test_borrow_as_permission_agent() public {
         // create 2nd position
         address alice = vm.addr(0x45674567);
-        PRBProxy aliceProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(alice))));
+        PRBProxy aliceProxy = PRBProxy(
+            payable(address(prbProxyRegistry.deployFor(alice)))
+        );
 
         // add collateral to 1st position
         uint256 upFrontUnderliers = 10_000 ether;
@@ -867,7 +913,9 @@ contract PositionAction20Test is IntegrationTestBase {
 
         // attempt to borrow from the 1st position as the 2nd position, expect revert due to lack of permission
         vm.prank(alice);
-        vm.expectRevert(CDPVault.CDPVault__modifyCollateralAndDebt_noPermission.selector);
+        vm.expectRevert(
+            CDPVault.CDPVault__modifyCollateralAndDebt_noPermission.selector
+        );
         aliceProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
@@ -884,7 +932,6 @@ contract PositionAction20Test is IntegrationTestBase {
         daiVault.modifyPermission(address(aliceProxy), true); // allow alice to modify this vault
         vm.stopPrank();
 
-
         // expect borrow to succeed
         vm.prank(alice);
         aliceProxy.execute(
@@ -897,16 +944,14 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-
-
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, upFrontUnderliers);
         assertEq(normalDebt, borrowAmount);
 
         assertEq(stablecoin.balanceOf(alice), borrowAmount);
-
-
     }
 
     function test_borrow_InvalidAuxSwap() public {
@@ -915,8 +960,8 @@ contract PositionAction20Test is IntegrationTestBase {
         _deposit(userProxy, address(daiVault), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether;
-        uint256 minAmountOut = borrowAmount * 99 / 100e12; // convert from stablecoin to usdc decimals
+        uint256 borrowAmount = 500 * 1 ether;
+        uint256 minAmountOut = (borrowAmount * 99) / 100e12; // convert from stablecoin to usdc decimals
         uint256 expectedAmountOut;
         deal(address(DAI), user, borrowAmount);
 
@@ -929,7 +974,6 @@ contract PositionAction20Test is IntegrationTestBase {
             address[] memory assets = new address[](2);
             assets[0] = address(stablecoin);
             assets[1] = address(USDC);
-
 
             // build borrow params
             creditParams = CreditParams({
@@ -951,7 +995,9 @@ contract PositionAction20Test is IntegrationTestBase {
 
         // trigger PositionAction__borrow_InvalidAuxSwap
         creditParams.auxSwap.assetIn = address(USDC);
-        vm.expectRevert(PositionAction.PositionAction__borrow_InvalidAuxSwap.selector);
+        vm.expectRevert(
+            PositionAction.PositionAction__borrow_InvalidAuxSwap.selector
+        );
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -967,9 +1013,14 @@ contract PositionAction20Test is IntegrationTestBase {
     // REPAY TESTS
 
     function test_repay() public {
-        uint256 depositAmount = 1_000*1 ether; // DAI
-        uint256 borrowAmount = 500*1 ether; // stablecoin
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        uint256 depositAmount = 1_000 * 1 ether; // DAI
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // build repay params
         SwapParams memory auxSwap;
@@ -993,7 +1044,9 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, depositAmount);
@@ -1003,9 +1056,14 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     function test_repay_with_interest() public {
-        uint256 depositAmount = 1_000*1 ether; // DAI
-        uint256 borrowAmount = 500*1 ether; // stablecoin
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        uint256 depositAmount = 1_000 * 1 ether; // DAI
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // accrue interest
         vm.warp(block.timestamp + 365 days);
@@ -1035,19 +1093,20 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(debt, 0);
         assertEq(creditAmount, 0);
         assertEq(stablecoin.balanceOf(user), 0);
-
     }
 
     function test_repay_with_interest_with_swap() public {
-        uint256 collateral = 1_000*1 ether; // DAI
-        uint256 normalDebt = 500*1 ether; // stablecoin
+        uint256 collateral = 1_000 * 1 ether; // DAI
+        uint256 normalDebt = 500 * 1 ether; // stablecoin
         _depositAndBorrow(userProxy, address(daiVault), collateral, normalDebt);
 
         // get rid of the stablecoin that was borrowed
@@ -1059,13 +1118,13 @@ contract PositionAction20Test is IntegrationTestBase {
         uint256 debt = _virtualDebt(daiVault, address(userProxy));
 
         // mint usdc to pay back with
-        uint256 swapAmount = debt/1e12 * 101/100;
+        uint256 swapAmount = ((debt / 1e12) * 101) / 100;
         deal(address(USDC), address(user), swapAmount);
 
-       // build repay params
-       uint256 expectedAmountIn;
-       CreditParams memory creditParams;
-       {
+        // build repay params
+        uint256 expectedAmountIn;
+        CreditParams memory creditParams;
+        {
             bytes32[] memory poolIds = new bytes32[](1);
             poolIds[0] = stablePoolId;
 
@@ -1088,48 +1147,55 @@ contract PositionAction20Test is IntegrationTestBase {
                 })
             });
             expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-       }
+        }
 
-       vm.startPrank(user);
-       USDC.approve(address(userProxy), swapAmount);
-       userProxy.execute(
-           address(positionAction),
-           abi.encodeWithSelector(
-               positionAction.repay.selector,
-               address(userProxy), // user proxy is the position
-               address(daiVault),
-               creditParams,
-               emptyPermitParams
-           )
-       );
-       vm.stopPrank();
+        vm.startPrank(user);
+        USDC.approve(address(userProxy), swapAmount);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.repay.selector,
+                address(userProxy), // user proxy is the position
+                address(daiVault),
+                creditParams,
+                emptyPermitParams
+            )
+        );
+        vm.stopPrank();
 
-       (uint256 vCollateral, uint256 vNormalDebt) = daiVault.positions(address(userProxy));
-       uint256 creditAmount = credit(address(userProxy));
+        (uint256 vCollateral, uint256 vNormalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
+        uint256 creditAmount = credit(address(userProxy));
 
-       assertEq(vCollateral, collateral);
-       assertEq(vNormalDebt, 0);
-       assertEq(creditAmount, 0);
-       assertEq(stablecoin.balanceOf(user), 0);
+        assertEq(vCollateral, collateral);
+        assertEq(vNormalDebt, 0);
+        assertEq(creditAmount, 0);
+        assertEq(stablecoin.balanceOf(user), 0);
     }
 
     function test_repay_from_swap() public {
-        uint256 depositAmount = 1_000*1 ether; // DAI
-        uint256 borrowAmount = 500*1 ether; // stablecoin
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        uint256 depositAmount = 1_000 * 1 ether; // DAI
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // mint usdc to pay back with
-        uint256 swapAmount = borrowAmount/1e12 * 101/100;
+        uint256 swapAmount = ((borrowAmount / 1e12) * 101) / 100;
         deal(address(USDC), address(user), swapAmount);
 
         // get rid of the stablecoin that was borrowed
         vm.prank(user);
         stablecoin.transfer(address(0x1), borrowAmount);
 
-       // build repay params
-       uint256 expectedAmountIn;
-       CreditParams memory creditParams;
-       {
+        // build repay params
+        uint256 expectedAmountIn;
+        CreditParams memory creditParams;
+        {
             bytes32[] memory poolIds = new bytes32[](1);
             poolIds[0] = stablePoolId;
 
@@ -1152,48 +1218,55 @@ contract PositionAction20Test is IntegrationTestBase {
                 })
             });
             expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-       }
+        }
 
-       vm.startPrank(user);
-       USDC.approve(address(userProxy), swapAmount);
-       userProxy.execute(
-           address(positionAction),
-           abi.encodeWithSelector(
-               positionAction.repay.selector,
-               address(userProxy), // user proxy is the position
-               address(daiVault),
-               creditParams,
-               emptyPermitParams
-           )
-       );
-       vm.stopPrank();
+        vm.startPrank(user);
+        USDC.approve(address(userProxy), swapAmount);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.repay.selector,
+                address(userProxy), // user proxy is the position
+                address(daiVault),
+                creditParams,
+                emptyPermitParams
+            )
+        );
+        vm.stopPrank();
 
-       (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-       uint256 creditAmount = credit(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
+        uint256 creditAmount = credit(address(userProxy));
 
-       assertEq(collateral, depositAmount);
-       assertEq(normalDebt, 0);
-       assertEq(creditAmount, 0);
-       assertEq(stablecoin.balanceOf(user), 0);
+        assertEq(collateral, depositAmount);
+        assertEq(normalDebt, 0);
+        assertEq(creditAmount, 0);
+        assertEq(stablecoin.balanceOf(user), 0);
     }
 
     function test_repay_from_swap_EXACT_IN() public {
-        uint256 depositAmount = 1_000*1 ether; // DAI
-        uint256 borrowAmount = 500*1 ether; // stablecoin
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        uint256 depositAmount = 1_000 * 1 ether; // DAI
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // mint usdc to pay back with
-        uint256 swapAmount = ((borrowAmount/2) * 101)/100e12; // repay half debt, mint extra to ensure our minimum is the exact amount
+        uint256 swapAmount = ((borrowAmount / 2) * 101) / 100e12; // repay half debt, mint extra to ensure our minimum is the exact amount
         deal(address(USDC), address(user), swapAmount);
 
         // get rid of the stablecoin that was borrowed
         vm.prank(user);
         stablecoin.transfer(address(0x1), borrowAmount);
 
-       // build repay params
-       uint256 expectedAmountOut;
-       CreditParams memory creditParams;
-       {
+        // build repay params
+        uint256 expectedAmountOut;
+        CreditParams memory creditParams;
+        {
             bytes32[] memory poolIds = new bytes32[](1);
             poolIds[0] = stablePoolId;
 
@@ -1202,62 +1275,69 @@ contract PositionAction20Test is IntegrationTestBase {
             assets[1] = address(stablecoin);
 
             creditParams = CreditParams({
-                amount: borrowAmount/2,
+                amount: borrowAmount / 2,
                 creditor: user,
                 auxSwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(USDC),
                     amount: swapAmount,
-                    limit: borrowAmount/2,
+                    limit: borrowAmount / 2,
                     recipient: address(userProxy),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
                 })
             });
             expectedAmountOut = _simulateBalancerSwap(creditParams.auxSwap);
-       }
+        }
 
-       vm.startPrank(user);
-       USDC.approve(address(userProxy), swapAmount);
-       userProxy.execute(
-           address(positionAction),
-           abi.encodeWithSelector(
-               positionAction.repay.selector,
-               address(userProxy), // user proxy is the position
-               address(daiVault),
-               creditParams,
-               emptyPermitParams
-           )
-       );
-       vm.stopPrank();
+        vm.startPrank(user);
+        USDC.approve(address(userProxy), swapAmount);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.repay.selector,
+                address(userProxy), // user proxy is the position
+                address(daiVault),
+                creditParams,
+                emptyPermitParams
+            )
+        );
+        vm.stopPrank();
 
-       (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-       uint256 creditAmount = credit(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
+        uint256 creditAmount = credit(address(userProxy));
 
-       assertEq(collateral, depositAmount);
-       assertEq(normalDebt, borrowAmount/2);
-       assertEq(creditAmount, expectedAmountOut - borrowAmount/2); // ensure that any extra credit is stored as credit for the user
-       assertEq(stablecoin.balanceOf(user), 0);
+        assertEq(collateral, depositAmount);
+        assertEq(normalDebt, borrowAmount / 2);
+        assertEq(creditAmount, expectedAmountOut - borrowAmount / 2); // ensure that any extra credit is stored as credit for the user
+        assertEq(stablecoin.balanceOf(user), 0);
     }
 
     function test_repay_InvalidAuxSwap() public {
-        uint256 depositAmount = 1_000*1 ether; // DAI
-        uint256 borrowAmount = 500*1 ether; // stablecoin
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        uint256 depositAmount = 1_000 * 1 ether; // DAI
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // mint usdc to pay back with
-        uint256 swapAmount = borrowAmount/1e12 * 101/100;
+        uint256 swapAmount = ((borrowAmount / 1e12) * 101) / 100;
         deal(address(USDC), address(user), swapAmount);
 
         // get rid of the stablecoin that was borrowed
         vm.prank(user);
         stablecoin.transfer(address(0x1), borrowAmount);
 
-       // build repay params
-       uint256 expectedAmountIn;
-       CreditParams memory creditParams;
-       {
+        // build repay params
+        uint256 expectedAmountIn;
+        CreditParams memory creditParams;
+        {
             bytes32[] memory poolIds = new bytes32[](1);
             poolIds[0] = stablePoolId;
 
@@ -1280,33 +1360,40 @@ contract PositionAction20Test is IntegrationTestBase {
                 })
             });
             expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-       }
+        }
 
-       vm.prank(user);
-       USDC.approve(address(userProxy), swapAmount);
+        vm.prank(user);
+        USDC.approve(address(userProxy), swapAmount);
 
-       // trigger PositionAction__repay_InvalidAuxSwap
-       creditParams.auxSwap.recipient = user;
-       vm.prank(user);
-       vm.expectRevert(PositionAction.PositionAction__repay_InvalidAuxSwap.selector);
-       userProxy.execute(
-           address(positionAction),
-           abi.encodeWithSelector(
-               positionAction.repay.selector,
-               address(userProxy), // user proxy is the position
-               address(daiVault),
-               creditParams,
-               emptyPermitParams
-           )
-       );
+        // trigger PositionAction__repay_InvalidAuxSwap
+        creditParams.auxSwap.recipient = user;
+        vm.prank(user);
+        vm.expectRevert(
+            PositionAction.PositionAction__repay_InvalidAuxSwap.selector
+        );
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.repay.selector,
+                address(userProxy), // user proxy is the position
+                address(daiVault),
+                creditParams,
+                emptyPermitParams
+            )
+        );
     }
 
     function test_withdrawAndRepay() public {
-        uint256 depositAmount = 5_000*1 ether;
-        uint256 borrowAmount = 2_500*1 ether;
+        uint256 depositAmount = 5_000 * 1 ether;
+        uint256 borrowAmount = 2_500 * 1 ether;
 
         // deposit and borrow
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // build withdraw and repay params
         CollateralParams memory collateralParams;
@@ -1341,8 +1428,9 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, 0);
@@ -1353,11 +1441,16 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     function test_withdrawAndRepay_with_swaps() public {
-        uint256 depositAmount = 5_000*1 ether;
-        uint256 borrowAmount = 2_500*1 ether;
+        uint256 depositAmount = 5_000 * 1 ether;
+        uint256 borrowAmount = 2_500 * 1 ether;
 
         // deposit and borrow
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // spend users stablecoin
         vm.prank(user);
@@ -1366,7 +1459,7 @@ contract PositionAction20Test is IntegrationTestBase {
         // build withdraw and repay params
         CollateralParams memory collateralParams;
         CreditParams memory creditParams;
-        uint256 debtSwapMaxAmountIn = borrowAmount * 101 /100e12;
+        uint256 debtSwapMaxAmountIn = (borrowAmount * 101) / 100e12;
         uint256 debtSwapAmountIn;
         uint256 expectedCollateralOut;
         {
@@ -1387,7 +1480,7 @@ contract PositionAction20Test is IntegrationTestBase {
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(DAI),
                     amount: depositAmount,
-                    limit: depositAmount * 99/100e12,
+                    limit: (depositAmount * 99) / 100e12,
                     recipient: address(user), // sent directly to the user
                     deadline: block.timestamp + 100,
                     args: abi.encode(stablePoolIdArray, collateralAssets)
@@ -1407,7 +1500,13 @@ contract PositionAction20Test is IntegrationTestBase {
                     args: abi.encode(stablePoolIdArray, debtAssets)
                 })
             });
-            (debtSwapAmountIn, expectedCollateralOut) = _simulateBalancerSwapMulti(creditParams.auxSwap, collateralParams.auxSwap);
+            (
+                debtSwapAmountIn,
+                expectedCollateralOut
+            ) = _simulateBalancerSwapMulti(
+                creditParams.auxSwap,
+                collateralParams.auxSwap
+            );
         }
 
         vm.startPrank(user);
@@ -1427,9 +1526,10 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-
         // ensure that users position is cleared out
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         uint256 creditAmount = credit(address(userProxy));
         assertEq(collateral, 0);
         assertEq(debt, 0);
@@ -1440,16 +1540,24 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(stablecoin.balanceOf(user), 0); // ensure no stablecoin has been left on user eoa
 
         // ensure that left over USDC from debt swap is kept on proxy and USDC from collateral swap is sent to user
-        assertEq(USDC.balanceOf(user), expectedCollateralOut + debtSwapMaxAmountIn - debtSwapAmountIn);
+        assertEq(
+            USDC.balanceOf(user),
+            expectedCollateralOut + debtSwapMaxAmountIn - debtSwapAmountIn
+        );
     }
 
     // withdraw dai and swap to usdc, then repay usdc debt by swapping to stablecoin
     function test_withdrawAndRepay_with_EXACT_OUT_swaps() public {
-        uint256 depositAmount = 5_000*1 ether;
-        uint256 borrowAmount = 2_500*1 ether;
+        uint256 depositAmount = 5_000 * 1 ether;
+        uint256 borrowAmount = 2_500 * 1 ether;
 
         // deposit and borrow
-        _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
+        _depositAndBorrow(
+            userProxy,
+            address(daiVault),
+            depositAmount,
+            borrowAmount
+        );
 
         // spend users stablecoin
         vm.prank(user);
@@ -1458,8 +1566,8 @@ contract PositionAction20Test is IntegrationTestBase {
         // build withdraw and repay params
         CollateralParams memory collateralParams;
         CreditParams memory creditParams;
-        uint256 debtSwapMaxAmountIn = borrowAmount * 101 /100e12;
-        uint256 collateralSwapOut = depositAmount * 99/100e12;
+        uint256 debtSwapMaxAmountIn = (borrowAmount * 101) / 100e12;
+        uint256 collateralSwapOut = (depositAmount * 99) / 100e12;
         uint256 debtSwapAmountIn; // usdc spent swapping debt to stablecoin
         uint256 expectedCollateralIn; // dai spent swapping collateral to usdc
         {
@@ -1500,7 +1608,13 @@ contract PositionAction20Test is IntegrationTestBase {
                     args: abi.encode(stablePoolIdArray, debtAssets)
                 })
             });
-            (debtSwapAmountIn, expectedCollateralIn) = _simulateBalancerSwapMulti(creditParams.auxSwap, collateralParams.auxSwap);
+            (
+                debtSwapAmountIn,
+                expectedCollateralIn
+            ) = _simulateBalancerSwapMulti(
+                creditParams.auxSwap,
+                collateralParams.auxSwap
+            );
         }
 
         vm.startPrank(user);
@@ -1520,9 +1634,10 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-
         // ensure that users position is cleared out
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         uint256 creditAmount = credit(address(userProxy));
         assertEq(collateral, 0);
         assertEq(debt, 0);
@@ -1533,13 +1648,16 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(stablecoin.balanceOf(user), 0); // ensure no stablecoin has been left on user eoa
 
         // ensure that left over USDC from debt swap and amount of from collateral swap is sent to user
-        assertEq(USDC.balanceOf(user), collateralSwapOut + debtSwapMaxAmountIn - debtSwapAmountIn);
+        assertEq(
+            USDC.balanceOf(user),
+            collateralSwapOut + debtSwapMaxAmountIn - debtSwapAmountIn
+        );
         assertEq(DAI.balanceOf(user), depositAmount - expectedCollateralIn); // ensure user got left over dai from collateral exact_out swap
     }
 
     function test_depositAndBorrow() public {
-        uint256 upFrontUnderliers = 10_000*1 ether;
-        uint256 borrowAmount = 5_000*1 ether;
+        uint256 upFrontUnderliers = 10_000 * 1 ether;
+        uint256 borrowAmount = 5_000 * 1 ether;
 
         deal(address(DAI), user, upFrontUnderliers);
 
@@ -1571,7 +1689,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, upFrontUnderliers);
         assertEq(normalDebt, borrowAmount);
@@ -1581,8 +1701,8 @@ contract PositionAction20Test is IntegrationTestBase {
 
     // enter a DAI vault with USDC and exit with USDT
     function test_depositAndBorrow_with_entry_and_exit_swaps() public {
-        uint256 upFrontUnderliers = 10_000*1e6; // in USDC
-        uint256 borrowAmount = 5_000*1 ether; // in stablecoin
+        uint256 upFrontUnderliers = 10_000 * 1e6; // in USDC
+        uint256 borrowAmount = 5_000 * 1 ether; // in stablecoin
 
         deal(address(USDC), user, upFrontUnderliers);
 
@@ -1591,7 +1711,6 @@ contract PositionAction20Test is IntegrationTestBase {
         uint256 expectedCollateral;
         uint256 expectedExitAmount;
         {
-
             address[] memory entryAssets = new address[](2);
             entryAssets[0] = address(USDC);
             entryAssets[1] = address(DAI);
@@ -1609,11 +1728,11 @@ contract PositionAction20Test is IntegrationTestBase {
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(USDC),
                     amount: upFrontUnderliers,
-                    limit: upFrontUnderliers * 1e12 * 98 / 100, // amountOutMin in DAI 
+                    limit: (upFrontUnderliers * 1e12 * 98) / 100, // amountOutMin in DAI
                     recipient: address(userProxy),
                     deadline: block.timestamp + 100,
                     args: abi.encode(stablePoolIdArray, entryAssets)
-                })            
+                })
             });
             creditParams = CreditParams({
                 amount: borrowAmount,
@@ -1623,14 +1742,20 @@ contract PositionAction20Test is IntegrationTestBase {
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(stablecoin),
                     amount: borrowAmount,
-                    limit: borrowAmount * 98 / 100e12, // amountOutMin in USDT
+                    limit: (borrowAmount * 98) / 100e12, // amountOutMin in USDT
                     recipient: user,
                     deadline: block.timestamp + 100,
                     args: abi.encode(stablePoolIdArray, exitAssets)
                 })
             });
 
-            (expectedCollateral, expectedExitAmount) = _simulateBalancerSwapMulti(collateralParams.auxSwap, creditParams.auxSwap);
+            (
+                expectedCollateral,
+                expectedExitAmount
+            ) = _simulateBalancerSwapMulti(
+                collateralParams.auxSwap,
+                creditParams.auxSwap
+            );
         }
 
         vm.prank(user);
@@ -1649,7 +1774,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedCollateral);
         assertEq(normalDebt, borrowAmount);
@@ -1658,9 +1785,11 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     // enter a DAI vault with USDC and exit with USDT using EXACT_OUT swaps
-    function test_depositAndBorrow_with_EXACT_OUT_entry_and_exit_swaps() public {
-        uint256 depositAmount = 10_100*1e6; // in USDC
-        uint256 borrowAmount = 5_100*1 ether; // in stablecoin
+    function test_depositAndBorrow_with_EXACT_OUT_entry_and_exit_swaps()
+        public
+    {
+        uint256 depositAmount = 10_100 * 1e6; // in USDC
+        uint256 borrowAmount = 5_100 * 1 ether; // in stablecoin
 
         deal(address(USDC), user, depositAmount);
 
@@ -1668,8 +1797,8 @@ contract PositionAction20Test is IntegrationTestBase {
         CreditParams memory creditParams;
         uint256 expectedEntryIn;
         uint256 expectedExitIn;
-        uint256 expectedCollateral = depositAmount * 99e12 / 100;
-        uint256 expectedExit = borrowAmount * 99/100e12;
+        uint256 expectedCollateral = (depositAmount * 99e12) / 100;
+        uint256 expectedExit = (borrowAmount * 99) / 100e12;
         {
             bytes32[] memory entryPoolIds = new bytes32[](1);
             entryPoolIds[0] = stablePoolId;
@@ -1715,7 +1844,10 @@ contract PositionAction20Test is IntegrationTestBase {
                 })
             });
 
-            (expectedEntryIn, expectedExitIn) = _simulateBalancerSwapMulti(collateralParams.auxSwap, creditParams.auxSwap);
+            (expectedEntryIn, expectedExitIn) = _simulateBalancerSwapMulti(
+                collateralParams.auxSwap,
+                creditParams.auxSwap
+            );
         }
 
         vm.prank(user);
@@ -1734,7 +1866,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, expectedCollateral);
         assertEq(normalDebt, borrowAmount);
@@ -1744,7 +1878,10 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(stablecoin.balanceOf(user), borrowAmount - expectedExitIn);
 
         // validate resiudal amounts from entry swap
-        assertEq(USDC.balanceOf(address(user)), depositAmount - expectedEntryIn);
+        assertEq(
+            USDC.balanceOf(address(user)),
+            depositAmount - expectedEntryIn
+        );
 
         // validate that there is no dust
         assertEq(USDT.balanceOf(address(userProxy)), 0);
@@ -1765,7 +1902,9 @@ contract PositionAction20Test is IntegrationTestBase {
         bool[] memory delegateCall = new bool[](1);
         delegateCall[0] = false;
 
-        vm.expectRevert(PositionAction.PositionAction__onlyDelegatecall.selector);
+        vm.expectRevert(
+            PositionAction.PositionAction__onlyDelegatecall.selector
+        );
         positionAction.multisend(targets, data, delegateCall);
     }
 
@@ -1779,7 +1918,9 @@ contract PositionAction20Test is IntegrationTestBase {
         bool[] memory delegateCall = new bool[](1);
         delegateCall[0] = false;
 
-        vm.expectRevert(BaseAction.Action__revertBytes_emptyRevertBytes.selector);
+        vm.expectRevert(
+            BaseAction.Action__revertBytes_emptyRevertBytes.selector
+        );
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -1824,7 +1965,8 @@ contract PositionAction20Test is IntegrationTestBase {
             creditParams,
             emptyPermitParams
         );
-        data[1] = abi.encodeWithSelector(CDPVault.modifyCollateralAndDebt.selector,
+        data[1] = abi.encodeWithSelector(
+            CDPVault.modifyCollateralAndDebt.selector,
             address(userProxy),
             address(userProxy),
             address(userProxy),
@@ -1847,7 +1989,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, depositAmount);
         assertEq(debt, borrowAmount);
     }
@@ -1872,7 +2016,13 @@ contract PositionAction20Test is IntegrationTestBase {
         targets[1] = address(daiVault);
 
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(positionAction.deposit.selector, address(userProxy), daiVault, collateralParams, emptyPermitParams);
+        data[0] = abi.encodeWithSelector(
+            positionAction.deposit.selector,
+            address(userProxy),
+            daiVault,
+            collateralParams,
+            emptyPermitParams
+        );
         data[1] = abi.encodeWithSelector(
             daiVault.modifyCollateralAndDebt.selector,
             address(userProxy),
@@ -1897,7 +2047,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = daiVault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 100 ether);
@@ -1933,7 +2085,11 @@ contract PositionAction20Test is IntegrationTestBase {
         );
     }
 
-    function _borrow(PRBProxy proxy, address vault, uint256 borrowAmount) internal {
+    function _borrow(
+        PRBProxy proxy,
+        address vault,
+        uint256 borrowAmount
+    ) internal {
         // build borrow params
         SwapParams memory auxSwap;
         CreditParams memory creditParams = CreditParams({
@@ -1954,7 +2110,12 @@ contract PositionAction20Test is IntegrationTestBase {
         );
     }
 
-    function _depositAndBorrow(PRBProxy proxy, address vault, uint256 depositAmount, uint256 borrowAmount) internal {
+    function _depositAndBorrow(
+        PRBProxy proxy,
+        address vault,
+        uint256 depositAmount,
+        uint256 borrowAmount
+    ) internal {
         CDPVault cdpVault = CDPVault(vault);
         address token = address(cdpVault.token());
 

@@ -19,21 +19,24 @@ import {PositionAction4626} from "../../proxy/PositionAction4626.sol";
 import {IVault} from "../../vendor/IBalancerVault.sol";
 import {AuraVault} from "../../vendor/AuraVault.sol";
 
-interface IBalancerComposableStablePool{
+interface IBalancerComposableStablePool {
     function getActualSupply() external returns (uint256);
 }
 
 contract PositionActionAuraTest is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
-    bytes32 wstETH_WETH_PoolId = 0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2;
+    bytes32 wstETH_WETH_PoolId =
+        0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2;
     address wstETH_WETH_BPT = 0x93d199263632a4EF4Bb438F1feB99e57b4b5f0BD;
     address BAL = 0xba100000625a3754423978a60c9317c58a424e3D;
 
     address constant wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
-    ERC4626 constant auraRewardsPool = ERC4626(0x2a14dB8D09dB0542f6A371c0cB308A768227D67D);
-    address constant auraPriceOracle = 0xc29562b045D80fD77c69Bec09541F5c16fe20d9d;
-    
+    ERC4626 constant auraRewardsPool =
+        ERC4626(0x2a14dB8D09dB0542f6A371c0cB308A768227D67D);
+    address constant auraPriceOracle =
+        0xc29562b045D80fD77c69Bec09541F5c16fe20d9d;
+
     // user
     PRBProxy userProxy;
     address internal user;
@@ -47,7 +50,8 @@ contract PositionActionAuraTest is IntegrationTestBase {
     bytes32[] weightedPoolIdArray;
 
     // Permit2
-    ISignatureTransfer internal constant permit2 = ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    ISignatureTransfer internal constant permit2 =
+        ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     // cdp vaults
     CDPVault vault;
@@ -68,12 +72,12 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
         auraVault = new AuraVault({
             rewardPool_: address(auraRewardsPool),
-            asset_ : wstETH_WETH_BPT,
+            asset_: wstETH_WETH_BPT,
             feed_: address(oracle),
             auraPriceOracle_: address(auraPriceOracle),
             maxClaimerIncentive_: 100,
             maxLockerIncentive_: 100,
-            tokenName_:  "Aura Vault",
+            tokenName_: "Aura Vault",
             tokenSymbol_: "auraVault"
         });
 
@@ -97,7 +101,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
         uint256 balancerTokenRate = _getBalancerTokenRateInUSD();
         oracle.updateSpot(address(wstETH_WETH_BPT), balancerTokenRate);
         oracle.updateSpot(address(auraVault), balancerTokenRate);
-        oracle.updateSpot(address(WETH),_getWETHRateInUSD());
+        oracle.updateSpot(address(WETH), _getWETHRateInUSD());
         oracle.updateSpot(address(stablecoin), _getStablecoinRateInUSD());
         oracle.updateSpot(address(BAL), _getBALRateInUSD());
 
@@ -107,7 +111,9 @@ contract PositionActionAuraTest is IntegrationTestBase {
         // setup user and userProxy
         userPk = 0x12341234;
         user = vm.addr(userPk);
-        userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
+        userProxy = PRBProxy(
+            payable(address(prbProxyRegistry.deployFor(user)))
+        );
 
         vm.label(address(userProxy), "userProxy");
         vm.label(address(user), "user");
@@ -118,10 +124,14 @@ contract PositionActionAuraTest is IntegrationTestBase {
         vm.stopPrank();
 
         // setup state variables to avoid stack too deep
-        weightedPoolIdArray.push(weightedPoolId); 
+        weightedPoolIdArray.push(weightedPoolId);
 
         // deploy position actions
-        positionAction = new PositionAction4626(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction4626(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction)
+        );
     }
 
     function test_deposit() public {
@@ -129,7 +139,9 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
         _deposit(userProxy, address(vault), depositAmount);
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -153,7 +165,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
             maxAmountsIn[0] = depositAmount;
             uint256[] memory tokensIn = new uint256[](2);
             tokensIn[0] = depositAmount;
-            
+
             (poolActionParams, permitParams) = _getPoolActionParams(
                 user,
                 wstETH_WETH_PoolId,
@@ -174,7 +186,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
         });
 
         vm.prank(user);
-            
+
         ERC20(wstETH_WETH_BPT).approve(address(userProxy), minOut);
 
         address[] memory targets = new address[](2);
@@ -212,14 +224,14 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, ) = vault.positions(address(userProxy));
+        (uint256 collateral, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, depositAmount);
     }
 
     function test_joinAndDeposit_multipleTokens() public {
         uint256 wstETHAmount = 1000 ether;
         uint256 wETHAmount = 1000 ether;
-        uint256 joinMinOut = (wstETHAmount + wETHAmount)*90/100;
+        uint256 joinMinOut = ((wstETHAmount + wETHAmount) * 90) / 100;
 
         deal(wstETH, user, wstETHAmount);
         deal(address(WETH), user, wETHAmount);
@@ -250,14 +262,8 @@ contract PositionActionAuraTest is IntegrationTestBase {
             protocol: Protocol.BALANCER,
             minOut: 0,
             recipient: user,
-            args: abi.encode(
-                wstETH_WETH_PoolId,
-                tokens,
-                tokensIn,
-                maxAmountsIn
-            )
-        });        
-
+            args: abi.encode(wstETH_WETH_PoolId, tokens, tokensIn, maxAmountsIn)
+        });
 
         CollateralParams memory collateralParams = CollateralParams({
             targetToken: address(wstETH_WETH_BPT),
@@ -303,7 +309,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, ) = vault.positions(address(userProxy));
+        (uint256 collateral, , , , ) = vault.positions(address(userProxy));
         uint256 shares = auraVault.convertToShares(joinMinOut);
         assertGe(collateral, shares);
     }
@@ -323,9 +329,9 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
             uint256[] memory maxAmountsIn = new uint256[](3);
             uint256[] memory tokensIn = new uint256[](2);
-            
+
             (poolActionParams, ) = _getPoolActionParams(
-                address(positionAction), 
+                address(positionAction),
                 wstETH_WETH_PoolId,
                 tokens,
                 maxAmountsIn,
@@ -378,17 +384,23 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
-        
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
+
         // assert that collateral is now equal to the upFrontAmount + the amount received from the join
-        uint256 shares = auraVault.convertToShares(joinOutMin + upFrontUnderliers);
+        uint256 shares = auraVault.convertToShares(
+            joinOutMin + upFrontUnderliers
+        );
         assertGe(collateral, shares);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = vault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -416,10 +428,10 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
             uint256[] memory maxAmountsIn = new uint256[](3);
             uint256[] memory tokensIn = new uint256[](2);
-            
+
             (poolActionParams, ) = _getPoolActionParams(
                 address(positionAction),
-                wstETH_WETH_PoolId, 
+                wstETH_WETH_PoolId,
                 tokens,
                 maxAmountsIn,
                 tokensIn,
@@ -432,7 +444,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
         deal(address(wstETH), user, upFrontUnderliers);
 
         bytes32[] memory poolIdArray = new bytes32[](3);
-        poolIdArray[0] = stablePoolId; 
+        poolIdArray[0] = stablePoolId;
         poolIdArray[1] = wethDaiPoolId;
         poolIdArray[2] = wstEthWethPoolId;
 
@@ -478,14 +490,18 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
         assertGe(collateral, auraVault.convertToShares(joinOutMin));
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = vault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -496,7 +512,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
         uint256 borrowAmount = 70000 ether;
         uint256 amountOutMin = 0;
         uint256 joinOutMin = 0 ether;
-        
+
         PoolActionParams memory poolActionParams;
         {
             address[] memory tokens = new address[](3);
@@ -506,7 +522,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
             uint256[] memory maxAmountsIn = new uint256[](3);
             uint256[] memory tokensIn = new uint256[](2);
-            
+
             (poolActionParams, ) = _getPoolActionParams(
                 address(positionAction),
                 wstETH_WETH_PoolId,
@@ -524,28 +540,28 @@ contract PositionActionAuraTest is IntegrationTestBase {
         bytes memory auxArgs;
         bytes memory primaryArgs;
         {
-        bytes32[] memory auxPoolIdArray = new bytes32[](2);
-        auxPoolIdArray[0] = wethDaiPoolId;
-        auxPoolIdArray[1] = wstEthWethPoolId;
+            bytes32[] memory auxPoolIdArray = new bytes32[](2);
+            auxPoolIdArray[0] = wethDaiPoolId;
+            auxPoolIdArray[1] = wstEthWethPoolId;
 
-        address[] memory auxAssets = new address[](3);
-        auxAssets[0] = address(DAI);
-        auxAssets[1] = address(WETH);
-        auxAssets[2] = address(wstETH);
+            address[] memory auxAssets = new address[](3);
+            auxAssets[0] = address(DAI);
+            auxAssets[1] = address(WETH);
+            auxAssets[2] = address(wstETH);
 
-        auxArgs = abi.encode(auxPoolIdArray, auxAssets);
-        bytes32[] memory poolIdArray = new bytes32[](3);
-        poolIdArray[0] = stablePoolId; 
-        poolIdArray[1] = wethDaiPoolId;
-        poolIdArray[2] = wstEthWethPoolId;
+            auxArgs = abi.encode(auxPoolIdArray, auxAssets);
+            bytes32[] memory poolIdArray = new bytes32[](3);
+            poolIdArray[0] = stablePoolId;
+            poolIdArray[1] = wethDaiPoolId;
+            poolIdArray[2] = wstEthWethPoolId;
 
-        // build increase lever params
-        address[] memory assets = new address[](4);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
-        assets[2] = address(WETH);
-        assets[3] = address(wstETH);
-        primaryArgs = abi.encode(poolIdArray, assets);
+            // build increase lever params
+            address[] memory assets = new address[](4);
+            assets[0] = address(stablecoin);
+            assets[1] = address(DAI);
+            assets[2] = address(WETH);
+            assets[3] = address(wstETH);
+            primaryArgs = abi.encode(poolIdArray, assets);
         }
 
         LeverParams memory leverParams = LeverParams({
@@ -592,14 +608,18 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
         assertGe(collateral, auraVault.convertToShares(joinOutMin));
-        
+
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = vault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -620,7 +640,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
             uint256[] memory maxAmountsIn = new uint256[](3);
             uint256[] memory tokensIn = new uint256[](2);
-            
+
             (poolActionParams, ) = _getPoolActionParams(
                 address(positionAction),
                 wstETH_WETH_PoolId,
@@ -651,7 +671,7 @@ contract PositionActionAuraTest is IntegrationTestBase {
             auxArgs = abi.encode(auxPoolIdArray, auxAssets);
 
             bytes32[] memory poolIdArray = new bytes32[](3);
-            poolIdArray[0] = stablePoolId; 
+            poolIdArray[0] = stablePoolId;
             poolIdArray[1] = wethDaiPoolId;
             poolIdArray[2] = wstEthWethPoolId;
 
@@ -709,14 +729,18 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
         assertGe(collateral, auraVault.convertToShares(joinOutMin));
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = vault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -745,11 +769,13 @@ contract PositionActionAuraTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
 
-        (int256 balance,) = cdm.accounts(address(userProxy));
+        (int256 balance, ) = cdm.accounts(address(userProxy));
         assertEq(balance, 0);
 
         assertEq(ERC20(wstETH_WETH_BPT).balanceOf(user), initialDeposit);
@@ -765,7 +791,8 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
         vm.warp(block.timestamp + 360 days);
 
-        (uint256 initialCollateral, uint256 initialNormalDebt) = vault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , ) = vault
+            .positions(address(userProxy));
         uint256 amountOut = initialNormalDebt;
         uint256 maxAmountIn = initialCollateral;
         uint256 subCollateral = maxAmountIn;
@@ -831,7 +858,9 @@ contract PositionActionAuraTest is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 normalDebt) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
+            address(userProxy)
+        );
 
         // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
         assertEq(collateral, initialCollateral - subCollateral);
@@ -840,7 +869,9 @@ contract PositionActionAuraTest is IntegrationTestBase {
         assertEq(normalDebt, initialNormalDebt - amountOut);
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , ) = vault.positions(
+            address(positionAction)
+        );
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -887,10 +918,10 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
             uint256[] memory maxAmountsIn = new uint256[](3);
             uint256[] memory tokensIn = new uint256[](2);
-            
+
             (poolActionParams, ) = _getPoolActionParams(
                 address(positionAction),
-                wstETH_WETH_PoolId, 
+                wstETH_WETH_PoolId,
                 tokens,
                 maxAmountsIn,
                 tokensIn,
@@ -944,10 +975,13 @@ contract PositionActionAuraTest is IntegrationTestBase {
 
     /// @dev Helper function that returns the lp token rate in USD
     function _getBalancerTokenRateInUSD() internal returns (uint256 price) {
-        (, uint256[] memory balances, ) = IVault(BALANCER_VAULT).getPoolTokens(wstETH_WETH_PoolId);
+        (, uint256[] memory balances, ) = IVault(BALANCER_VAULT).getPoolTokens(
+            wstETH_WETH_PoolId
+        );
         uint256 tokenWSTETHSupply = wmul(balances[0], _getWstETHRateInUSD());
         uint256 tokenWETHSupply = wmul(balances[2], _getWETHRateInUSD());
-        uint256 totalSupply = IBalancerComposableStablePool(wstETH_WETH_BPT).getActualSupply();
+        uint256 totalSupply = IBalancerComposableStablePool(wstETH_WETH_BPT)
+            .getActualSupply();
 
         return wdiv(tokenWSTETHSupply + tokenWETHSupply, totalSupply);
     }
@@ -962,20 +996,25 @@ contract PositionActionAuraTest is IntegrationTestBase {
         uint256 permitIndex,
         uint256 depositAmount,
         uint256 minOut_
-    ) view internal returns (
-        PoolActionParams memory poolActionParams,
-        PermitParams[] memory permitParams
-    ) {
+    )
+        internal
+        view
+        returns (
+            PoolActionParams memory poolActionParams,
+            PermitParams[] memory permitParams
+        )
+    {
         uint256 deadline = block.timestamp + 100;
-        (uint8 v, bytes32 r, bytes32 s) = PermitMaker.getPermit2TransferFromSignature(
-            address(wstETH),
-            address(userProxy),
-            depositAmount,
-            NONCE,
-            deadline,
-            userPk
-        );
-         
+        (uint8 v, bytes32 r, bytes32 s) = PermitMaker
+            .getPermit2TransferFromSignature(
+                address(wstETH),
+                address(userProxy),
+                depositAmount,
+                NONCE,
+                deadline,
+                userPk
+            );
+
         permitParams = new PermitParams[](3);
         permitParams[permitIndex] = PermitParams({
             approvalType: ApprovalType.PERMIT2,
@@ -991,16 +1030,17 @@ contract PositionActionAuraTest is IntegrationTestBase {
             protocol: Protocol.BALANCER,
             minOut: minOut_,
             recipient: user_,
-            args: abi.encode(
-                poolId_,
-                tokens,
-                tokensIn,
-                maxAmountsIn
-            )
+            args: abi.encode(poolId_, tokens, tokensIn, maxAmountsIn)
         });
     }
 
-    function getForkBlockNumber() internal virtual override(IntegrationTestBase) pure returns (uint256){
+    function getForkBlockNumber()
+        internal
+        pure
+        virtual
+        override(IntegrationTestBase)
+        returns (uint256)
+    {
         return 18163902; //Sep-18-2023 04:06:35 PM +UTC
     }
 }

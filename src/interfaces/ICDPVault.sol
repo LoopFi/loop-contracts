@@ -35,26 +35,37 @@ struct CDPVaultConfig {
 /// @title ICDPVaultBase
 /// @notice Interface for the CDPVault without `paused` to avoid unnecessary overriding of `paused` in CDPVault
 interface ICDPVaultBase is IAccessControl, IPause, IPermission {
-
     function cdm() external view returns (ICDM);
-    
+
     function oracle() external view returns (IOracle);
-    
+
     function buffer() external view returns (IBuffer);
-    
+
     function token() external view returns (IERC20);
-    
+
     function tokenScale() external view returns (uint256);
 
-    function vaultConfig() external view returns (
-        uint128 debtFloor, uint64 liquidationRatio
-    );
+    function vaultConfig()
+        external
+        view
+        returns (uint128 debtFloor, uint64 liquidationRatio);
 
     function totalNormalDebt() external view returns (uint256);
 
     function cash(address owner) external view returns (uint256);
 
-    function positions(address owner) external view returns (uint256 collateral, uint256 normalDebt);
+    function positions(
+        address owner
+    )
+        external
+        view
+        returns (
+            uint256 collateral,
+            uint256 normalDebt,
+            uint256 debt,
+            uint256 lastDebtUpdate,
+            uint256 cumulativeIndexLastUpdate
+        );
 
     function deposit(address to, uint256 amount) external returns (uint256);
 
@@ -74,6 +85,5 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 /// @title ICDPVault
 /// @notice Interface for the CDPVault
 interface ICDPVault is ICDPVaultBase, IInterestRateModel {
-
     function paused() external view returns (bool);
 }

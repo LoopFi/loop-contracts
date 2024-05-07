@@ -25,14 +25,18 @@ contract BorrowHandler is BaseHandler {
 
     uint256 public limitOrderPriceIncrement = 0.25 ether;
 
-    mapping (address owner => uint256 limitOrderPrice) activeLimitOrders;
+    mapping(address owner => uint256 limitOrderPrice) activeLimitOrders;
 
     function liquidationPrice(ICDPVaultBase vault_) internal returns (uint256) {
         (, uint64 liquidationRatio) = vault_.vaultConfig();
         return wdiv(vault_.spotPrice(), uint256(liquidationRatio));
     }
 
-    constructor(CDPVaultWrapper vault_, InvariantTestBase testContract_, GhostVariableStorage ghostStorage_) BaseHandler("BorrowHandler", testContract_, ghostStorage_) {
+    constructor(
+        CDPVaultWrapper vault_,
+        InvariantTestBase testContract_,
+        GhostVariableStorage ghostStorage_
+    ) BaseHandler("BorrowHandler", testContract_, ghostStorage_) {
         vault = vault_;
         cdm = CDM(address(vault_.cdm()));
         token = vault.token();
@@ -41,7 +45,13 @@ contract BorrowHandler is BaseHandler {
         _trackRateAccumulator();
     }
 
-    function getTargetSelectors() public pure virtual override returns (bytes4[] memory selectors, string[] memory names) {
+    function getTargetSelectors()
+        public
+        pure
+        virtual
+        override
+        returns (bytes4[] memory selectors, string[] memory names)
+    {
         selectors = new bytes4[](5);
         names = new string[](5);
         selectors[0] = this.borrow.selector;
@@ -61,62 +71,90 @@ contract BorrowHandler is BaseHandler {
     }
 
     // Account (with or without existing position) deposits collateral and increases debt
-    function borrow(uint256 collateralSeed, uint256 warpAmount) public useCurrentTimestamp {
+    function borrow(
+        uint256 collateralSeed,
+        uint256 warpAmount
+    ) public useCurrentTimestamp {
         trackCallStart(msg.sig);
 
         address owner = msg.sender;
         // register sender as a user
         addActor(USERS_CATEGORY, owner);
 
-        (uint128 debtFloor,) = vault.vaultConfig();
+        (uint128 debtFloor, ) = vault.vaultConfig();
         uint256 collateral = bound(collateralSeed, debtFloor, maximumDeposit);
 
         // deposit collateral if needed
         token.approve(address(vault), collateral);
         vault.deposit(owner, collateral);
 
-        (int256 deltaCollateral, int256 deltaNormalDebt, uint256 creditNeeded) = vault.getMaximumDebtForCollateral(owner, owner, owner, int256(collateral));
+        (
+            int256 deltaCollateral,
+            int256 deltaNormalDebt,
+            uint256 creditNeeded
+        ) = vault.getMaximumDebtForCollateral(
+                owner,
+                owner,
+                owner,
+                int256(collateral)
+            );
 
-        if (creditNeeded != 0){
+        if (creditNeeded != 0) {
             testContract.createCredit(owner, creditNeeded);
         }
 
         _setupPermissions(owner, owner);
 
         vm.startPrank(owner);
-        vault.modifyCollateralAndDebt(owner, owner, owner, deltaCollateral, deltaNormalDebt);
+        vault.modifyCollateralAndDebt(
+            owner,
+            owner,
+            owner,
+            deltaCollateral,
+            deltaNormalDebt
+        );
         vm.stopPrank();
         _trackUserRateAccumulator(owner);
         _trackRateAccumulator();
-        
+
         warpInterval(warpAmount);
 
         trackCallEnd(msg.sig);
     }
 
     // Partially repays debt and withdraws collateral
-    function partialRepay(uint256 userSeed, uint256 percent) public useCurrentTimestamp {
+    function partialRepay(
+        uint256 userSeed,
+        uint256 percent
+    ) public useCurrentTimestamp {
         trackCallStart(msg.sig);
 
         percent = bound(percent, 1, 99);
 
         address owner = getRandomActor(USERS_CATEGORY, userSeed);
-        
-        if(owner == address(0)) return;
+
+        if (owner == address(0)) return;
 
         _setupPermissions(owner, address(this));
-        
-        (, uint256 normalDebt) = vault.positions(owner);
-        if(normalDebt == 0) return;
-        
+
+        (, uint256 normalDebt, , , ) = vault.positions(owner);
+        if (normalDebt == 0) return;
+
         (uint128 debtFloor, ) = vault.vaultConfig();
 
         uint256 amount = (normalDebt * percent) / 100;
         amount = bound(amount, 0, cdm.creditLine(address(this)));
 
         // full replay if we are below debt floor
-        if(int256(normalDebt - amount) < int256(int128(debtFloor))) amount = normalDebt;
-        vault.modifyCollateralAndDebt(owner, owner, address(this), 0, -int256(amount));
+        if (int256(normalDebt - amount) < int256(int128(debtFloor)))
+            amount = normalDebt;
+        vault.modifyCollateralAndDebt(
+            owner,
+            owner,
+            address(this),
+            0,
+            -int256(amount)
+        );
 
         _trackUserRateAccumulator(owner);
         _trackRateAccumulator();
@@ -131,16 +169,22 @@ contract BorrowHandler is BaseHandler {
         // same as partialRepay, but 100%
         // users are removed from the list if they have no debt
         address owner = getRandomActor(USERS_CATEGORY, userSeed);
-        if(owner == address(0)) return;
+        if (owner == address(0)) return;
 
         _setupPermissions(owner, address(this));
-        
-        (, uint256 normalDebt) = vault.positions(owner);
 
-        if(normalDebt == 0) return;
-        
+        (, uint256 normalDebt, , , ) = vault.positions(owner);
+
+        if (normalDebt == 0) return;
+
         normalDebt = bound(normalDebt, 0, cdm.creditLine(address(this)));
-        vault.modifyCollateralAndDebt(owner, owner, address(this), 0, -int256(normalDebt));
+        vault.modifyCollateralAndDebt(
+            owner,
+            owner,
+            address(this),
+            0,
+            -int256(normalDebt)
+        );
 
         _trackUserRateAccumulator(owner);
         _trackRateAccumulator();
@@ -151,7 +195,7 @@ contract BorrowHandler is BaseHandler {
     // Governance updates the base interest rate
     function changeBaseRate(uint256 baseRate) public {
         trackCallStart(msg.sig);
-        baseRate = bound (baseRate, WAD, vault.RATE_CEILING());
+        baseRate = bound(baseRate, WAD, vault.RATE_CEILING());
         vault.setParameter("baseRate", baseRate);
         trackCallEnd(msg.sig);
     }
@@ -168,15 +212,14 @@ contract BorrowHandler is BaseHandler {
 
     /// ======== Helper Functions ======== ///
 
-    function getRateAccumulator() view public returns (uint64) {
-        return uint64(uint256(
-            getGhostValue(
-                keccak256(abi.encode(RATE_ACCUMULATOR))
-            )
-        ));
+    function getRateAccumulator() public view returns (uint64) {
+        return
+            uint64(
+                uint256(getGhostValue(keccak256(abi.encode(RATE_ACCUMULATOR))))
+            );
     }
 
-    function getPreviousRateAccumulator() view public returns (uint64) {
+    function getPreviousRateAccumulator() public view returns (uint64) {
         bytes32 prevValueKey = keccak256("prevRateAccumulator");
         return uint64(uint256(getGhostValue(prevValueKey)));
     }
@@ -187,7 +230,7 @@ contract BorrowHandler is BaseHandler {
         trackValue(RATE_ACCUMULATOR, bytes32(uint256(irs.rateAccumulator)));
     }
 
-    // Track the rateAcummulator and the previous rate accumulator for a given user 
+    // Track the rateAcummulator and the previous rate accumulator for a given user
     function _trackUserRateAccumulator(address user) private {
         InterestRateModel.IRS memory irs = vault.getIRS();
         bytes32 key = getValueKey(user, RATE_ACCUMULATOR);

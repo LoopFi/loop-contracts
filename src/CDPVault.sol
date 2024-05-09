@@ -23,6 +23,12 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 interface IPoolV3Loop is IPoolV3 {
     function mintProfit(uint256 profit) external;
+
+    function enter(address user, uint256 amount) external;
+
+    function exit(address user, uint256 amount) external;
+
+    function addAvailable(address user, int256 amount) external;
 }
 // Authenticated Roles
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
@@ -295,12 +301,12 @@ contract CDPVault is
                           INTEREST COLLECTION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sends accrued protocol fees to the Buffer
-    function collectInterest() external returns (uint256 interestCollected) {
-        interestCollected = getAccruedInterest();
-        _resetAccruedInterest();
-        cdm.modifyBalance(address(this), address(buffer), interestCollected);
-    }
+    // /// @notice Sends accrued protocol fees to the Buffer
+    // function collectInterest() external returns (uint256 interestCollected) {
+    //     interestCollected = getAccruedInterest();
+    //     _resetAccruedInterest();
+    //     cdm.modifyBalance(address(this), address(buffer), interestCollected);
+    // }
 
     /*//////////////////////////////////////////////////////////////
                                 PRICING
@@ -404,7 +410,7 @@ contract CDPVault is
         uint256 spotPrice_ = spotPrice();
 
         // update the interest rate state
-        IRS memory irs = _updateIRS(totalNormalDebt_);
+        // IRS memory irs = _updateIRS(totalNormalDebt_);
 
         // position is either less risky than before or it is safe
         uint256 accruedInterest = calcAccruedInterest(
@@ -443,7 +449,7 @@ contract CDPVault is
         // update debt and credit balances in the CDM
         // pay the claimedRebate to the creditor (claimedRebate is zero if deltaNormalDebt >= 0 and positive else)
         //  int256 deltaDebt = wmul(irs.rateAccumulator, deltaNormalDebt);
-        uint256 newDebt;
+        uint256 newDebt = position.debt;
         uint256 newCumulativeIndex;
         uint256 profit;
         if (deltaNormalDebt > 0) {
@@ -453,6 +459,9 @@ contract CDPVault is
                 IPoolV3Loop(pool).baseInterestIndex(), // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             );
+            position.debt = newDebt;
+            position.lastDebtUpdate = block.timestamp;
+            position.cumulativeIndexLastUpdate = newCumulativeIndex;
         } else {
             uint256 accruedFees = (accruedInterest * feeInterest) /
                 PERCENTAGE_FACTOR;
@@ -473,6 +482,9 @@ contract CDPVault is
                     position.cumulativeIndexLastUpdate
                 );
             }
+            position.debt = newDebt;
+            position.lastDebtUpdate = block.timestamp;
+            position.cumulativeIndexLastUpdate = newCumulativeIndex;
         }
 
         if (deltaNormalDebt > 0) {
@@ -481,6 +493,7 @@ contract CDPVault is
                 creditor,
                 uint256(deltaNormalDebt)
             );
+            IPoolV3Loop(pool).addAvailable(creditor, deltaNormalDebt);
         } else if (deltaNormalDebt < 0) {
             cdm.modifyBalance(
                 creditor,
@@ -488,10 +501,6 @@ contract CDPVault is
                 uint256(-deltaNormalDebt)
             );
         }
-
-        position.debt = newDebt;
-        position.lastDebtUpdate = block.timestamp;
-        position.cumulativeIndexLastUpdate = newCumulativeIndex;
 
         if (profit != 0) IPoolV3Loop(pool).mintProfit(profit);
 

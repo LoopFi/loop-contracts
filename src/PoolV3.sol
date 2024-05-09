@@ -105,6 +105,7 @@ contract PoolV3 is
     /// @dev Mapping credit manager => debt params
     mapping(address => DebtParams) internal _creditManagerDebt;
 
+    mapping(address => uint256) internal borrowable;
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
@@ -1036,13 +1037,29 @@ contract PoolV3 is
             revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
         }
 
-        _updateBaseInterest({
-            expectedLiquidityDelta: 0,
-            availableLiquidityDelta: -amount.toInt256(),
-            checkOptimalBorrowing: true
-        }); // U:[LP-13B]
-
         _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
+
+        // In case someone modifies debt on a CDP but doesn't pick the funds immediately
+        if (borrowable[msg.sender] != 0) {
+            if (borrowable[msg.sender] < amount) {
+                _updateBaseInterest({
+                    expectedLiquidityDelta: 0,
+                    availableLiquidityDelta: -(amount - borrowable[msg.sender])
+                        .toInt256(),
+                    checkOptimalBorrowing: true
+                }); // U:[LP-13B]
+                borrowable[msg.sender] = 0;
+            } else {
+                // We don't update interest rate here because it has been already updated when modifying debt
+                borrowable[msg.sender] -= amount;
+            }
+        } else {
+            _updateBaseInterest({
+                expectedLiquidityDelta: 0,
+                availableLiquidityDelta: -amount.toInt256(),
+                checkOptimalBorrowing: true
+            }); // U:[LP-13B]
+        }
 
         cdm.modifyBalance(msg.sender, address(this), amount);
         //stablecoin.mint(user, amount);
@@ -1064,14 +1081,13 @@ contract PoolV3 is
         }); // U:[LP-14B,14C,14D]
     }
 
-    function updateBaseInterest(
-        int256 expectedLiquidityDelta,
+    // In case someone modifies debt on a CDP but doesn't pick the funds immediately, we still have to update the utilization rate and store his availability for later use
+    function addAvailable(
+        address user,
         int256 availableLiquidityDelta
     ) external vaultOnly {
-        _updateBaseInterest(
-            expectedLiquidityDelta,
-            availableLiquidityDelta,
-            false
-        );
+        _updateBaseInterest(0, -availableLiquidityDelta, false);
+
+        borrowable[user] += availableLiquidityDelta.toUint256();
     }
 }

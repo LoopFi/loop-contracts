@@ -105,11 +105,15 @@ contract PoolV3 is
     /// @dev Mapping credit manager => debt params
     mapping(address => DebtParams) internal _creditManagerDebt;
 
-    mapping(address => uint256) internal borrowable;
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
-    ICDM public cdm;
+    // Accounting
+    struct Account {
+        int256 balance; // [wad]
+        uint256 debtCeiling; // [wad]
+    }
+
     //  /// @dev Ensures that function can only be called by the pool quota keeper
     // modifier poolQuotaKeeperOnly() {
     //     _revertIfCallerIsNotPoolQuotaKeeper();
@@ -524,143 +528,143 @@ contract PoolV3 is
         return _convertToU256(_totalDebt.limit);
     }
 
-    // /// @notice Amount borrowed by a given credit manager
-    // function creditManagerBorrowed(
-    //     address creditManager
-    // ) external view override returns (uint256) {
-    //     return _creditManagerDebt[creditManager].borrowed;
-    // }
+    /// @notice Amount borrowed by a given credit manager
+    function creditManagerBorrowed(
+        address creditManager
+    ) external view override returns (uint256) {
+        return _creditManagerDebt[creditManager].borrowed;
+    }
 
-    // /// @notice Debt limit for a given credit manager, `type(uint256).max` means no limit
-    // function creditManagerDebtLimit(
-    //     address creditManager
-    // ) external view override returns (uint256) {
-    //     return _convertToU256(_creditManagerDebt[creditManager].limit);
-    // }
+    /// @notice Debt limit for a given credit manager, `type(uint256).max` means no limit
+    function creditManagerDebtLimit(
+        address creditManager
+    ) external view override returns (uint256) {
+        return _convertToU256(_creditManagerDebt[creditManager].limit);
+    }
 
-    // /// @notice Amount available to borrow for a given credit manager
-    // function creditManagerBorrowable(
-    //     address creditManager
-    // ) external view override returns (uint256 borrowable) {
-    //     borrowable = _borrowable(_totalDebt); // U:[LP-12]
-    //     if (borrowable == 0) return 0; // U:[LP-12]
+    /// @notice Amount available to borrow for a given credit manager
+    function creditManagerBorrowable(
+        address creditManager
+    ) external view override returns (uint256 borrowable) {
+        borrowable = _borrowable(_totalDebt); // U:[LP-12]
+        if (borrowable == 0) return 0; // U:[LP-12]
 
-    //     borrowable = Math.min(
-    //         borrowable,
-    //         _borrowable(_creditManagerDebt[creditManager])
-    //     ); // U:[LP-12]
-    //     if (borrowable == 0) return 0; // U:[LP-12]
+        borrowable = Math.min(
+            borrowable,
+            _borrowable(_creditManagerDebt[creditManager])
+        ); // U:[LP-12]
+        if (borrowable == 0) return 0; // U:[LP-12]
 
-    //     uint256 available = ILinearInterestRateModelV3(interestRateModel)
-    //         .availableToBorrow({
-    //             expectedLiquidity: expectedLiquidity(),
-    //             availableLiquidity: availableLiquidity()
-    //         }); // U:[LP-12]
+        uint256 available = ILinearInterestRateModelV3(interestRateModel)
+            .availableToBorrow({
+                expectedLiquidity: expectedLiquidity(),
+                availableLiquidity: availableLiquidity()
+            }); // U:[LP-12]
 
-    //     borrowable = Math.min(borrowable, available); // U:[LP-12]
-    // }
+        borrowable = Math.min(borrowable, available); // U:[LP-12]
+    }
 
-    // /// @notice Lends funds to a credit account, can only be called by credit managers
-    // /// @param borrowedAmount Amount to borrow
-    // /// @param creditAccount Credit account to send the funds to
-    // function lendCreditAccount(
-    //     uint256 borrowedAmount,
-    //     address creditAccount
-    // )
-    //     external
-    //     override
-    //     whenNotPaused // U:[LP-2A]
-    //     nonReentrant // U:[LP-2B]
-    // {
-    //     uint128 borrowedAmountU128 = borrowedAmount.toUint128();
+    /// @notice Lends funds to a credit account, can only be called by credit managers
+    /// @param borrowedAmount Amount to borrow
+    /// @param creditAccount Credit account to send the funds to
+    function lendCreditAccount(
+        uint256 borrowedAmount,
+        address creditAccount
+    )
+        external
+        override
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+    {
+        uint128 borrowedAmountU128 = borrowedAmount.toUint128();
 
-    //     DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
-    //     uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
-    //     uint128 cmBorrowed_ = cmDebt.borrowed + borrowedAmountU128;
-    //     if (
-    //         borrowedAmount == 0 ||
-    //         cmBorrowed_ > cmDebt.limit ||
-    //         totalBorrowed_ > _totalDebt.limit
-    //     ) {
-    //         revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
-    //     }
+        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
+        uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
+        uint128 cmBorrowed_ = cmDebt.borrowed + borrowedAmountU128;
+        if (
+            borrowedAmount == 0 ||
+            cmBorrowed_ > cmDebt.limit ||
+            totalBorrowed_ > _totalDebt.limit
+        ) {
+            revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
+        }
 
-    //     _updateBaseInterest({
-    //         expectedLiquidityDelta: 0,
-    //         availableLiquidityDelta: -borrowedAmount.toInt256(),
-    //         checkOptimalBorrowing: true
-    //     }); // U:[LP-13B]
+        _updateBaseInterest({
+            expectedLiquidityDelta: 0,
+            availableLiquidityDelta: -borrowedAmount.toInt256(),
+            checkOptimalBorrowing: true
+        }); // U:[LP-13B]
 
-    //     cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
-    //     _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
+        cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
+        _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
 
-    //     IERC20(underlyingToken).safeTransfer({
-    //         to: creditAccount,
-    //         value: borrowedAmount
-    //     }); // U:[LP-13B]
-    //     emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
-    // }
+        IERC20(underlyingToken).safeTransfer({
+            to: creditAccount,
+            value: borrowedAmount
+        }); // U:[LP-13B]
+        emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
+    }
 
-    // /// @notice Updates pool state to indicate debt repayment, can only be called by credit managers
-    // ///         after transferring underlying from a credit account to the pool.
-    // ///         - If transferred amount exceeds debt principal + base interest + quota interest,
-    // ///           the difference is deemed protocol's profit and the respective number of shares
-    // ///           is minted to the treasury.
-    // ///         - If, however, transferred amount is insufficient to repay debt and interest,
-    // ///           which may only happen during liquidation, treasury's shares are burned to
-    // ///           cover as much of the loss as possible.
-    // /// @param repaidAmount Amount of debt principal repaid
-    // /// @param profit Pool's profit in underlying after repaying
-    // /// @param loss Pool's loss in underlying after repaying
-    // /// @custom:expects Credit manager transfers underlying from a credit account to the pool before calling this function
-    // /// @custom:expects Profit/loss computed in the credit manager are cosistent with pool's implicit calculations
-    // function repayCreditAccount(
-    //     uint256 repaidAmount,
-    //     uint256 profit,
-    //     uint256 loss
-    // )
-    //     external
-    //     override
-    //     whenNotPaused // U:[LP-2A]
-    //     nonReentrant // U:[LP-2B]
-    // {
-    //     uint128 repaidAmountU128 = repaidAmount.toUint128();
+    /// @notice Updates pool state to indicate debt repayment, can only be called by credit managers
+    ///         after transferring underlying from a credit account to the pool.
+    ///         - If transferred amount exceeds debt principal + base interest + quota interest,
+    ///           the difference is deemed protocol's profit and the respective number of shares
+    ///           is minted to the treasury.
+    ///         - If, however, transferred amount is insufficient to repay debt and interest,
+    ///           which may only happen during liquidation, treasury's shares are burned to
+    ///           cover as much of the loss as possible.
+    /// @param repaidAmount Amount of debt principal repaid
+    /// @param profit Pool's profit in underlying after repaying
+    /// @param loss Pool's loss in underlying after repaying
+    /// @custom:expects Credit manager transfers underlying from a credit account to the pool before calling this function
+    /// @custom:expects Profit/loss computed in the credit manager are cosistent with pool's implicit calculations
+    function repayCreditAccount(
+        uint256 repaidAmount,
+        uint256 profit,
+        uint256 loss
+    )
+        external
+        override
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+    {
+        uint128 repaidAmountU128 = repaidAmount.toUint128();
 
-    //     DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
-    //     uint128 cmBorrowed = cmDebt.borrowed;
-    //     if (cmBorrowed == 0) {
-    //         revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
-    //     }
+        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
+        uint128 cmBorrowed = cmDebt.borrowed;
+        if (cmBorrowed == 0) {
+            revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
+        }
 
-    //     if (profit > 0) {
-    //         _mint(treasury, convertToShares(profit)); // U:[LP-14B]
-    //     } else if (loss > 0) {
-    //         address treasury_ = treasury;
-    //         uint256 sharesInTreasury = balanceOf(treasury_);
-    //         uint256 sharesToBurn = convertToShares(loss);
-    //         if (sharesToBurn > sharesInTreasury) {
-    //             unchecked {
-    //                 emit IncurUncoveredLoss({
-    //                     creditManager: msg.sender,
-    //                     loss: convertToAssets(sharesToBurn - sharesInTreasury)
-    //                 }); // U:[LP-14D]
-    //             }
-    //             sharesToBurn = sharesInTreasury;
-    //         }
-    //         _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
-    //     }
+        if (profit > 0) {
+            _mint(treasury, convertToShares(profit)); // U:[LP-14B]
+        } else if (loss > 0) {
+            address treasury_ = treasury;
+            uint256 sharesInTreasury = balanceOf(treasury_);
+            uint256 sharesToBurn = convertToShares(loss);
+            if (sharesToBurn > sharesInTreasury) {
+                unchecked {
+                    emit IncurUncoveredLoss({
+                        creditManager: msg.sender,
+                        loss: convertToAssets(sharesToBurn - sharesInTreasury)
+                    }); // U:[LP-14D]
+                }
+                sharesToBurn = sharesInTreasury;
+            }
+            _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
+        }
 
-    //     _updateBaseInterest({
-    //         expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
-    //         availableLiquidityDelta: 0,
-    //         checkOptimalBorrowing: false
-    //     }); // U:[LP-14B,14C,14D]
+        _updateBaseInterest({
+            expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        }); // U:[LP-14B,14C,14D]
 
-    //     _totalDebt.borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
-    //     cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[LP-14B,14C,14D]
+        _totalDebt.borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
+        cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[LP-14B,14C,14D]
 
-    //     emit Repay(msg.sender, repaidAmount, profit, loss); // U:[LP-14B,14C,14D]
-    // }
+        emit Repay(msg.sender, repaidAmount, profit, loss); // U:[LP-14B,14C,14D]
+    }
 
     /// @dev Returns borrowable amount based on debt limit and current borrowed amount
     function _borrowable(
@@ -739,8 +743,7 @@ contract PoolV3 is
             _baseInterestIndexLU = _calcBaseInterestIndex(
                 lastBaseInterestUpdate_
             ).toUint128(); // U:[LP-18]
-            lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
-        }
+         }
 
         // if (block.timestamp != lastQuotaRevenueUpdate) {
         //     lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
@@ -892,30 +895,30 @@ contract PoolV3 is
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
 
-    // /// @notice Sets new debt limit for a given credit manager, can only be called by controller
-    // ///         Adds credit manager to the list of connected managers when called for the first time
-    // /// @param creditManager Credit manager to set the limit for
-    // /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
-    // function setCreditManagerDebtLimit(
-    //     address creditManager,
-    //     uint256 newLimit
-    // )
-    //     external
-    //     override
-    //     controllerOnly // U:[LP-2C]
-    //     nonZeroAddress(creditManager) // U:[LP-25A]
-    //     registeredCreditManagerOnly(creditManager) // U:[LP-25B]
-    // {
-    //     if (!_creditManagerSet.contains(creditManager)) {
-    //         if (address(this) != ICreditManagerV3(creditManager).pool()) {
-    //             revert IncompatibleCreditManagerException(); // U:[LP-25C]
-    //         }
-    //         _creditManagerSet.add(creditManager); // U:[LP-25D]
-    //         emit AddCreditManager(creditManager); // U:[LP-25D]
-    //     }
-    //     _creditManagerDebt[creditManager].limit = _convertToU128(newLimit); // U:[LP-25D]
-    //     emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[LP-25D]
-    // }
+    /// @notice Sets new debt limit for a given credit manager, can only be called by controller
+    ///         Adds credit manager to the list of connected managers when called for the first time
+    /// @param creditManager Credit manager to set the limit for
+    /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
+    function setCreditManagerDebtLimit(
+        address creditManager,
+        uint256 newLimit
+    )
+        external
+        override
+        controllerOnly // U:[LP-2C]
+        nonZeroAddress(creditManager) // U:[LP-25A]
+        registeredCreditManagerOnly(creditManager) // U:[LP-25B]
+    {
+        if (!_creditManagerSet.contains(creditManager)) {
+            if (address(this) != ICreditManagerV3(creditManager).pool()) {
+                revert IncompatibleCreditManagerException(); // U:[LP-25C]
+            }
+            _creditManagerSet.add(creditManager); // U:[LP-25D]
+            emit AddCreditManager(creditManager); // U:[LP-25D]
+        }
+        _creditManagerDebt[creditManager].limit = _convertToU128(newLimit); // U:[LP-25D]
+        emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[LP-25D]
+    }
 
     /// @notice Sets new withdrawal fee, can only be called by controller
     /// @param newWithdrawFee New withdrawal fee in bps
@@ -1069,6 +1072,10 @@ contract PoolV3 is
         // TODO; add events
 
         // emit Exit(user, amount);
+    }
+
+    function _modifyBalance(address account, uint256 amount) external {
+        cdm.modifyBalance(msg.sender, account, amount);
     }
 
     function mintProfit(uint256 amount) external vaultOnly {

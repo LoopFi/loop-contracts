@@ -10,7 +10,7 @@ import {ICDM} from "./interfaces/ICDM.sol";
 import {ICDPVaultBase, CDPVaultConstants, CDPVaultConfig} from "./interfaces/ICDPVault.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-import {WAD, toInt256, toUint64, max, min, add, sub, wmul, wdiv, wmulUp} from "./utils/Math.sol";
+import {WAD, toInt256, toUint64, max, min, add, sub, wmul, wdiv, wmulUp, abs} from "./utils/Math.sol";
 import {Permission} from "./utils/Permission.sol";
 import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
 
@@ -283,9 +283,8 @@ contract CDPVault is
         address to,
         uint256 amount
     ) external whenNotPaused returns (uint256 cashAmount) {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        cashAmount = wdiv(amount, tokenScale);
-        cash[to] += cashAmount;
+        int256 deltaCollateral = toInt256(amount);
+        modifyCollateralAndDebt({owner: msg.sender, collateralizer: to, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
     }
 
     /// @notice Withdraws collateral tokens from this contract and decreases a users cash balance
@@ -295,10 +294,9 @@ contract CDPVault is
     function withdraw(
         address to,
         uint256 amount
-    ) external whenNotPaused returns (uint256 tokenAmount) {
-        cash[msg.sender] -= amount;
-        tokenAmount = wmul(amount, tokenScale);
-        token.safeTransfer(to, tokenAmount);
+    ) external whenNotPaused {
+        int256 deltaCollateral = -toInt256(amount);
+        modifyCollateralAndDebt({owner: msg.sender, collateralizer: to, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
     }
     
     function borrow(address borrower, address position, uint256 amount ) external {
@@ -310,17 +308,6 @@ contract CDPVault is
         int256 deltaDebt = -toInt256(amount);
         modifyCollateralAndDebt({owner: position, collateralizer: position, creditor: borrower, deltaCollateral: 0, deltaDebt: deltaDebt});
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTEREST COLLECTION
-    //////////////////////////////////////////////////////////////*/
-
-    // /// @notice Sends accrued protocol fees to the Buffer
-    // function collectInterest() external returns (uint256 interestCollected) {
-    //     interestCollected = getAccruedInterest();
-    //     _resetAccruedInterest();
-    //     cdm.modifyBalance(address(this), address(buffer), interestCollected);
-    // }
 
     /*//////////////////////////////////////////////////////////////
                                 PRICING
@@ -436,7 +423,7 @@ contract CDPVault is
         uint256 newCumulativeIndex;
         uint256 profit;
         if (deltaDebt > 0 ) {
-            (newDebt, newCumulativeIndex) = (newDebt, newCumulativeIndex) = calcIncrease(
+            (newDebt, newCumulativeIndex) = calcIncrease(
                 uint256(deltaDebt), // delta debt
                 position.debt,
                 collateralDebtData.cumulativeIndexNow, // current cumulative base interest index in Ray
@@ -446,7 +433,7 @@ contract CDPVault is
             IPoolV3(pool).lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
         } else {
             uint256 maxRepayment = calcTotalDebt(collateralDebtData);
-            uint256 amount = deltaDebt.toUint256();
+            uint256 amount = abs(deltaDebt);
             if (amount >= maxRepayment) {
                 amount = maxRepayment; // U:[CM-11]
             }
@@ -471,6 +458,13 @@ contract CDPVault is
         }
 
         // todo: transfer collateral
+        if (deltaCollateral > 0){
+            uint256 amount = deltaCollateral.toUint256();
+            token.safeTransferFrom(msg.sender, address(this), deltaCollateral);
+        } else if (deltaCollateral < 0) {
+            uint256 amount = abs(deltaCollateral);
+            token.safeTransfer(collateralizer, amount);
+        }
 
         // todo: check total debt ceiling
 
@@ -632,7 +626,7 @@ contract CDPVault is
         cdm.modifyBalance(msg.sender, address(this), repayAmount);
 
         // transfer the cash amount from the vault to the liquidator
-        cash[msg.sender] += takeCollateral;
+        // cash[msg.sender] += takeCollateral;
 
         // // transfer the penalty from the vault to the buffer
         // cdm.modifyBalance(address(this), address(buffer), penalty);

@@ -994,90 +994,6 @@ contract PoolV3 is
                 : limit.toUint128();
     }
 
-    // LOOP INTEGRATION
-    /*//////////////////////////////////////////////////////////////
-                       CREDIT AND Stablecoin REDEMPTION
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Redeems Stablecoin for internal credit
-    /// @dev User has to set allowance for Minter to burn Stablecoin
-    /// @param user Address of the user
-    /// @param amount Amount of Stablecoin to be redeemed for internal credit [wad]
-    function enter(address user, uint256 amount) external {
-        uint128 repaidAmountU128 = amount.toUint128();
-
-        _updateBaseInterest({
-            expectedLiquidityDelta: amount.toInt256(),
-            availableLiquidityDelta: 0,
-            checkOptimalBorrowing: false
-        }); // U:[LP-14B,14C,14D]
-
-        _totalDebt.borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
-
-        emit Repay(msg.sender, amount, 0, 0); // U:[LP-14B,14C,14D]
-
-        cdm.modifyBalance(address(this), user, amount);
-        // stablecoin.burn(msg.sender, amount);
-        IERC20(underlyingToken).safeTransferFrom({
-            from: msg.sender,
-            to: address(this),
-            value: amount
-        });
-        // TODO: add events
-        //emit Enter(user, amount);
-    }
-
-    /// @notice Redeems internal credit for Stablecoin
-    /// @dev User has to grant the delegate of transferring credit to Minter
-    /// @param user Address of the user
-    /// @param amount Amount of credit to be redeemed for Stablecoin [wad]
-    function exit(address user, uint256 amount) external whenNotPaused {
-        uint128 borrowedAmountU128 = amount.toUint128();
-
-        uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
-
-        if (amount == 0 || totalBorrowed_ > _totalDebt.limit) {
-            revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
-        }
-
-        _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
-
-        // In case someone modifies debt on a CDP but doesn't pick the funds immediately
-        if (borrowable[msg.sender] != 0) {
-            if (borrowable[msg.sender] < amount) {
-                _updateBaseInterest({
-                    expectedLiquidityDelta: 0,
-                    availableLiquidityDelta: -(amount - borrowable[msg.sender])
-                        .toInt256(),
-                    checkOptimalBorrowing: true
-                }); // U:[LP-13B]
-                borrowable[msg.sender] = 0;
-            } else {
-                // We don't update interest rate here because it has been already updated when modifying debt
-                borrowable[msg.sender] -= amount;
-            }
-        } else {
-            _updateBaseInterest({
-                expectedLiquidityDelta: 0,
-                availableLiquidityDelta: -amount.toInt256(),
-                checkOptimalBorrowing: true
-            }); // U:[LP-13B]
-        }
-
-        cdm.modifyBalance(msg.sender, address(this), amount);
-        //stablecoin.mint(user, amount);
-        IERC20(underlyingToken).safeTransfer({to: user, value: amount});
-
-        emit Borrow(msg.sender, user, amount); // U:[LP-13B]
-        // TODO; add events
-
-        // emit Exit(user, amount);
-    }
-
-    function _modifyBalance(address account, uint256 amount) external {
-        cdm.modifyBalance(msg.sender, account, amount);
-    }
-
     function mintProfit(uint256 amount) external vaultOnly {
         _mint(treasury, amount);
 
@@ -1086,15 +1002,5 @@ contract PoolV3 is
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
         }); // U:[LP-14B,14C,14D]
-    }
-
-    // In case someone modifies debt on a CDP but doesn't pick the funds immediately, we still have to update the utilization rate and store his availability for later use
-    function addAvailable(
-        address user,
-        int256 availableLiquidityDelta
-    ) external vaultOnly {
-        _updateBaseInterest(0, -availableLiquidityDelta, false);
-
-        borrowable[user] += availableLiquidityDelta.toUint256();
     }
 }

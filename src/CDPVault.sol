@@ -284,7 +284,7 @@ contract CDPVault is
         uint256 amount
     ) external whenNotPaused returns (uint256 cashAmount) {
         int256 deltaCollateral = toInt256(amount);
-        modifyCollateralAndDebt({owner: msg.sender, collateralizer: to, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
+        modifyCollateralAndDebt({owner: to, collateralizer: msg.sender, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
     }
 
     /// @notice Withdraws collateral tokens from this contract and decreases a users cash balance
@@ -460,7 +460,7 @@ contract CDPVault is
         // todo: transfer collateral
         if (deltaCollateral > 0){
             uint256 amount = deltaCollateral.toUint256();
-            token.safeTransferFrom(msg.sender, address(this), deltaCollateral);
+            token.safeTransferFrom(collateralizer, address(this), deltaCollateral);
         } else if (deltaCollateral < 0) {
             uint256 amount = abs(deltaCollateral);
             token.safeTransfer(collateralizer, amount);

@@ -79,11 +79,11 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
     ) external view override(IVaultRegistry) returns (uint256 totalNormalDebt) {
         uint256 vaultLen = vaultList.length;
         for (uint256 i = 0; i < vaultLen; ) {
-            (, uint256 normalDebt, , , ) = ICDPVault(vaultList[i]).positions(
+            (, uint256 debt , , ) = ICDPVault(vaultList[i]).positions(
                 user
             );
 
-            totalNormalDebt += normalDebt;
+            totalNormalDebt += debt;
 
             unchecked {
                 ++i;

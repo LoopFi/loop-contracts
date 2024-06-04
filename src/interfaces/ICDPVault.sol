@@ -52,8 +52,6 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
     function totalNormalDebt() external view returns (uint256);
 
-    function cash(address owner) external view returns (uint256);
-
     function positions(
         address owner
     )
@@ -61,7 +59,6 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
         view
         returns (
             uint256 collateral,
-            uint256 normalDebt,
             uint256 debt,
             uint256 lastDebtUpdate,
             uint256 cumulativeIndexLastUpdate

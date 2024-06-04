@@ -777,7 +777,7 @@ contract ChefIncentivesController is
     function _updateRegisteredBalance(address _user) internal {
         uint256 length = poolLength();
         for (uint256 i; i < length; ) {
-            (, uint256 newBal, , , ) = ICDPVault(registeredTokens[i]).positions(
+            (, uint256 newBal, , ) = ICDPVault(registeredTokens[i]).positions(
                 _user
             );
             uint256 registeredBal = userInfo[registeredTokens[i]][_user].amount;

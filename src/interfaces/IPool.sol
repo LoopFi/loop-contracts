@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -10,26 +10,13 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code
-    event Refer(
-        address indexed onBehalfOf,
-        uint256 indexed referralCode,
-        uint256 amount
-    );
+    event Refer(address indexed onBehalfOf, uint256 indexed referralCode, uint256 amount);
 
     /// @notice Emitted when credit account borrows funds from the pool
-    event Borrow(
-        address indexed creditManager,
-        address indexed creditAccount,
-        uint256 amount
-    );
+    event Borrow(address indexed creditManager, address indexed creditAccount, uint256 amount);
 
     /// @notice Emitted when credit account's debt is repaid to the pool
-    event Repay(
-        address indexed creditManager,
-        uint256 borrowedAmount,
-        uint256 profit,
-        uint256 loss
-    );
+    event Repay(address indexed creditManager, uint256 borrowedAmount, uint256 profit, uint256 loss);
 
     /// @notice Emitted when incurred loss can't be fully covered by burning treasury's shares
     event IncurUncoveredLoss(address indexed creditManager, uint256 loss);
@@ -47,10 +34,7 @@ interface IPoolV3Events {
     event AddCreditManager(address indexed creditManager);
 
     /// @notice Emitted when new debt limit is set for a credit manager
-    event SetCreditManagerDebtLimit(
-        address indexed creditManager,
-        uint256 newLimit
-    );
+    event SetCreditManagerDebtLimit(address indexed creditManager, uint256 newLimit);
 
     /// @notice Emitted when new withdrawal fee is set
     event SetWithdrawFee(uint256 fee);
@@ -78,17 +62,13 @@ interface IPool is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     // ERC-4626 LENDING //
     // ---------------- //
 
-    function depositWithReferral(
-        uint256 assets,
-        address receiver,
-        uint256 referralCode
-    ) external returns (uint256 shares);
+    function depositWithReferral(uint256 assets, address receiver, uint256 referralCode)
+        external
+        returns (uint256 shares);
 
-    function mintWithReferral(
-        uint256 shares,
-        address receiver,
-        uint256 referralCode
-    ) external returns (uint256 assets);
+    function mintWithReferral(uint256 shares, address receiver, uint256 referralCode)
+        external
+        returns (uint256 assets);
 
     // --------- //
     // BORROWING //
@@ -98,16 +78,15 @@ interface IPool is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
 
     function totalDebtLimit() external view returns (uint256);
 
-    // function lendCreditAccount(
-    //     uint256 borrowedAmount,
-    //     address creditAccount
-    // ) external;
+    function creditManagerBorrowed(address creditManager) external view returns (uint256);
 
-    // function repayCreditAccount(
-    //     uint256 repaidAmount,
-    //     uint256 profit,
-    //     uint256 loss
-    // ) external;
+    function creditManagerDebtLimit(address creditManager) external view returns (uint256);
+
+    function creditManagerBorrowable(address creditManager) external view returns (uint256 borrowable);
+
+    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
+
+    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss) external;
 
     // ------------- //
     // INTEREST RATE //
@@ -133,10 +112,7 @@ interface IPool is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
 
     function setTotalDebtLimit(uint256 newLimit) external;
 
-    // function setCreditManagerDebtLimit(
-    //     address creditManager,
-    //     uint256 newLimit
-    // ) external;
+    function setCreditManagerDebtLimit(address creditManager, uint256 newLimit) external;
 
     function setWithdrawFee(uint256 newWithdrawFee) external;
 }

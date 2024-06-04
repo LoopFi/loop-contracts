@@ -158,8 +158,8 @@ contract CDPVault is
 
     event ModifyPosition(
         address indexed position,
-        int256 deltaCollateral,
-        int256 deltaDebt,
+        uint256 debt,
+        uint256 collateral,
         uint256 totalNormalDebt
     );
     event ModifyCollateralAndDebt(
@@ -285,6 +285,9 @@ contract CDPVault is
     ) external whenNotPaused returns (uint256 cashAmount) {
         int256 deltaCollateral = toInt256(amount);
         modifyCollateralAndDebt({owner: to, collateralizer: msg.sender, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
+        
+        //todo: perform the conversion
+        cashAmount = amount;
     }
 
     /// @notice Withdraws collateral tokens from this contract and decreases a users cash balance
@@ -294,9 +297,11 @@ contract CDPVault is
     function withdraw(
         address to,
         uint256 amount
-    ) external whenNotPaused {
+    ) external whenNotPaused returns (uint256 tokenAmount){
         int256 deltaCollateral = -toInt256(amount);
         modifyCollateralAndDebt({owner: msg.sender, collateralizer: to, creditor: msg.sender, deltaCollateral: deltaCollateral, deltaDebt: 0});
+        //todo: perform conversion
+        tokenAmount = amount;
     }
     
     function borrow(address borrower, address position, uint256 amount ) external {
@@ -460,7 +465,7 @@ contract CDPVault is
         // todo: transfer collateral
         if (deltaCollateral > 0){
             uint256 amount = deltaCollateral.toUint256();
-            token.safeTransferFrom(collateralizer, address(this), deltaCollateral);
+            token.safeTransferFrom(collateralizer, address(this), amount);
         } else if (deltaCollateral < 0) {
             uint256 amount = abs(deltaCollateral);
             token.safeTransfer(collateralizer, amount);
@@ -499,7 +504,7 @@ contract CDPVault is
         );
     }
 
-    function _calcDebtAndCollateral(Position calldata position ) internal view returns (CollateralDebtData memory cdd) {
+    function _calcDebtAndCollateral(Position memory position ) internal view returns (CollateralDebtData memory cdd) {
         uint256 index = IPoolV3Loop(pool).baseInterestIndex();
         cdd.debt = position.debt;
         cdd.cumulativeIndexNow = index;
@@ -514,7 +519,7 @@ contract CDPVault is
         cdd.accruedFees = cdd.accruedInterest * feeInterest / PERCENTAGE_FACTOR;
     }
 
-    function _updatePosition(address position) internal returns (Position memory updatedPos) {
+    function _updatePosition(address position) internal view returns (Position memory updatedPos) {
         Position memory pos = positions[position];
         // pos.cumulativeIndexLastUpdate = 
         uint256 accruedInterest = calcAccruedInterest(
@@ -610,20 +615,20 @@ contract CDPVault is
         }
 
         // update liquidated position
-        _modifyPosition(
-            owner,
-            position,
-            currentDebt,
-            -toInt256(takeCollateral),
-            -toInt256(deltaDebt),
-            totalNormalDebt
-        );
+        // _modifyPosition(
+        //     owner,
+        //     position,
+        //     currentDebt,
+        //     -toInt256(takeCollateral),
+        //     -toInt256(deltaDebt),
+        //     totalNormalDebt
+        // );
 
         // update vault state
         totalNormalDebt -= deltaDebt;
 
         // transfer the repay amount from the liquidator to the vault
-        cdm.modifyBalance(msg.sender, address(this), repayAmount);
+        // cdm.modifyBalance(msg.sender, address(this), repayAmount);
 
         // transfer the cash amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;

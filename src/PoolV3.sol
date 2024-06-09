@@ -18,11 +18,11 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 // INTERFACES
-import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "@gearbox-protocol/core-v3/contracts//interfaces/IAddressProviderV3.sol";
-import {ICreditManagerV3} from "@gearbox-protocol/core-v3/contracts//interfaces/ICreditManagerV3.sol";
-import {ILinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts//interfaces/ILinearInterestRateModelV3.sol";
-import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts//interfaces/IPoolQuotaKeeperV3.sol";
-import {IPool} from "./interfaces/IPool.sol";
+import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
+import {ICreditManagerV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ICreditManagerV3.sol";
+import {ILinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ILinearInterestRateModelV3.sol";
+import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts//libraries/CreditLogic.sol";
@@ -33,7 +33,6 @@ import {ContractsRegisterTrait} from "@gearbox-protocol/core-v3/contracts//trait
 import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import {ICDM} from "./interfaces/ICDM.sol";
-import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 
 // EXCEPTIONS
 import "@gearbox-protocol/core-v3/contracts//interfaces/IExceptions.sol";
@@ -50,9 +49,9 @@ struct DebtParams {
 contract PoolV3 is
     ERC4626,
     ERC20Permit,
-    ACLNonReentrantTrait,
+    ACLNonReentrantTrait, 
     ContractsRegisterTrait,
-    IPool
+    IPoolV3
 {
     using Math for uint256;
     using SafeCast for int256;
@@ -61,7 +60,7 @@ contract PoolV3 is
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
-    error CallerNotVaultException();
+    error CallerNotManagerException();
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -75,21 +74,19 @@ contract PoolV3 is
     /// @notice Protocol treasury address
     address public immutable override treasury;
 
-    IVaultRegistry public immutable vaultRegistry;
-
     /// @notice Interest rate model contract address
     address public override interestRateModel;
     /// @notice Timestamp of the last base interest rate and index update
     uint40 public override lastBaseInterestUpdate;
-    // /// @notice Timestamp of the last quota revenue update
-    // uint40 public override lastQuotaRevenueUpdate;
+    /// @notice Timestamp of the last quota revenue update
+    uint40 public override lastQuotaRevenueUpdate;
     /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
 
-    // /// @notice Pool quota keeper contract address
-    // address public override poolQuotaKeeper;
-    // /// @dev Current quota revenue
-    // uint96 internal _quotaRevenue;
+    /// @notice Pool quota keeper contract address
+    address public override poolQuotaKeeper;
+    /// @dev Current quota revenue
+    uint96 internal _quotaRevenue;
 
     /// @dev Current base interest rate in ray
     uint128 internal _baseInterestRate;
@@ -108,31 +105,15 @@ contract PoolV3 is
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
-    // Accounting
-    struct Account {
-        int256 balance; // [wad]
-        uint256 debtCeiling; // [wad]
-    }
-
-    //  /// @dev Ensures that function can only be called by the pool quota keeper
-    // modifier poolQuotaKeeperOnly() {
-    //     _revertIfCallerIsNotPoolQuotaKeeper();
-    //     _;
-    // }
-
-    modifier vaultOnly() {
-        _revertIfCallerIsNotVault();
+     /// @dev Ensures that function can only be called by the pool quota keeper
+    modifier poolQuotaKeeperOnly() {
+        _revertIfCallerIsNotPoolQuotaKeeper();
         _;
     }
 
-    // function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-    //     if (msg.sender != poolQuotaKeeper)
-    //         revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
-    // }
-
-    function _revertIfCallerIsNotVault() internal view {
-        if (!vaultRegistry.isVaultRegistered(msg.sender))
-            revert CallerNotVaultException(); // U:[LP-2C]
+    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
+        if (msg.sender != poolQuotaKeeper)
+            revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 
     /// @notice Constructor
@@ -140,7 +121,6 @@ contract PoolV3 is
     /// @param underlyingToken_ Pool underlying token address
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
-    /// @param vaultRegistry_ Vault registry contract address
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
@@ -148,7 +128,6 @@ contract PoolV3 is
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        address vaultRegistry_,
         string memory name_,
         string memory symbol_
     )
@@ -163,19 +142,17 @@ contract PoolV3 is
         addressProvider = addressProvider_; // U:[LP-1B]
         underlyingToken = underlyingToken_; // U:[LP-1B]
 
-        treasury = IAddressProviderV3(addressProvider_).getAddressOrRevert({
-            key: AP_TREASURY,
-            _version: NO_VERSION_CONTROL
-        }); // U:[LP-1B]
+        treasury =
+            IAddressProviderV3(addressProvider_).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
         _baseInterestIndexLU = uint128(RAY); // U:[LP-1B]
 
         interestRateModel = interestRateModel_; // U:[LP-1B]
-        vaultRegistry = IVaultRegistry(vaultRegistry_);
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
+        _creditManagerSet.add(msg.sender);
     }
 
     /// @notice Pool shares decimals, matches underlying token decimals
@@ -745,9 +722,9 @@ contract PoolV3 is
             ).toUint128(); // U:[LP-18]
          }
 
-        // if (block.timestamp != lastQuotaRevenueUpdate) {
-        //     lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
-        // }
+        if (block.timestamp != lastQuotaRevenueUpdate) {
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
+        }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[LP-18]
         _baseInterestRate = ILinearInterestRateModelV3(interestRateModel)
@@ -777,69 +754,69 @@ contract PoolV3 is
                 (RAY + baseInterestRate().calcLinearGrowth(timestamp))) / RAY;
     }
 
-    // // ------ //
-    // // QUOTAS //
-    // // ------ //
+    // ------ //
+    // QUOTAS //
+    // ------ //
 
-    // /// @notice Current annual quota revenue in underlying tokens
-    // function quotaRevenue() public view override returns (uint256) {
-    //     return _quotaRevenue;
-    // }
+    /// @notice Current annual quota revenue in underlying tokens
+    function quotaRevenue() public view override returns (uint256) {
+        return _quotaRevenue;
+    }
 
-    // /// @notice Updates quota revenue value by given delta
-    // /// @param quotaRevenueDelta Quota revenue delta
-    // function updateQuotaRevenue(
-    //     int256 quotaRevenueDelta
-    // )
-    //     external
-    //     override
-    //     nonReentrant // U:[LP-2B]
-    //     poolQuotaKeeperOnly // U:[LP-2C]
-    // {
-    //     _setQuotaRevenue(
-    //         (quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()
-    //     ); // U:[LP-19]
-    // }
+    /// @notice Updates quota revenue value by given delta
+    /// @param quotaRevenueDelta Quota revenue delta
+    function updateQuotaRevenue(
+        int256 quotaRevenueDelta
+    )
+        external
+        override
+        nonReentrant // U:[LP-2B]
+        poolQuotaKeeperOnly // U:[LP-2C]
+    {
+        _setQuotaRevenue(
+            (quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()
+        ); // U:[LP-19]
+    }
 
-    // /// @notice Sets new quota revenue value
-    // /// @param newQuotaRevenue New quota revenue value
-    // function setQuotaRevenue(
-    //     uint256 newQuotaRevenue
-    // )
-    //     external
-    //     override
-    //     nonReentrant // U:[LP-2B]
-    //     poolQuotaKeeperOnly // U:[LP-2C]
-    // {
-    //     _setQuotaRevenue(newQuotaRevenue); // U:[LP-20]
-    // }
+    /// @notice Sets new quota revenue value
+    /// @param newQuotaRevenue New quota revenue value
+    function setQuotaRevenue(
+        uint256 newQuotaRevenue
+    )
+        external
+        override
+        nonReentrant // U:[LP-2B]
+        poolQuotaKeeperOnly // U:[LP-2C]
+    {
+        _setQuotaRevenue(newQuotaRevenue); // U:[LP-20]
+    }
 
-    // /// @dev Computes quota revenue accrued since the last update
-    // function _calcQuotaRevenueAccrued() internal view returns (uint256) {
-    //     uint256 timestampLU = lastQuotaRevenueUpdate;
-    //     if (block.timestamp == timestampLU) return 0; // U:[LP-21]
-    //     return _calcQuotaRevenueAccrued(timestampLU); // U:[LP-21]
-    // }
+    /// @dev Computes quota revenue accrued since the last update
+    function _calcQuotaRevenueAccrued() internal view returns (uint256) {
+        uint256 timestampLU = lastQuotaRevenueUpdate;
+        if (block.timestamp == timestampLU) return 0; // U:[LP-21]
+        return _calcQuotaRevenueAccrued(timestampLU); // U:[LP-21]
+    }
 
-    // /// @dev Sets new quota revenue value
-    // ///      - If time has passed since the last quota revenue update, adds accrued revenue
-    // ///        to stored expected liquidity and updates last update timestamp
-    // function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
-    //     uint256 timestampLU = lastQuotaRevenueUpdate;
-    //     if (block.timestamp != timestampLU) {
-    //         _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU)
-    //             .toUint128(); // U:[LP-20]
-    //         lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-20]
-    //     }
-    //     _quotaRevenue = newQuotaRevenue.toUint96(); // U:[LP-20]
-    // }
+    /// @dev Sets new quota revenue value
+    ///      - If time has passed since the last quota revenue update, adds accrued revenue
+    ///        to stored expected liquidity and updates last update timestamp
+    function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
+        uint256 timestampLU = lastQuotaRevenueUpdate;
+        if (block.timestamp != timestampLU) {
+            _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU)
+                .toUint128(); // U:[LP-20]
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-20]
+        }
+        _quotaRevenue = newQuotaRevenue.toUint96(); // U:[LP-20]
+    }
 
-    // /// @dev Computes quota revenue accrued since given timestamp
-    // function _calcQuotaRevenueAccrued(
-    //     uint256 timestamp
-    // ) private view returns (uint256) {
-    //     return quotaRevenue().calcLinearGrowth(timestamp);
-    // }
+    /// @dev Computes quota revenue accrued since given timestamp
+    function _calcQuotaRevenueAccrued(
+        uint256 timestamp
+    ) private view returns (uint256) {
+        return quotaRevenue().calcLinearGrowth(timestamp);
+    }
 
     // ------------- //
     // CONFIGURATION //
@@ -860,28 +837,28 @@ contract PoolV3 is
         emit SetInterestRateModel(newInterestRateModel); // U:[LP-22B]
     }
 
-    // /// @notice Sets new pool quota keeper, can only be called by configurator
-    // /// @param newPoolQuotaKeeper Address of the new pool quota keeper contract
-    // function setPoolQuotaKeeper(
-    //     address newPoolQuotaKeeper
-    // )
-    //     external
-    //     override
-    //     configuratorOnly // U:[LP-2C]
-    //     nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
-    // {
-    //     if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
-    //         revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
-    //     }
+    /// @notice Sets new pool quota keeper, can only be called by configurator
+    /// @param newPoolQuotaKeeper Address of the new pool quota keeper contract
+    function setPoolQuotaKeeper(
+        address newPoolQuotaKeeper
+    )
+        external
+        override
+        configuratorOnly // U:[LP-2C]
+        nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
+    {
+        if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
+            revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
+        }
 
-    //     poolQuotaKeeper = newPoolQuotaKeeper; // U:[LP-23D]
+        poolQuotaKeeper = newPoolQuotaKeeper; // U:[LP-23D]
 
-    //     uint256 newQuotaRevenue = IPoolQuotaKeeperV3(poolQuotaKeeper)
-    //         .poolQuotaRevenue();
-    //     _setQuotaRevenue(newQuotaRevenue); // U:[LP-23D]
+        uint256 newQuotaRevenue = IPoolQuotaKeeperV3(poolQuotaKeeper)
+            .poolQuotaRevenue();
+        _setQuotaRevenue(newQuotaRevenue); // U:[LP-23D]
 
-    //     emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
-    // }
+        emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
+    }
 
     /// @notice Sets new total debt limit, can only be called by controller
     /// @param newLimit New debt limit, `type(uint256).max` for no limit
@@ -907,7 +884,6 @@ contract PoolV3 is
         override
         controllerOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
-        registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
         if (!_creditManagerSet.contains(creditManager)) {
             if (address(this) != ICreditManagerV3(creditManager).pool()) {
@@ -994,7 +970,14 @@ contract PoolV3 is
                 : limit.toUint128();
     }
 
-    function mintProfit(uint256 amount) external vaultOnly {
+    function mintProfit(uint256 amount) external {
+
+        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
+        uint128 cmBorrowed = cmDebt.borrowed;
+        if (cmBorrowed == 0) {
+            revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
+        }
+
         _mint(treasury, amount);
 
         _updateBaseInterest({

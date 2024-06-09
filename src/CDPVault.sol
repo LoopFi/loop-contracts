@@ -15,7 +15,6 @@ import {Permission} from "./utils/Permission.sol";
 import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
 
 import {getCredit, getDebt, getCreditLine} from "./CDM.sol";
-import {InterestRateModel} from "./InterestRateModel.sol";
 
 import {IChefIncentivesController} from "./reward/interfaces/IChefIncentivesController.sol";
 import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";
@@ -69,7 +68,6 @@ contract CDPVault is
     AccessControl,
     Pause,
     Permission,
-    InterestRateModel,
     ICDPVaultBase
 {
     /*//////////////////////////////////////////////////////////////
@@ -83,12 +81,8 @@ contract CDPVault is
     //////////////////////////////////////////////////////////////*/
 
     // CDPVault Parameters
-    /// @notice CDM (Credit and Debt Manager)
-    ICDM public immutable cdm;
     /// @notice Oracle of the collateral token
     IOracle public immutable oracle;
-    /// @notice Global surplus and debt Buffer
-    IBuffer public immutable buffer;
     /// @notice collateral token
     IERC20 public immutable token;
     /// @notice Collateral token's decimals scale (10 ** decimals)
@@ -101,8 +95,8 @@ contract CDPVault is
 
     uint16 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
 
-    address public pool;
-    IERC20 public poolUnderlying;
+    IPoolV3 public immutable pool;
+    IERC20 public immutable poolUnderlying;
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -120,7 +114,7 @@ contract CDPVault is
     /// @notice Sum of backed normalized debt over all positions [wad]
     uint256 public totalNormalDebt;
 
-    struct CollateralDebtData {
+    struct DebtData {
         uint256 debt;
         uint256 cumulativeIndexNow;
         uint256 cumulativeIndexLastUpdate;
@@ -203,11 +197,12 @@ contract CDPVault is
         CDPVaultConstants memory constants,
         CDPVaultConfig memory config
     ) {
-        cdm = constants.cdm;
+        pool = constants.pool;
         oracle = constants.oracle;
-        buffer = constants.buffer;
         token = constants.token;
         tokenScale = constants.tokenScale;
+
+        poolUnderlying = IERC20(pool.underlyingToken());
 
         vaultConfig = VaultConfig({
             debtFloor: config.debtFloor,
@@ -231,7 +226,7 @@ contract CDPVault is
         _grantRole(DEFAULT_ADMIN_ROLE, config.roleAdmin);
         _grantRole(VAULT_CONFIG_ROLE, config.vaultAdmin);
         _grantRole(PAUSER_ROLE, config.pauseAdmin);
-        _grantRole(VAULT_UNWINDER_ROLE, config.vaultUnwinder);
+        // _grantRole(VAULT_UNWINDER_ROLE, config.vaultUnwinder);
 
         emit VaultCreated(address(this), address(token), config.roleAdmin);
     }
@@ -251,7 +246,6 @@ contract CDPVault is
         if (parameter == "debtFloor") vaultConfig.debtFloor = uint128(data);
         else if (parameter == "liquidationRatio")
             vaultConfig.liquidationRatio = uint64(data);
-        else if (parameter == "baseRate") _setBaseRate(uint64(data));
         else if (parameter == "liquidationPenalty")
             liquidationConfig.liquidationPenalty = uint64(data);
         else if (parameter == "liquidationDiscount")
@@ -387,9 +381,9 @@ contract CDPVault is
 
         // update the global debt balance
         if (newDebt > currentDebt) {
-            totalDebt_ = totalDebt_ + (currentDebt - newDebt);
+            totalDebt_ = totalDebt_ + (newDebt - currentDebt);
         } else {
-            totalDebt_ = totalDebt_ - (newDebt - currentDebt);
+            totalDebt_ = totalDebt_ - (currentDebt - newDebt);
         }
         totalNormalDebt = totalDebt_;
 
@@ -419,6 +413,9 @@ contract CDPVault is
     ) internal pure returns (bool) {
         return (wdiv(collateralValue, liquidationRatio) >= debt);
     }
+
+    event debug(string message);
+    event debug(string message, uint256 value);
 
     /// @notice Modifies a Position's collateral and debt balances
     /// @dev Checks that the global debt ceiling and the vault's debt ceiling have not been exceeded via the CDM,
@@ -453,9 +450,7 @@ contract CDPVault is
         ) revert CDPVault__modifyCollateralAndDebt_noPermission();
 
         Position memory position = positions[owner];
-        CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral(
-            position
-        );
+        DebtData memory debtData = _calcDebt(position);
 
         uint256 newDebt;
         uint256 newCumulativeIndex;
@@ -464,36 +459,36 @@ contract CDPVault is
             (newDebt, newCumulativeIndex) = calcIncrease(
                 uint256(deltaDebt), // delta debt
                 position.debt,
-                collateralDebtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             ); // U:[CM-10]
 
-            IPoolV3(pool).lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
-        } else {
-            uint256 maxRepayment = calcTotalDebt(collateralDebtData);
+            pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
+            emit debug("Lend complete");
+        } else if (deltaDebt < 0) {
+            uint256 maxRepayment = calcTotalDebt(debtData);
             uint256 amount = abs(deltaDebt);
             if (amount >= maxRepayment) {
                 amount = maxRepayment; // U:[CM-11]
             }
 
-            // ICreditAccountBase(creditor).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
-            poolUnderlying.safeTransferFrom(creditor, pool, amount);
+            poolUnderlying.safeTransferFrom(creditor, address(pool), amount);
 
             if (amount == maxRepayment) {
                 newDebt = 0;
-                newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
-                profit = collateralDebtData.accruedFees;
+                newCumulativeIndex = debtData.cumulativeIndexNow;
+                profit = debtData.accruedFees;
             } else {
                 (newDebt, newCumulativeIndex, profit) = calcDecrease(
                     amount, // delta debt
                     position.debt,
-                    collateralDebtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                    debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                     position.cumulativeIndexLastUpdate
                 );
             }
 
-            IPoolV3(pool).repayCreditAccount(
-                collateralDebtData.debt - newDebt,
+            pool.repayCreditAccount(
+                debtData.debt - newDebt,
                 profit,
                 0
             ); // U:[CM-11]
@@ -509,7 +504,7 @@ contract CDPVault is
         }
 
         // todo: check total debt ceiling
-
+        emit debug("_modifyPosition 1");
         position = _modifyPosition(
             owner,
             position,
@@ -518,6 +513,8 @@ contract CDPVault is
             deltaCollateral,
             totalNormalDebt
         );
+
+        emit debug("_modifyPosition 2 ");
 
         VaultConfig memory config = vaultConfig;
         uint256 spotPrice_ = spotPrice();
@@ -541,10 +538,10 @@ contract CDPVault is
         );
     }
 
-    function _calcDebtAndCollateral(
+    function _calcDebt(
         Position memory position
-    ) internal view returns (CollateralDebtData memory cdd) {
-        uint256 index = IPoolV3Loop(pool).baseInterestIndex();
+    ) internal view returns (DebtData memory cdd) {
+        uint256 index = pool.baseInterestIndex();
         cdd.debt = position.debt;
         cdd.cumulativeIndexNow = index;
         cdd.cumulativeIndexLastUpdate = position.cumulativeIndexLastUpdate;
@@ -568,7 +565,7 @@ contract CDPVault is
         uint256 accruedInterest = calcAccruedInterest(
             pos.debt,
             pos.cumulativeIndexLastUpdate,
-            IPoolV3Loop(pool).baseInterestIndex()
+            pool.baseInterestIndex()
         );
         uint256 currentDebt = pos.debt + accruedInterest;
         uint256 spotPrice_ = spotPrice();
@@ -621,9 +618,7 @@ contract CDPVault is
         );
 
         // update debt
-        CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral(
-            position
-        );
+        DebtData memory debtData = _calcDebt(position);
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
@@ -645,7 +640,7 @@ contract CDPVault is
         if (
             spotPrice_ == 0 ||
             _isCollateralized(
-                collateralDebtData.debt,
+                debtData.debt,
                 collateralValue,
                 config.liquidationRatio
             )
@@ -659,7 +654,7 @@ contract CDPVault is
             penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
             // debt >= repayAmount if takeCollateral > position.collateral
             //deltaDebt = currentDebt;
-            deltaDebt = collateralDebtData.debt;
+            deltaDebt = debtData.debt;
         }
 
         // update liquidated position
@@ -674,30 +669,30 @@ contract CDPVault is
 
         // update vault state
         // totalNormalDebt -= deltaDebt;
-
+  
         // transfer the repay amount from the liquidator to the vault
         // cdm.modifyBalance(msg.sender, address(this), repayAmount);
-        poolUnderlying.safeTransferFrom(msg.sender, pool, deltaDebt);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), deltaDebt);
 
         uint256 newDebt;
         uint256 newCumulativeIndex;
         uint256 profit;
-        uint256 maxRepayment = calcTotalDebt(collateralDebtData);
+        uint256 maxRepayment = calcTotalDebt(debtData);
         if (deltaDebt == maxRepayment) {
             newDebt = 0;
-            newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
-            profit = collateralDebtData.accruedFees;
+            newCumulativeIndex = debtData.cumulativeIndexNow;
+            profit = debtData.accruedFees;
         } else {
             (newDebt, newCumulativeIndex, profit) = calcDecrease(
                 deltaDebt, // delta debt
-                collateralDebtData.debt,
-                collateralDebtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                collateralDebtData.cumulativeIndexLastUpdate
+                debtData.debt,
+                debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                debtData.cumulativeIndexLastUpdate
             );
         }
 
-        IPoolV3(pool).repayCreditAccount(
-            collateralDebtData.debt - newDebt,
+        pool.repayCreditAccount(
+            debtData.debt - newDebt,
             profit,
             0
         ); // U:[CM-11]
@@ -707,7 +702,7 @@ contract CDPVault is
 
         // Mint the penalty from the vault to the treasury
         // cdm.modifyBalance(address(this), address(buffer), penalty);
-        IPoolV3Loop(pool).mintProfit(penalty);
+        IPoolV3Loop(address(pool)).mintProfit(penalty);
 
         position.debt = newDebt;
         position.lastDebtUpdate = block.timestamp;
@@ -824,14 +819,20 @@ contract CDPVault is
         newDebt = debt - amountToRepay; // U:[CL-3]
     }
 
+    function virtualDebt(address position) external view returns (uint256) {
+        return calcTotalDebt(
+            _calcDebt(positions[position])
+        );
+    }
+
     /// @dev Computes total debt, given raw debt data
-    /// @param collateralDebtData See `CollateralDebtData` (must have debt data filled)
+    /// @param debtData See `DebtData` (must have debt data filled)
     function calcTotalDebt(
-        CollateralDebtData memory collateralDebtData
+        DebtData memory debtData
     ) internal pure returns (uint256) {
         return
-            collateralDebtData.debt +
-            collateralDebtData.accruedInterest +
-            collateralDebtData.accruedFees;
+            debtData.debt +
+            debtData.accruedInterest +
+            debtData.accruedFees;
     }
 }

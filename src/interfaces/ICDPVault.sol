@@ -10,12 +10,12 @@ import {IBuffer} from "./IBuffer.sol";
 import {IPause} from "./IPause.sol";
 import {IPermission} from "./IPermission.sol";
 import {IInterestRateModel} from "./IInterestRateModel.sol";
+import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // Deployment related structs
 struct CDPVaultConstants {
-    ICDM cdm;
+    IPoolV3 pool;
     IOracle oracle;
-    IBuffer buffer;
     IERC20 token;
     uint256 tokenScale;
 }
@@ -25,21 +25,17 @@ struct CDPVaultConfig {
     uint64 liquidationRatio;
     uint64 liquidationPenalty;
     uint64 liquidationDiscount;
-    uint256 baseRate;
     address roleAdmin;
     address vaultAdmin;
     address pauseAdmin;
-    address vaultUnwinder;
 }
 
 /// @title ICDPVaultBase
 /// @notice Interface for the CDPVault without `paused` to avoid unnecessary overriding of `paused` in CDPVault
 interface ICDPVaultBase is IAccessControl, IPause, IPermission {
-    function cdm() external view returns (ICDM);
+    function pool() external view returns (IPoolV3);
 
     function oracle() external view returns (IOracle);
-
-    function buffer() external view returns (IBuffer);
 
     function token() external view returns (IERC20);
 

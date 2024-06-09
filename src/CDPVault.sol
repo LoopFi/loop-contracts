@@ -414,9 +414,6 @@ contract CDPVault is
         return (wdiv(collateralValue, liquidationRatio) >= debt);
     }
 
-    event debug(string message);
-    event debug(string message, uint256 value);
-
     /// @notice Modifies a Position's collateral and debt balances
     /// @dev Checks that the global debt ceiling and the vault's debt ceiling have not been exceeded via the CDM,
     /// - that the Position is still safe after the modification,
@@ -464,7 +461,6 @@ contract CDPVault is
             ); // U:[CM-10]
 
             pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
-            emit debug("Lend complete");
         } else if (deltaDebt < 0) {
             uint256 maxRepayment = calcTotalDebt(debtData);
             uint256 amount = abs(deltaDebt);
@@ -504,7 +500,6 @@ contract CDPVault is
         }
 
         // todo: check total debt ceiling
-        emit debug("_modifyPosition 1");
         position = _modifyPosition(
             owner,
             position,
@@ -513,8 +508,6 @@ contract CDPVault is
             deltaCollateral,
             totalNormalDebt
         );
-
-        emit debug("_modifyPosition 2 ");
 
         VaultConfig memory config = vaultConfig;
         uint256 spotPrice_ = spotPrice();

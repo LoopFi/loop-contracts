@@ -6,17 +6,13 @@ import {TestBase} from "../TestBase.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ICDM} from "../../interfaces/ICDM.sol";
-import {IBuffer} from "../../interfaces/IBuffer.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {ICDPVaultBase} from "../../interfaces/ICDPVault.sol";
 import {CDPVaultConstants, CDPVaultConfig} from "../../interfaces/ICDPVault.sol";
 import {IPermission} from "../../interfaces/IPermission.sol";
 
 import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
-import {CDM} from "../../CDM.sol";
 import {CDPVault, calculateDebt, calculateNormalDebt, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
-import {InterestRateModel} from "../../InterestRateModel.sol";
 
 contract CDPVaultWrapper is CDPVault {
     constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) CDPVault(constants, config) {}

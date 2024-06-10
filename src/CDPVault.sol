@@ -5,16 +5,12 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBuffer} from "./interfaces/IBuffer.sol";
-import {ICDM} from "./interfaces/ICDM.sol";
 import {ICDPVaultBase, CDPVaultConstants, CDPVaultConfig} from "./interfaces/ICDPVault.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
 import {WAD, toInt256, toUint64, max, min, add, sub, wmul, wdiv, wmulUp, abs} from "./utils/Math.sol";
 import {Permission} from "./utils/Permission.sol";
 import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
-
-import {getCredit, getDebt, getCreditLine} from "./CDM.sol";
 
 import {IChefIncentivesController} from "./reward/interfaces/IChefIncentivesController.sol";
 import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";

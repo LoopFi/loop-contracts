@@ -55,6 +55,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     using SafeERC20 for IERC20;
 
     error CallerNotManagerException();
+    error PoolV3LockedException();
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -76,6 +77,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     uint40 public override lastQuotaRevenueUpdate;
     /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
+    /// @notice Redeeming or withdrawal allowed
+    bool public locked;
 
     /// @notice Pool quota keeper contract address
     address public override poolQuotaKeeper;
@@ -99,14 +102,31 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
+    /// @dev List of whitelisted account thallowdeem or withdraw when pool is locked
+    mapping(address => bool) internal _allowed;
+
     /// @dev Ensures that function can only be called by the pool quota keeper
     modifier poolQuotaKeeperOnly() {
         _revertIfCallerIsNotPoolQuotaKeeper();
         _;
     }
 
+    modifier whenNotLocked() {
+        if (_allowed[msg.sender]) {
+            _;
+        } else {
+            _revertIfLocked();
+            _;
+        }
+        _;
+    }
+
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
         if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
+    }
+
+    function _revertIfLocked() internal view {
+        if (locked) revert PoolV3LockedException(); // U:[LP-2C]
     }
 
     /// @notice Constructor
@@ -146,6 +166,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         interestRateModel = interestRateModel_; // U:[LP-1B]
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
+        locked = true;
+
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
         _creditManagerSet.add(msg.sender);
     }
@@ -168,9 +190,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
     ///         and quota revenue were fully repaid
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued();
-        //+
-        // _calcQuotaRevenueAccrued(); // U:[LP-4]
+        return _expectedLiquidityLU + _calcBaseInterestAccrued() + _calcQuotaRevenueAccrued(); // U:[LP-4]
     }
 
     /// @notice Expected liquidity stored as of last update
@@ -261,6 +281,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         public
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
+        whenNotLocked
         nonReentrant // U:[LP-2B]
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
@@ -284,6 +305,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         public
         override(ERC4626, IERC4626)
         whenNotPaused // U:[LP-2A]
+        whenNotLocked
         nonReentrant // U:[LP-2B]
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
@@ -390,16 +412,16 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @dev Internal conversion function (from assets to shares) with support for rounding direction
     /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply();
-        return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
+    function _convertToShares(uint256 assets) internal pure override returns (uint256 shares) {
+        // uint256 supply = totalSupply();
+        return assets; //(assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
     }
 
     /// @dev Internal conversion function (from shares to assets) with support for rounding direction
     /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
-        uint256 supply = totalSupply();
-        return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
+    function _convertToAssets(uint256 shares) internal pure override returns (uint256 assets) {
+        //uint256 supply = totalSupply();
+        return shares; //(supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
     }
 
     // --------- //
@@ -507,26 +529,25 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
         }
 
-        if (profit > 0) {
-            _mint(treasury, convertToShares(profit)); // U:[LP-14B]
-        } else if (loss > 0) {
-            address treasury_ = treasury;
-            uint256 sharesInTreasury = balanceOf(treasury_);
-            uint256 sharesToBurn = convertToShares(loss);
-            if (sharesToBurn > sharesInTreasury) {
-                unchecked {
-                    emit IncurUncoveredLoss({
-                        creditManager: msg.sender,
-                        loss: convertToAssets(sharesToBurn - sharesInTreasury)
-                    }); // U:[LP-14D]
-                }
-                sharesToBurn = sharesInTreasury;
-            }
-            _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
-        }
+        if (profit > 0) _mint(treasury, convertToShares(profit)); // U:[LP-14B]
+        // } else if (loss > 0) {
+        //     address treasury_ = treasury;
+        //     uint256 sharesInTreasury = balanceOf(treasury_);
+        //     uint256 sharesToBurn = convertToShares(loss);
+        //     if (sharesToBurn > sharesInTreasury) {
+        //         unchecked {
+        //             emit IncurUncoveredLoss({
+        //                 creditManager: msg.sender,
+        //                 loss: convertToAssets(sharesToBurn - sharesInTreasury)
+        //             }); // U:[LP-14D]
+        //         }
+        //         sharesToBurn = sharesInTreasury;
+        //     }
+        //     _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
+        // }
 
         _updateBaseInterest({
-            expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
+            expectedLiquidityDelta: 0, //profit.toInt256() - loss.toInt256(),
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
         }); // U:[LP-14B,14C,14D]
@@ -560,7 +581,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Annual interest rate in ray that liquidity providers receive per unit of deposited capital,
-    ///         consists of base interest and quota revenue
+    ///         consists of base interest and quota revenue,
+    /// @dev This function expects all liquidity providers to be staked.
     function supplyRate() external view override returns (uint256) {
         uint256 assets = expectedLiquidity();
         uint256 baseInterestRate_ = baseInterestRate();
@@ -785,6 +807,25 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
         withdrawFee = newWithdrawFee.toUint16(); // U:[LP-26B]
         emit SetWithdrawFee(newWithdrawFee); // U:[LP-26B]
+    }
+
+    /// @notice Allows or denies account to redeem or withdraw even if pool is locked
+    /// @param account Account to allow or disallow
+    /// @param status `true` to allow, `false` to disallow
+    function setAllowed(address account, bool status) external controllerOnly {
+        _allowed[account] = status;
+    }
+
+    /// @notice Locks or unlocks the pool, can only be called by controller
+    /// @param status `true` to lock, `false` to unlock, default pool status is locked
+    function setLock(bool status) external controllerOnly {
+        locked = status;
+    }
+
+    /// @notice Returns `true` if account is allowed to redeem or withdraw even if pool is locked
+    /// @param account Account to check
+    function isAllowed(address account) external view returns (bool) {
+        return _allowed[account];
     }
 
     /// @dev Sets new total debt limit

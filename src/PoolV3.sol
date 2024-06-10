@@ -545,7 +545,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         // }
 
         _updateBaseInterest({
-            expectedLiquidityDelta: 0, //profit.toInt256() - loss.toInt256(),
+            expectedLiquidityDelta: profit.toInt256() //- loss.toInt256(),
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
         }); // U:[LP-14B,14C,14D]

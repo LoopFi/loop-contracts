@@ -304,8 +304,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                         POSITION ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
 
-    event debug(string, uint256);
-
     /// @notice Updates a position's collateral and normalized debt balances
     /// @dev This is the only method which is allowed to modify a position's collateral and normalized debt balances
     function _modifyPosition(
@@ -324,8 +322,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         position.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
 
         // position either has no debt or more debt than the debt floor
-        emit debug("debt", position.debt);
-        emit debug("debtFloor", vaultConfig.debtFloor);
         if (position.debt != 0 && position.debt < uint256(vaultConfig.debtFloor))
             revert CDPVault__modifyPosition_debtFloor();
 

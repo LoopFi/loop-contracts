@@ -13,7 +13,6 @@ import {wmul} from "./utils/Math.sol";
 bytes32 constant CONFIG_ROLE = keccak256("CONFIG_ROLE");
 
 contract PSM is AccessControl, Pause {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -74,7 +73,15 @@ contract PSM is AccessControl, Pause {
     /// @param roleAdmin The admin role address
     /// @param configAdmin The configuration admin role address
     /// @param pauseAdmin The pause admin role address
-    constructor(IMinter minter_, ICDM cdm_, IERC20 collateral_, IERC20 stablecoin_, address roleAdmin, address configAdmin, address pauseAdmin) {
+    constructor(
+        IMinter minter_,
+        ICDM cdm_,
+        IERC20 collateral_,
+        IERC20 stablecoin_,
+        address roleAdmin,
+        address configAdmin,
+        address pauseAdmin
+    ) {
         _grantRole(DEFAULT_ADMIN_ROLE, roleAdmin);
         _grantRole(CONFIG_ROLE, configAdmin);
         _grantRole(PAUSER_ROLE, pauseAdmin);
@@ -89,10 +96,8 @@ contract PSM is AccessControl, Pause {
 
         uint256 decimals = IERC20Metadata(address(collateral_)).decimals();
         uint256 conversionFactor;
-        if (decimals > 18)
-            revert PSM__constructor_unsupportedCollateral();
-        else
-            conversionFactor = 10**(18-decimals);
+        if (decimals > 18) revert PSM__constructor_unsupportedCollateral();
+        else conversionFactor = 10 ** (18 - decimals);
 
         collateralConversionFactor = conversionFactor;
     }
@@ -127,9 +132,9 @@ contract PSM is AccessControl, Pause {
         uint256 totalCollateralAmount = amount / collateralConversionFactor;
         uint256 feeInCollateral = feeInStablecoin / collateralConversionFactor;
         collectedFees += feeInCollateral;
-        
+
         collateral.safeTransferFrom(msg.sender, address(this), totalCollateralAmount);
-        
+
         uint256 netMintAmount = amount - feeInStablecoin;
         minter.exit(msg.sender, netMintAmount);
 
@@ -145,13 +150,13 @@ contract PSM is AccessControl, Pause {
         uint256 amountInCollateral = amount / collateralConversionFactor;
         uint256 feeInCollateral = feeInStablecoin / collateralConversionFactor;
         collectedFees += feeInCollateral;
-        
+
         // Burn the stablecoins from the user
         stablecoin.transferFrom(msg.sender, address(this), amount);
         minter.enter(address(this), amount);
         // Transfer the collateral to the user, subtracting the fee
         collateral.safeTransfer(msg.sender, amountInCollateral - feeInCollateral);
-        
+
         emit Redeem(msg.sender, amountInCollateral - feeInCollateral, feeInCollateral);
     }
 

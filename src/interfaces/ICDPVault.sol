@@ -41,10 +41,7 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
     function tokenScale() external view returns (uint256);
 
-    function vaultConfig()
-        external
-        view
-        returns (uint128 debtFloor, uint64 liquidationRatio);
+    function vaultConfig() external view returns (uint128 debtFloor, uint64 liquidationRatio);
 
     function totalNormalDebt() external view returns (uint256);
 
@@ -53,12 +50,7 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
     )
         external
         view
-        returns (
-            uint256 collateral,
-            uint256 debt,
-            uint256 lastDebtUpdate,
-            uint256 cumulativeIndexLastUpdate
-        );
+        returns (uint256 collateral, uint256 debt, uint256 lastDebtUpdate, uint256 cumulativeIndexLastUpdate);
 
     function deposit(address to, uint256 amount) external returns (uint256);
 

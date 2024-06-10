@@ -15,7 +15,6 @@ bytes32 constant CREDIT_MANAGER_ROLE = keccak256("CREDIT_MANAGER_ROLE");
 /// @title Buffer
 /// @notice Buffer for credit and debt in the system
 contract Buffer is IBuffer, Initializable, AccessControlUpgradeable {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/

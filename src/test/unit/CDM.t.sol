@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 import {CDM} from "../../CDM.sol";
 
 contract CDMTest is Test {
-
     CDM cdm;
 
     uint256 constant globalDebtCeiling = 10_000 ether;
@@ -19,7 +18,7 @@ contract CDMTest is Test {
     address me = address(this);
 
     function balance(address account) internal view returns (int256 balance_) {
-        (balance_,) = cdm.accounts(account);
+        (balance_, ) = cdm.accounts(account);
     }
 
     function setUp() public {
@@ -33,7 +32,7 @@ contract CDMTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// ======== Configuration tests ======== ///
-    
+
     function test_setParameter() public {
         cdm.setParameter("globalDebtCeiling", 1_000 ether);
         assertEq(cdm.globalDebtCeiling(), 1_000 ether);
@@ -120,14 +119,14 @@ contract CDMTest is Test {
     function test_modifyBalance_decreaseDebt_aboveZero() public {
         vm.prank(vaultA);
         cdm.modifyBalance(vaultA, vaultB, 100 ether);
-        
+
         vm.prank(vaultB);
         cdm.modifyBalance(vaultB, vaultA, 50 ether);
         assertEq(cdm.globalDebt(), 50 ether);
         assertEq(balance(vaultA), -50 ether);
         assertEq(balance(vaultB), 50 ether);
 
-        cdm.setParameter(vaultC, "debtCeiling", vaultDebtCeiling); 
+        cdm.setParameter(vaultC, "debtCeiling", vaultDebtCeiling);
         vm.prank(vaultC);
         cdm.modifyBalance(vaultC, vaultA, 100 ether);
         assertEq(cdm.globalDebt(), 100 ether);
@@ -165,5 +164,3 @@ contract CDMTest is Test {
         cdm.modifyBalance(vaultA, vaultB, 100 ether);
     }
 }
-
-

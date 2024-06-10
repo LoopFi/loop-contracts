@@ -11,7 +11,6 @@ import {PositionAction, LeverParams} from "./PositionAction.sol";
 /// @title PositionAction20
 /// @notice ERC20 implementation of PositionAction base contract
 contract PositionAction20 is PositionAction {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -22,7 +21,11 @@ contract PositionAction20 is PositionAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapAction_, address PoolAction_ ) PositionAction(flashlender_, swapAction_, PoolAction_) {}
+    constructor(
+        address flashlender_,
+        address swapAction_,
+        address PoolAction_
+    ) PositionAction(flashlender_, swapAction_, PoolAction_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION
@@ -75,5 +78,4 @@ contract PositionAction20 is PositionAction {
     ) internal override returns (uint256) {
         return _onWithdraw(leverParams.vault, address(0), subCollateral);
     }
-
 }

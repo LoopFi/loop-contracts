@@ -13,7 +13,6 @@ import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
 /// @notice The canonical mint for Stablecoin
 /// where users can redeem their internal credit for Stablecoin
 contract Minter is IMinter, AccessControl, Pause {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/

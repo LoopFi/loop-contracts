@@ -119,5 +119,4 @@ abstract contract FlashLoanReceiverBase is ICreditFlashBorrower, IERC3156FlashBo
         // Lender takes back the Stablecoin as per ERC3156 spec
         flashlender.stablecoin().approve(address(flashlender), amount);
     }
-
 }

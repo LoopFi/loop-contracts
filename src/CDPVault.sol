@@ -37,10 +37,7 @@ bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");
 /// @param normalDebt Normalized debt (either of a position or the total normalized debt)
 /// @param rateAccumulator Rate accumulator
 /// @return debt Actual debt [wad]
-function calculateDebt(
-    uint256 normalDebt,
-    uint64 rateAccumulator
-) pure returns (uint256 debt) {
+function calculateDebt(uint256 normalDebt, uint64 rateAccumulator) pure returns (uint256 debt) {
     debt = wmul(normalDebt, rateAccumulator);
 }
 
@@ -48,10 +45,7 @@ function calculateDebt(
 /// @param debt Actual debt (either of a position or the total debt)
 /// @param rateAccumulator Rate accumulator
 /// @return normalDebt Normalized debt [wad]
-function calculateNormalDebt(
-    uint256 debt,
-    uint64 rateAccumulator
-) pure returns (uint256 normalDebt) {
+function calculateNormalDebt(uint256 debt, uint64 rateAccumulator) pure returns (uint256 normalDebt) {
     normalDebt = wdiv(debt, rateAccumulator);
 
     // account for rounding errors due to division
@@ -64,12 +58,7 @@ function calculateNormalDebt(
 
 /// @title CDPVault
 /// @notice Base logic of a borrow vault for depositing collateral and drawing credit against it
-contract CDPVault is
-    AccessControl,
-    Pause,
-    Permission,
-    ICDPVaultBase
-{
+contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -150,12 +139,7 @@ contract CDPVault is
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event ModifyPosition(
-        address indexed position,
-        uint256 debt,
-        uint256 collateral,
-        uint256 totalNormalDebt
-    );
+    event ModifyPosition(address indexed position, uint256 debt, uint256 collateral, uint256 totalNormalDebt);
     event ModifyCollateralAndDebt(
         address indexed position,
         address indexed collateralizer,
@@ -171,11 +155,7 @@ contract CDPVault is
         uint256 normalDebtRepaid,
         address indexed liquidator
     );
-    event VaultCreated(
-        address indexed vault,
-        address indexed token,
-        address indexed owner
-    );
+    event VaultCreated(address indexed vault, address indexed token, address indexed owner);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -193,10 +173,7 @@ contract CDPVault is
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(
-        CDPVaultConstants memory constants,
-        CDPVaultConfig memory config
-    ) {
+    constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) {
         pool = constants.pool;
         oracle = constants.oracle;
         token = constants.token;
@@ -204,10 +181,7 @@ contract CDPVault is
 
         poolUnderlying = IERC20(pool.underlyingToken());
 
-        vaultConfig = VaultConfig({
-            debtFloor: config.debtFloor,
-            liquidationRatio: config.liquidationRatio
-        });
+        vaultConfig = VaultConfig({debtFloor: config.debtFloor, liquidationRatio: config.liquidationRatio});
 
         liquidationConfig = LiquidationConfig({
             liquidationPenalty: config.liquidationPenalty,
@@ -239,27 +213,17 @@ contract CDPVault is
     /// @dev Sender has to be allowed to call this method
     /// @param parameter Name of the variable to set
     /// @param data New value to set for the variable [wad]
-    function setParameter(
-        bytes32 parameter,
-        uint256 data
-    ) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
+    function setParameter(bytes32 parameter, uint256 data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
         if (parameter == "debtFloor") vaultConfig.debtFloor = uint128(data);
-        else if (parameter == "liquidationRatio")
-            vaultConfig.liquidationRatio = uint64(data);
-        else if (parameter == "liquidationPenalty")
-            liquidationConfig.liquidationPenalty = uint64(data);
-        else if (parameter == "liquidationDiscount")
-            liquidationConfig.liquidationDiscount = uint64(data);
+        else if (parameter == "liquidationRatio") vaultConfig.liquidationRatio = uint64(data);
+        else if (parameter == "liquidationPenalty") liquidationConfig.liquidationPenalty = uint64(data);
+        else if (parameter == "liquidationDiscount") liquidationConfig.liquidationDiscount = uint64(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
         emit SetParameter(parameter, data);
     }
 
-    function setParameter(
-        bytes32 parameter,
-        address data
-    ) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
-        if (parameter == "rewardController")
-            rewardController = IChefIncentivesController(data);
+    function setParameter(bytes32 parameter, address data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
+        if (parameter == "rewardController") rewardController = IChefIncentivesController(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
         emit SetParameter(parameter, data);
     }
@@ -273,10 +237,7 @@ contract CDPVault is
     /// @param to Address of the user to attribute the cash to
     /// @param amount Amount of tokens to deposit [tokenScale]
     /// @return cashAmount Amount of cash deposited [wad]
-    function deposit(
-        address to,
-        uint256 amount
-    ) external whenNotPaused returns (uint256 cashAmount) {
+    function deposit(address to, uint256 amount) external whenNotPaused returns (uint256 cashAmount) {
         int256 deltaCollateral = toInt256(amount);
         modifyCollateralAndDebt({
             owner: to,
@@ -294,10 +255,7 @@ contract CDPVault is
     /// @param to Address of the user to withdraw tokens to
     /// @param amount Amount of tokens to withdraw [wad]
     /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
-    function withdraw(
-        address to,
-        uint256 amount
-    ) external whenNotPaused returns (uint256 tokenAmount) {
+    function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
         int256 deltaCollateral = -toInt256(amount);
         modifyCollateralAndDebt({
             owner: msg.sender,
@@ -310,11 +268,7 @@ contract CDPVault is
         tokenAmount = amount;
     }
 
-    function borrow(
-        address borrower,
-        address position,
-        uint256 amount
-    ) external {
+    function borrow(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = toInt256(amount);
         modifyCollateralAndDebt({
             owner: position,
@@ -325,11 +279,7 @@ contract CDPVault is
         });
     }
 
-    function repay(
-        address borrower,
-        address position,
-        uint256 amount
-    ) external {
+    function repay(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = -toInt256(amount);
         modifyCollateralAndDebt({
             owner: position,
@@ -354,6 +304,8 @@ contract CDPVault is
                         POSITION ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
 
+    event debug(string, uint256);
+
     /// @notice Updates a position's collateral and normalized debt balances
     /// @dev This is the only method which is allowed to modify a position's collateral and normalized debt balances
     function _modifyPosition(
@@ -372,9 +324,10 @@ contract CDPVault is
         position.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
 
         // position either has no debt or more debt than the debt floor
-        if (
-            position.debt != 0 && position.debt < uint256(vaultConfig.debtFloor)
-        ) revert CDPVault__modifyPosition_debtFloor();
+        emit debug("debt", position.debt);
+        emit debug("debtFloor", vaultConfig.debtFloor);
+        if (position.debt != 0 && position.debt < uint256(vaultConfig.debtFloor))
+            revert CDPVault__modifyPosition_debtFloor();
 
         // store the position's balances
         positions[owner] = position;
@@ -388,19 +341,10 @@ contract CDPVault is
         totalNormalDebt = totalDebt_;
 
         if (address(rewardController) != address(0)) {
-            rewardController.handleActionAfter(
-                owner,
-                position.debt,
-                totalDebt_
-            );
+            rewardController.handleActionAfter(owner, position.debt, totalDebt_);
         }
 
-        emit ModifyPosition(
-            owner,
-            position.debt,
-            position.collateral,
-            totalDebt_
-        );
+        emit ModifyPosition(owner, position.debt, position.collateral, totalDebt_);
 
         return position;
     }
@@ -437,11 +381,9 @@ contract CDPVault is
     ) public {
         if (
             // position is either more safe than before or msg.sender has the permission from the owner
-            ((deltaDebt > 0 || deltaCollateral < 0) &&
-                !hasPermission(owner, msg.sender)) ||
+            ((deltaDebt > 0 || deltaCollateral < 0) && !hasPermission(owner, msg.sender)) ||
             // msg.sender has the permission of the collateralizer to collateralize the position using their cash
-            (deltaCollateral > 0 &&
-                !hasPermission(collateralizer, msg.sender)) ||
+            (deltaCollateral > 0 && !hasPermission(collateralizer, msg.sender)) ||
             // msg.sender has the permission of the creditor to use their credit to repay the debt
             (deltaDebt < 0 && !hasPermission(creditor, msg.sender))
         ) revert CDPVault__modifyCollateralAndDebt_noPermission();
@@ -483,11 +425,7 @@ contract CDPVault is
                 );
             }
 
-            pool.repayCreditAccount(
-                debtData.debt - newDebt,
-                profit,
-                0
-            ); // U:[CM-11]
+            pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
         }
 
         // todo: transfer collateral
@@ -500,14 +438,7 @@ contract CDPVault is
         }
 
         // todo: check total debt ceiling
-        position = _modifyPosition(
-            owner,
-            position,
-            newDebt,
-            newCumulativeIndex,
-            deltaCollateral,
-            totalNormalDebt
-        );
+        position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, deltaCollateral, totalNormalDebt);
 
         VaultConfig memory config = vaultConfig;
         uint256 spotPrice_ = spotPrice();
@@ -515,44 +446,24 @@ contract CDPVault is
 
         if (
             (deltaDebt > 0 || deltaCollateral < 0) &&
-            !_isCollateralized(
-                newDebt,
-                collateralValue,
-                config.liquidationRatio
-            )
+            !_isCollateralized(newDebt, collateralValue, config.liquidationRatio)
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
-        emit ModifyCollateralAndDebt(
-            owner,
-            collateralizer,
-            creditor,
-            deltaCollateral,
-            deltaDebt
-        );
+        emit ModifyCollateralAndDebt(owner, collateralizer, creditor, deltaCollateral, deltaDebt);
     }
 
-    function _calcDebt(
-        Position memory position
-    ) internal view returns (DebtData memory cdd) {
+    function _calcDebt(Position memory position) internal view returns (DebtData memory cdd) {
         uint256 index = pool.baseInterestIndex();
         cdd.debt = position.debt;
         cdd.cumulativeIndexNow = index;
         cdd.cumulativeIndexLastUpdate = position.cumulativeIndexLastUpdate;
 
-        cdd.accruedInterest = calcAccruedInterest(
-            cdd.debt,
-            cdd.cumulativeIndexLastUpdate,
-            index
-        );
+        cdd.accruedInterest = calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
 
-        cdd.accruedFees =
-            (cdd.accruedInterest * feeInterest) /
-            PERCENTAGE_FACTOR;
+        cdd.accruedFees = (cdd.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
     }
 
-    function _updatePosition(
-        address position
-    ) internal view returns (Position memory updatedPos) {
+    function _updatePosition(address position) internal view returns (Position memory updatedPos) {
         Position memory pos = positions[position];
         // pos.cumulativeIndexLastUpdate =
         uint256 accruedInterest = calcAccruedInterest(
@@ -564,14 +475,8 @@ contract CDPVault is
         uint256 spotPrice_ = spotPrice();
         uint256 collateralValue = wmul(pos.collateral, spotPrice_);
 
-        if (
-            spotPrice_ == 0 ||
-            _isCollateralized(
-                currentDebt,
-                collateralValue,
-                vaultConfig.liquidationRatio
-            )
-        ) revert CDPVault__modifyCollateralAndDebt_notSafe();
+        if (spotPrice_ == 0 || _isCollateralized(currentDebt, collateralValue, vaultConfig.liquidationRatio))
+            revert CDPVault__modifyCollateralAndDebt_notSafe();
 
         return pos;
     }
@@ -588,13 +493,9 @@ contract CDPVault is
     /// @dev The liquidator has to approve the vault to transfer the sum of `repayAmounts`.
     /// @param owner Owner of the position to liquidate
     /// @param repayAmount Amount the liquidator wants to repay [wad]
-    function liquidatePosition(
-        address owner,
-        uint256 repayAmount
-    ) external whenNotPaused {
+    function liquidatePosition(address owner, uint256 repayAmount) external whenNotPaused {
         // validate params
-        if (owner == address(0) || repayAmount == 0)
-            revert CDPVault__liquidatePosition_invalidParameters();
+        if (owner == address(0) || repayAmount == 0) revert CDPVault__liquidatePosition_invalidParameters();
 
         // load configs
         VaultConfig memory config = vaultConfig;
@@ -605,10 +506,7 @@ contract CDPVault is
 
         // load price and calculate discounted price
         uint256 spotPrice_ = spotPrice();
-        uint256 discountedPrice = wmul(
-            spotPrice_,
-            liqConfig_.liquidationDiscount
-        );
+        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
 
         // update debt
         DebtData memory debtData = _calcDebt(position);
@@ -616,10 +514,7 @@ contract CDPVault is
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
         uint256 deltaDebt = wmul(repayAmount, liqConfig_.liquidationPenalty);
-        uint256 penalty = wmul(
-            repayAmount,
-            WAD - liqConfig_.liquidationPenalty
-        );
+        uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
 
         // uint256 accruedInterest = calcAccruedInterest(
         //     position.debt,
@@ -630,14 +525,8 @@ contract CDPVault is
         uint256 collateralValue = wmul(position.collateral, spotPrice_);
 
         // verify that the position is indeed unsafe
-        if (
-            spotPrice_ == 0 ||
-            _isCollateralized(
-                debtData.debt,
-                collateralValue,
-                config.liquidationRatio
-            )
-        ) revert CDPVault__liquidatePosition_notUnsafe();
+        if (spotPrice_ == 0 || _isCollateralized(debtData.debt, collateralValue, config.liquidationRatio))
+            revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
         // TODO: review this
@@ -662,7 +551,7 @@ contract CDPVault is
 
         // update vault state
         // totalNormalDebt -= deltaDebt;
-  
+
         // transfer the repay amount from the liquidator to the vault
         // cdm.modifyBalance(msg.sender, address(this), repayAmount);
         poolUnderlying.safeTransferFrom(msg.sender, address(pool), deltaDebt);
@@ -684,11 +573,7 @@ contract CDPVault is
             );
         }
 
-        pool.repayCreditAccount(
-            debtData.debt - newDebt,
-            profit,
-            0
-        ); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
         // transfer the cash amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
@@ -722,10 +607,7 @@ contract CDPVault is
         if (debt == 0) return (amount, cumulativeIndexNow);
         newDebt = debt + amount; // U:[CL-2]
         newCumulativeIndex = ((cumulativeIndexNow * newDebt * INDEX_PRECISION) /
-            ((INDEX_PRECISION * cumulativeIndexNow * debt) /
-                cumulativeIndexLastUpdate +
-                INDEX_PRECISION *
-                amount)); // U:[CL-2]
+            ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)); // U:[CL-2]
     }
 
     /// @dev Computes interest accrued since the last update
@@ -735,8 +617,7 @@ contract CDPVault is
         uint256 cumulativeIndexNow
     ) internal pure returns (uint256) {
         if (amount == 0) return 0;
-        return
-            (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
+        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt
@@ -765,11 +646,7 @@ contract CDPVault is
         uint256 debt,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate
-    )
-        internal
-        view
-        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit)
-    {
+    ) internal view returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit) {
         uint256 amountToRepay = amount;
 
         if (amountToRepay != 0) {
@@ -778,8 +655,7 @@ contract CDPVault is
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
             }); // U:[CL-3]
-            uint256 profitFromInterest = (interestAccrued * feeInterest) /
-                PERCENTAGE_FACTOR; // U:[CL-3]
+            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3]
 
             if (amountToRepay >= interestAccrued + profitFromInterest) {
                 amountToRepay -= interestAccrued + profitFromInterest;
@@ -789,21 +665,16 @@ contract CDPVault is
                 newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
             } else {
                 // If amount is not enough to repay base interest + DAO fee, then it is split pro-rata between them
-                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) /
-                    (PERCENTAGE_FACTOR + feeInterest);
+                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // U:[CL-3]
                 amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex =
-                    (INDEX_PRECISION *
-                        cumulativeIndexNow *
-                        cumulativeIndexLastUpdate) /
+                    (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
                     (INDEX_PRECISION *
                         cumulativeIndexNow -
-                        (INDEX_PRECISION *
-                            amountToPool *
-                            cumulativeIndexLastUpdate) /
+                        (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) /
                         debt); // U:[CL-3]
             }
         } else {
@@ -813,19 +684,12 @@ contract CDPVault is
     }
 
     function virtualDebt(address position) external view returns (uint256) {
-        return calcTotalDebt(
-            _calcDebt(positions[position])
-        );
+        return calcTotalDebt(_calcDebt(positions[position]));
     }
 
     /// @dev Computes total debt, given raw debt data
     /// @param debtData See `DebtData` (must have debt data filled)
-    function calcTotalDebt(
-        DebtData memory debtData
-    ) internal pure returns (uint256) {
-        return
-            debtData.debt +
-            debtData.accruedInterest +
-            debtData.accruedFees;
+    function calcTotalDebt(DebtData memory debtData) internal pure returns (uint256) {
+        return debtData.debt + debtData.accruedInterest + debtData.accruedFees;
     }
 }

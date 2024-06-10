@@ -12,7 +12,6 @@ import {PositionAction, LeverParams, PoolActionParams} from "./PositionAction.so
 /// @title PositionAction4626
 /// @notice Generic ERC4626 implementation of PositionAction base contract
 contract PositionAction4626 is PositionAction {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -23,7 +22,11 @@ contract PositionAction4626 is PositionAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapActions_, address PoolAction_) PositionAction(flashlender_, swapActions_, PoolAction_) {}
+    constructor(
+        address flashlender_,
+        address swapActions_,
+        address PoolAction_
+    ) PositionAction(flashlender_, swapActions_, PoolAction_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION
@@ -93,23 +96,21 @@ contract PositionAction4626 is PositionAction {
             address joinToken = swapAction.getSwapToken(leverParams.primarySwap);
             address joinUpfrontToken = upFrontToken;
 
-            if (leverParams.auxSwap.assetIn != address(0)){
+            if (leverParams.auxSwap.assetIn != address(0)) {
                 joinUpfrontToken = swapAction.getSwapToken(leverParams.auxSwap);
             }
 
             // update the join parameters with the new amounts
             PoolActionParams memory poolActionParams = poolAction.updateLeverJoin(
-                leverParams.auxAction, 
-                joinToken, 
-                joinUpfrontToken, 
-                swapAmountOut, 
+                leverParams.auxAction,
+                joinToken,
+                joinUpfrontToken,
+                swapAmountOut,
                 upFrontAmount,
                 underlyingToken
             );
 
-            _delegateCall(
-                address(poolAction), abi.encodeWithSelector(poolAction.join.selector, poolActionParams)
-            );
+            _delegateCall(address(poolAction), abi.encodeWithSelector(poolAction.join.selector, poolActionParams));
 
             // retrieve the total amount of collateral after the join
             addCollateralAmount = IERC20(underlyingToken).balanceOf(address(this));
@@ -117,7 +118,9 @@ contract PositionAction4626 is PositionAction {
 
         // deposit into the ERC4626 vault
         IERC20(underlyingToken).forceApprove(leverParams.collateralToken, addCollateralAmount);
-        addCollateralAmount = IERC4626(leverParams.collateralToken).deposit(addCollateralAmount, address(this)) + upFrontCollateral;
+        addCollateralAmount =
+            IERC4626(leverParams.collateralToken).deposit(addCollateralAmount, address(this)) +
+            upFrontCollateral;
 
         // deposit into the CDP vault
         IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
@@ -132,7 +135,6 @@ contract PositionAction4626 is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-
         // withdraw collateral from vault
         uint256 withdrawnCollateral = ICDPVault(leverParams.vault).withdraw(address(this), subCollateral);
 
@@ -141,7 +143,8 @@ contract PositionAction4626 is PositionAction {
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(
-                address(poolAction), abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
+                address(poolAction),
+                abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );
 
             tokenOut = abi.decode(exitData, (uint256));

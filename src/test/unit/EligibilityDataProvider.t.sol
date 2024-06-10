@@ -13,39 +13,42 @@ import {IChefIncentivesController} from "../../reward/interfaces/IChefIncentives
 import {LockedBalance, Balances} from "../../reward/interfaces/LockedBalance.sol";
 
 contract EligibilityDataProviderTest is TestBase {
-
     EligibilityDataProvider internal eligibilityDataProvider;
 
     address internal mockVaultRegistry;
     address internal mockMultiFeeDistribution;
     address internal mockPriceProvider;
 
-    function setUp() public override virtual{
+    function setUp() public virtual override {
         super.setUp();
         mockVaultRegistry = vm.addr(uint256(keccak256("mockVaultRegistry")));
         mockMultiFeeDistribution = vm.addr(uint256(keccak256("mockMultiFeeDistribution")));
         mockPriceProvider = vm.addr(uint256(keccak256("mockPriceProvider")));
 
-        eligibilityDataProvider = EligibilityDataProvider(address(new ERC1967Proxy(
-            address(new EligibilityDataProvider()),
-            abi.encodeWithSelector(
-                EligibilityDataProvider.initialize.selector,
-                IVaultRegistry(address(mockVaultRegistry)),
-		        IMultiFeeDistribution(address(mockMultiFeeDistribution)),
-		        IPriceProvider(address(mockPriceProvider))
+        eligibilityDataProvider = EligibilityDataProvider(
+            address(
+                new ERC1967Proxy(
+                    address(new EligibilityDataProvider()),
+                    abi.encodeWithSelector(
+                        EligibilityDataProvider.initialize.selector,
+                        IVaultRegistry(address(mockVaultRegistry)),
+                        IMultiFeeDistribution(address(mockMultiFeeDistribution)),
+                        IPriceProvider(address(mockPriceProvider))
+                    )
+                )
             )
-        )));
+        );
 
         _mockLPPrice(WAD);
     }
 
     function _mockBalances(address user, uint256 lockedAmount) internal {
         Balances memory _balance = Balances({
-            total: lockedAmount, 
+            total: lockedAmount,
             locked: lockedAmount,
             unlocked: 0,
-            lockedWithMultiplier:0,
-            earned:0
+            lockedWithMultiplier: 0,
+            earned: 0
         });
 
         vm.mockCall(
@@ -80,6 +83,7 @@ contract EligibilityDataProviderTest is TestBase {
     }
 
     function test_setChefIncentivesController(address cic) public {
+        vm.assume(cic != address(0));
         eligibilityDataProvider.setChefIncentivesController(IChefIncentivesController(cic));
         assertEq(address(eligibilityDataProvider.chef()), cic);
 
@@ -167,7 +171,7 @@ contract EligibilityDataProviderTest is TestBase {
 
         uint256 ratio = eligibilityDataProvider.requiredDepositRatio();
         uint256 divisor = eligibilityDataProvider.RATIO_DIVISOR();
-        uint256 required = totalNormalDebt * ratio / divisor;
+        uint256 required = (totalNormalDebt * ratio) / divisor;
 
         assertEq(eligibilityDataProvider.requiredUsdValue(user), required);
     }
@@ -179,13 +183,13 @@ contract EligibilityDataProviderTest is TestBase {
 
         uint256 ratio = eligibilityDataProvider.requiredDepositRatio();
         uint256 divisor = eligibilityDataProvider.RATIO_DIVISOR();
-        uint256 required = totalNormalDebt * ratio / divisor;
+        uint256 required = (totalNormalDebt * ratio) / divisor;
 
         uint256 lockedAmount = required;
         _mockBalances(user, uint128(lockedAmount));
         assertTrue(eligibilityDataProvider.isEligibleForRewards(user));
 
-        // Event if we have less than required, we are still eligible because of 
+        // Event if we have less than required, we are still eligible because of
         // the price tolerance ratio
         lockedAmount = required - 1;
         _mockBalances(user, uint128(lockedAmount));
@@ -204,7 +208,7 @@ contract EligibilityDataProviderTest is TestBase {
         _mockTotalNormalDebt(user, 100 ether);
         _mockBalances(user, 0);
 
-        assertEq(eligibilityDataProvider.lastEligibleTime(user),0);
+        assertEq(eligibilityDataProvider.lastEligibleTime(user), 0);
     }
 
     function test_lastEligibleTime_returnsTimestamp(address user) public {
@@ -215,12 +219,7 @@ contract EligibilityDataProviderTest is TestBase {
         LockedBalance[] memory lockedBalances = new LockedBalance[](1);
         uint256 unlockTime = block.timestamp + 100;
 
-        lockedBalances[0] = LockedBalance({
-            amount: required,
-            unlockTime: unlockTime,
-            multiplier: 1,
-            duration: 100
-        });
+        lockedBalances[0] = LockedBalance({amount: required, unlockTime: unlockTime, multiplier: 1, duration: 100});
         vm.mockCall(
             mockMultiFeeDistribution,
             abi.encodeWithSelector(IMultiFeeDistribution.lockInfo.selector, user),
@@ -229,7 +228,7 @@ contract EligibilityDataProviderTest is TestBase {
 
         // If user is still eligible, it will return future time
         assertEq(eligibilityDataProvider.lastEligibleTime(user), unlockTime);
-    } 
+    }
 
     function test_lastEligibleTime_multiple_returnsTimestamp(address user) public {
         _mockTotalNormalDebt(user, 100 ether);
@@ -237,29 +236,14 @@ contract EligibilityDataProviderTest is TestBase {
         _mockBalances(user, required);
 
         LockedBalance[] memory lockedBalances = new LockedBalance[](3);
-        
-        uint256 unlockTime = block.timestamp + 100;
-        uint256 half = required/2;
-        lockedBalances[0] = LockedBalance({
-            amount: half,
-            unlockTime: unlockTime + 50,
-            multiplier: 1,
-            duration: 100
-        });
-        
-        lockedBalances[1] = LockedBalance({
-            amount: half,
-            unlockTime: unlockTime,
-            multiplier: 1,
-            duration: 100
-        });
 
-        lockedBalances[2] = LockedBalance({
-            amount: half,
-            unlockTime: unlockTime - 50,
-            multiplier: 1,
-            duration: 100
-        });
+        uint256 unlockTime = block.timestamp + 100;
+        uint256 half = required / 2;
+        lockedBalances[0] = LockedBalance({amount: half, unlockTime: unlockTime + 50, multiplier: 1, duration: 100});
+
+        lockedBalances[1] = LockedBalance({amount: half, unlockTime: unlockTime, multiplier: 1, duration: 100});
+
+        lockedBalances[2] = LockedBalance({amount: half, unlockTime: unlockTime - 50, multiplier: 1, duration: 100});
 
         vm.mockCall(
             mockMultiFeeDistribution,
@@ -276,11 +260,7 @@ contract EligibilityDataProviderTest is TestBase {
         vm.expectRevert(EligibilityDataProvider.OnlyCIC.selector);
         eligibilityDataProvider.refresh(user);
 
-        vm.mockCall(
-            mockPriceProvider,
-            abi.encodeWithSelector(IPriceProvider.update.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockPriceProvider, abi.encodeWithSelector(IPriceProvider.update.selector), abi.encode());
 
         uint256 totalNormalDebt = 1000 ether;
         _mockTotalNormalDebt(user, totalNormalDebt);
@@ -288,7 +268,7 @@ contract EligibilityDataProviderTest is TestBase {
 
         bool isEligible = eligibilityDataProvider.isEligibleForRewards(user);
         assertTrue(isEligible);
-        
+
         // Last eligible status is false because we have not called refresh
         assertEq(eligibilityDataProvider.lastEligibleStatus(user), false);
 
@@ -308,11 +288,7 @@ contract EligibilityDataProviderTest is TestBase {
         vm.expectRevert(EligibilityDataProvider.OnlyCIC.selector);
         eligibilityDataProvider.refresh(user);
 
-        vm.mockCall(
-            mockPriceProvider,
-            abi.encodeWithSelector(IPriceProvider.update.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockPriceProvider, abi.encodeWithSelector(IPriceProvider.update.selector), abi.encode());
 
         uint256 totalNormalDebt = 1000 ether;
         _mockTotalNormalDebt(user, totalNormalDebt);
@@ -320,13 +296,13 @@ contract EligibilityDataProviderTest is TestBase {
 
         address cic = address(0x123);
         eligibilityDataProvider.setChefIncentivesController(IChefIncentivesController(cic));
-        
+
         vm.prank(cic);
         eligibilityDataProvider.refresh(user);
 
         assertEq(eligibilityDataProvider.lastEligibleStatus(user), true);
 
-        _mockBalances(user, 0); 
+        _mockBalances(user, 0);
 
         vm.startPrank(cic);
         eligibilityDataProvider.setDqTime(user, block.timestamp);

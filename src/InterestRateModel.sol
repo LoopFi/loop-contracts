@@ -4,13 +4,12 @@ pragma solidity ^0.8.19;
 import {WAD, add, wmul, wdiv, wpow} from "./utils/Math.sol";
 
 abstract contract InterestRateModel {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
     // Max. allowed per second base interest rate (200%, assuming 366 days per year) [wad]
-    uint64 constant public RATE_CEILING = 1000000021919499726;
+    uint64 public constant RATE_CEILING = 1000000021919499726;
 
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -29,7 +28,7 @@ abstract contract InterestRateModel {
     IRS private _irs;
 
     /// @notice Accrued interest
-    uint256 private _accruedInterest;   
+    uint256 private _accruedInterest;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -85,19 +84,13 @@ abstract contract InterestRateModel {
     //////////////////////////////////////////////////////////////*/
 
     function _calculateRateAccumulator(IRS memory irs) internal view returns (uint64 rateAccumulator) {
-        return uint64(wmul(
-            irs.rateAccumulator,
-            wpow(uint256(irs.baseRate), (block.timestamp - irs.lastUpdated), WAD)
-        ));
+        return uint64(wmul(irs.rateAccumulator, wpow(uint256(irs.baseRate), (block.timestamp - irs.lastUpdated), WAD)));
     }
 
     /// @notice Calculates the new global interest state
     /// @param totalNormalDebtBefore Previous total normalized debt [wad]
     /// @return irsAfter New global interest rate state
-    function _updateIRS(
-        uint256 totalNormalDebtBefore
-    ) internal returns (IRS memory irsAfter) {
-
+    function _updateIRS(uint256 totalNormalDebtBefore) internal returns (IRS memory irsAfter) {
         IRS memory irsBefore = _irs;
 
         uint64 rateAccumulatorAfter = _calculateRateAccumulator(irsBefore);
@@ -109,17 +102,14 @@ abstract contract InterestRateModel {
         });
         _irs = irsAfter;
 
-        _accruedInterest += (totalNormalDebtBefore == 0) ? 0 : wmul(
-            rateAccumulatorAfter - irsBefore.rateAccumulator,
-            totalNormalDebtBefore
-        );
+        _accruedInterest += (totalNormalDebtBefore == 0)
+            ? 0
+            : wmul(rateAccumulatorAfter - irsBefore.rateAccumulator, totalNormalDebtBefore);
     }
 
     /// @notice Returns the virtual rate accumulator
     /// @return rateAccumulator Current virtual rate accumulator [wad]
-    function virtualRateAccumulator() public view returns (
-        uint64 rateAccumulator
-    ) {
+    function virtualRateAccumulator() public view returns (uint64 rateAccumulator) {
         rateAccumulator = _calculateRateAccumulator(_irs);
     }
 }

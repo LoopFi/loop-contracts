@@ -34,7 +34,7 @@ contract MultiFeeDistributionTest is TestBase {
     uint256 public burnRatio = 50000; // 50%
     uint256 public vestDuration = 30 days;
 
-    function setUp() public override virtual{
+    function setUp() public virtual override {
         super.setUp();
 
         mockPriceProvider = vm.addr(uint256(keccak256("mockPriceProvider")));
@@ -44,21 +44,25 @@ contract MultiFeeDistributionTest is TestBase {
         loopToken = new ERC20Mock();
         stakeToken = new ERC20Mock();
 
-        multiFeeDistribution = MultiFeeDistribution(address(new ERC1967Proxy(
-            address(new MultiFeeDistribution()),
-            abi.encodeWithSelector(
-                MultiFeeDistribution.initialize.selector,
-                address(loopToken),
-                mockLockZap,
-                mockDao,
-                mockPriceProvider,
-                rewardsDuration,
-                rewardsLookback,
-                lockDuration,
-                burnRatio,
-                vestDuration
+        multiFeeDistribution = MultiFeeDistribution(
+            address(
+                new ERC1967Proxy(
+                    address(new MultiFeeDistribution()),
+                    abi.encodeWithSelector(
+                        MultiFeeDistribution.initialize.selector,
+                        address(loopToken),
+                        mockLockZap,
+                        mockDao,
+                        mockPriceProvider,
+                        rewardsDuration,
+                        rewardsLookback,
+                        lockDuration,
+                        burnRatio,
+                        vestDuration
+                    )
+                )
             )
-        )));
+        );
     }
 
     function _addLockDurations() internal returns (uint256 len) {
@@ -70,7 +74,7 @@ contract MultiFeeDistributionTest is TestBase {
         lockDurations[2] = 15552000;
         lockDurations[3] = 31104000;
 
-        rewardMultipliers[0] = 1; 
+        rewardMultipliers[0] = 1;
         rewardMultipliers[1] = 4;
         rewardMultipliers[2] = 10;
         rewardMultipliers[3] = 25;
@@ -137,14 +141,14 @@ contract MultiFeeDistributionTest is TestBase {
     function test_setLockTypeInfo() public {
         uint256 len = _addLockDurations();
 
-        (uint256[] memory lockDurations) = multiFeeDistribution.getLockDurations();
+        uint256[] memory lockDurations = multiFeeDistribution.getLockDurations();
         assertEq(lockDurations.length, len);
         assertEq(lockDurations[0], 2592000);
         assertEq(lockDurations[1], 7776000);
         assertEq(lockDurations[2], 15552000);
         assertEq(lockDurations[3], 31104000);
 
-        (uint256[] memory rewardMultipliers) = multiFeeDistribution.getLockMultipliers();
+        uint256[] memory rewardMultipliers = multiFeeDistribution.getLockMultipliers();
         assertEq(rewardMultipliers.length, 4);
         assertEq(rewardMultipliers[0], 1);
         assertEq(rewardMultipliers[1], 4);
@@ -213,7 +217,7 @@ contract MultiFeeDistributionTest is TestBase {
         multiFeeDistribution.setMinters(minters);
         multiFeeDistribution.addReward(rewardToken);
 
-        (uint256 periodFinish,,uint256 lastUpdateTime,,)= multiFeeDistribution.rewardData(rewardToken);
+        (uint256 periodFinish, , uint256 lastUpdateTime, , ) = multiFeeDistribution.rewardData(rewardToken);
         assertEq(lastUpdateTime, block.timestamp);
         assertEq(periodFinish, block.timestamp);
     }
@@ -249,11 +253,11 @@ contract MultiFeeDistributionTest is TestBase {
         multiFeeDistribution.removeReward(rewardToken);
         (
             uint256 periodFinish,
-            uint256 rewardPerSecond, 
-            uint256 lastUpdateTime, 
-            uint256 rewardPerTokenStored, 
+            uint256 rewardPerSecond,
+            uint256 lastUpdateTime,
+            uint256 rewardPerTokenStored,
             uint256 balance
-        )= multiFeeDistribution.rewardData(rewardToken);
+        ) = multiFeeDistribution.rewardData(rewardToken);
 
         assertEq(periodFinish, 0);
         assertEq(rewardPerSecond, 0);
@@ -280,7 +284,7 @@ contract MultiFeeDistributionTest is TestBase {
         uint256 minSlippage = multiFeeDistribution.MAX_SLIPPAGE();
 
         // exclude the PERCENT_DIVISOR() value from the maxSlippage
-        uint256 maxSlippage = multiFeeDistribution.PERCENT_DIVISOR()-1;
+        uint256 maxSlippage = multiFeeDistribution.PERCENT_DIVISOR() - 1;
 
         slippage = bound(slippage, minSlippage, maxSlippage);
 
@@ -292,16 +296,16 @@ contract MultiFeeDistributionTest is TestBase {
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);
         vm.prank(sender);
-        multiFeeDistribution.setAutocompound(value, minSlippage-1);
+        multiFeeDistribution.setAutocompound(value, minSlippage - 1);
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);
         vm.prank(sender);
-        multiFeeDistribution.setAutocompound(value, maxSlippage+1);
+        multiFeeDistribution.setAutocompound(value, maxSlippage + 1);
     }
 
     function test_setUserSlippage(address user, uint256 slippage) public {
         uint256 minSlippage = multiFeeDistribution.MAX_SLIPPAGE();
-        uint256 maxSlippage = multiFeeDistribution.PERCENT_DIVISOR()-1;
+        uint256 maxSlippage = multiFeeDistribution.PERCENT_DIVISOR() - 1;
         slippage = bound(slippage, minSlippage, maxSlippage);
 
         vm.prank(user);
@@ -310,12 +314,12 @@ contract MultiFeeDistributionTest is TestBase {
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);
         vm.prank(user);
-        multiFeeDistribution.setUserSlippage(minSlippage-1);
+        multiFeeDistribution.setUserSlippage(minSlippage - 1);
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);
         vm.prank(user);
-        multiFeeDistribution.setUserSlippage(maxSlippage+1);
-    } 
+        multiFeeDistribution.setUserSlippage(maxSlippage + 1);
+    }
 
     function test_toggleAutocompound(address sender) public {
         vm.prank(sender);
@@ -341,7 +345,7 @@ contract MultiFeeDistributionTest is TestBase {
         assertEq(lookback, multiFeeDistribution.rewardsLookback());
 
         vm.expectRevert(MultiFeeDistribution.InvalidLookback.selector);
-        multiFeeDistribution.setLookback(duration+1);
+        multiFeeDistribution.setLookback(duration + 1);
 
         vm.expectRevert(MultiFeeDistribution.AmountZero.selector);
         multiFeeDistribution.setLookback(0);
@@ -361,7 +365,7 @@ contract MultiFeeDistributionTest is TestBase {
         assertEq(receiver, multiFeeDistribution.operationExpenseReceiver());
 
         vm.expectRevert(MultiFeeDistribution.InvalidRatio.selector);
-        multiFeeDistribution.setOperationExpenses(receiver, maxRatio+1);
+        multiFeeDistribution.setOperationExpenses(receiver, maxRatio + 1);
 
         vm.expectRevert(MultiFeeDistribution.AddressZero.selector);
         multiFeeDistribution.setOperationExpenses(address(0), expenseRatio);
@@ -390,7 +394,7 @@ contract MultiFeeDistributionTest is TestBase {
             abi.encode(true)
         );
 
-        stakeToken.approve(address(multiFeeDistribution), amount);            
+        stakeToken.approve(address(multiFeeDistribution), amount);
         multiFeeDistribution.stake(amount, onBehalfOf, typeIndex);
     }
 

@@ -18,7 +18,6 @@ import {EligibilityDataProvider} from "../../reward/EligibilityDataProvider.sol"
 import {ChefIncentivesController} from "../../reward/ChefIncentivesController.sol";
 
 contract ChefIncentivesControllerTest is TestBase {
-
     ChefIncentivesController public incentivesController;
     ERC20Mock public loopToken;
 
@@ -28,24 +27,28 @@ contract ChefIncentivesControllerTest is TestBase {
     uint256 public rewardsPerSecond = 0.01 ether;
     uint256 public endingTimeCadence = 2 days;
 
-    function setUp() public override virtual{
+    function setUp() public virtual override {
         super.setUp();
         loopToken = new ERC20Mock();
         mockEligibilityDataProvider = vm.addr(uint256(keccak256("mockEligibilityDataProvider")));
         mockMultiFeeDistribution = vm.addr(uint256(keccak256("mockMultiFeeDistribution")));
 
-        incentivesController = ChefIncentivesController(address(new ERC1967Proxy(
-            address(new ChefIncentivesController()),
-            abi.encodeWithSelector(
-                ChefIncentivesController.initialize.selector, 
-                address(this),
-		        mockEligibilityDataProvider,
-                IMultiFeeDistribution(mockMultiFeeDistribution),
-		        rewardsPerSecond,
-                address(loopToken),
-                endingTimeCadence
+        incentivesController = ChefIncentivesController(
+            address(
+                new ERC1967Proxy(
+                    address(new ChefIncentivesController()),
+                    abi.encodeWithSelector(
+                        ChefIncentivesController.initialize.selector,
+                        address(this),
+                        mockEligibilityDataProvider,
+                        IMultiFeeDistribution(mockMultiFeeDistribution),
+                        rewardsPerSecond,
+                        address(loopToken),
+                        endingTimeCadence
+                    )
+                )
             )
-        )));
+        );
 
         vm.label(mockEligibilityDataProvider, "mockEligibilityDataProvider");
         vm.label(mockMultiFeeDistribution, "mockMultiFeeDistribution");
@@ -55,11 +58,11 @@ contract ChefIncentivesControllerTest is TestBase {
 
     function _excludeContracts(address contract_) internal view {
         vm.assume(
-            contract_ != mockEligibilityDataProvider && 
-            contract_ != mockMultiFeeDistribution &&
-            contract_ != address(incentivesController) &&
-            contract_ != address(loopToken) &&
-            contract_ != address(0)
+            contract_ != mockEligibilityDataProvider &&
+                contract_ != mockMultiFeeDistribution &&
+                contract_ != address(incentivesController) &&
+                contract_ != address(loopToken) &&
+                contract_ != address(0)
         );
     }
 
@@ -130,7 +133,7 @@ contract ChefIncentivesControllerTest is TestBase {
             uint256 lastRewardTime,
             uint256 accRewardPerShare
         ) = incentivesController.vaultInfo(token);
-        
+
         assertEq(totalSupply, 0);
         assertEq(_allocPoint, allocPoint);
         assertEq(lastRewardTime, block.timestamp);
@@ -149,8 +152,8 @@ contract ChefIncentivesControllerTest is TestBase {
     function test_addPool_multiple() public {
         uint256 totalAllocPoint = 1000;
 
-        incentivesController.addPool(address(0x1), totalAllocPoint/2);
-        incentivesController.addPool(address(0x2), totalAllocPoint/2);
+        incentivesController.addPool(address(0x1), totalAllocPoint / 2);
+        incentivesController.addPool(address(0x2), totalAllocPoint / 2);
 
         assertEq(incentivesController.poolLength(), 2);
         assertEq(incentivesController.totalAllocPoint(), totalAllocPoint);
@@ -160,8 +163,8 @@ contract ChefIncentivesControllerTest is TestBase {
         uint256 totalAllocPoint = 1000;
         address vault1 = address(0x1);
         address vault2 = address(0x2);
-        incentivesController.addPool(vault1, totalAllocPoint/2);
-        incentivesController.addPool(vault2, totalAllocPoint/2);
+        incentivesController.addPool(vault1, totalAllocPoint / 2);
+        incentivesController.addPool(vault2, totalAllocPoint / 2);
 
         assertEq(incentivesController.totalAllocPoint(), totalAllocPoint);
 
@@ -169,12 +172,12 @@ contract ChefIncentivesControllerTest is TestBase {
         vaults[0] = vault1;
         vaults[1] = vault2;
         uint256[] memory allocPoints = new uint256[](2);
-        allocPoints[0] = totalAllocPoint/4;
-        allocPoints[1] = totalAllocPoint/4;
-        
+        allocPoints[0] = totalAllocPoint / 4;
+        allocPoints[1] = totalAllocPoint / 4;
+
         incentivesController.batchUpdateAllocPoint(vaults, allocPoints);
 
-        assertEq(incentivesController.totalAllocPoint(), totalAllocPoint/2);
+        assertEq(incentivesController.totalAllocPoint(), totalAllocPoint / 2);
 
         (
             uint256 totalSupply,
@@ -182,17 +185,12 @@ contract ChefIncentivesControllerTest is TestBase {
             uint256 lastRewardTime,
             uint256 accRewardPerShare
         ) = incentivesController.vaultInfo(address(0x1));
-        
-        assertEq(_allocPoint, totalAllocPoint/4);
 
-        (
-            totalSupply,
-            _allocPoint,
-            lastRewardTime,
-            accRewardPerShare
-        ) = incentivesController.vaultInfo(address(0x2));
-        
-        assertEq(_allocPoint, totalAllocPoint/4);
+        assertEq(_allocPoint, totalAllocPoint / 4);
+
+        (totalSupply, _allocPoint, lastRewardTime, accRewardPerShare) = incentivesController.vaultInfo(address(0x2));
+
+        assertEq(_allocPoint, totalAllocPoint / 4);
 
         vm.prank(address(0x1));
         vm.expectRevert("Ownable: caller is not the owner");
@@ -245,8 +243,8 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.setEmissionSchedule(startTimeOffets, rewardsPerSeconds);
 
         startTimeOffets = new uint256[](2);
-        startTimeOffets[0] =  block.timestamp + 4 days;
-        startTimeOffets[1] =  block.timestamp + 3 days;
+        startTimeOffets[0] = block.timestamp + 4 days;
+        startTimeOffets[1] = block.timestamp + 3 days;
 
         rewardsPerSeconds = new uint256[](2);
         rewardsPerSeconds[0] = 0.01 ether;
@@ -266,14 +264,14 @@ contract ChefIncentivesControllerTest is TestBase {
         _excludeContracts(tokenAddress);
 
         vm.mockCall(
-            tokenAddress, 
+            tokenAddress,
             abi.encodeWithSelector(IERC20.transfer.selector, address(this), tokenAmount),
             abi.encode(true)
         );
         incentivesController.recoverERC20(tokenAddress, tokenAmount);
 
-        vm.prank(address(0x1));
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(address(0x1));
         incentivesController.recoverERC20(tokenAddress, tokenAmount);
     }
 
@@ -310,19 +308,19 @@ contract ChefIncentivesControllerTest is TestBase {
         vaults[0] = vault;
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.isEligibleForRewards.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
             abi.encode(0)
         );
@@ -331,7 +329,7 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.claim(user, vaults);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
@@ -341,7 +339,7 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.warp(block.timestamp + 30 days);
 
         vm.mockCall(
-            mockMultiFeeDistribution, 
+            mockMultiFeeDistribution,
             abi.encodeWithSelector(IMultiFeeDistribution.vestTokens.selector, user, 1000 ether),
             abi.encode(true)
         );
@@ -362,7 +360,7 @@ contract ChefIncentivesControllerTest is TestBase {
 
         vm.prank(caller);
         incentivesController.setEligibilityExempt(contract_, value);
-        
+
         incentivesController.setEligibilityMode(ChefIncentivesController.EligibilityModes.LIMITED);
         address caller2 = address(0x2);
         vm.prank(caller2);
@@ -392,13 +390,13 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.addPool(vault, totalAllocPoint);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
@@ -416,13 +414,13 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.addPool(vault, totalAllocPoint);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
@@ -435,13 +433,13 @@ contract ChefIncentivesControllerTest is TestBase {
 
         // simulate non eligible user
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(false)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
             abi.encode(block.timestamp)
         );
@@ -464,24 +462,24 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.afterLockUpdate(user);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
-        vm.prank(mockMultiFeeDistribution); 
+        vm.prank(mockMultiFeeDistribution);
         incentivesController.afterLockUpdate(user);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(false)
         );
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
             abi.encode(block.timestamp)
         );
-        vm.prank(mockMultiFeeDistribution); 
+        vm.prank(mockMultiFeeDistribution);
         incentivesController.afterLockUpdate(user);
     }
 
@@ -496,13 +494,13 @@ contract ChefIncentivesControllerTest is TestBase {
         assertFalse(hasEligibleDeposits);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
@@ -525,19 +523,19 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.setBountyManager(bountyManager);
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
             abi.encode(0)
         );
@@ -552,19 +550,19 @@ contract ChefIncentivesControllerTest is TestBase {
         assertTrue(incentivesController.hasEligibleDeposits(user));
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
             abi.encode(true)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
             abi.encode(false)
         );
 
         vm.mockCall(
-            mockEligibilityDataProvider, 
+            mockEligibilityDataProvider,
             abi.encodeWithSelector(EligibilityDataProvider.getDqTime.selector, user),
             abi.encode(0)
         );
@@ -592,5 +590,4 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.expectRevert("Ownable: caller is not the owner");
         incentivesController.unpause();
     }
-
-} 
+}

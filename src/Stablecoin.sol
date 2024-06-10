@@ -13,7 +13,6 @@ bytes32 constant MINTER_AND_BURNER_ROLE = keccak256("MINTER_AND_BURNER_ROLE");
 /// @title Stablecoin
 /// @notice `Stablecoin` is the protocol's stable asset which can be redeemed for `Credit` via `Minter`
 contract Stablecoin is AccessControl, ERC20Permit, IStablecoin {
-
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -36,7 +35,7 @@ contract Stablecoin is AccessControl, ERC20Permit, IStablecoin {
     }
 
     /// @notice Decreases the totalSupply by `amount` and using the tokens from `from`
-    /// @dev Sender has to be allowed to call this method. 
+    /// @dev Sender has to be allowed to call this method.
     ////     If `from` is not the caller, caller needs to have sufficient allowance from `from`,
     ///      `amount` is then deducted from the caller's allowance
     /// @param from Address from which tokens should be burned from
@@ -51,11 +50,7 @@ contract Stablecoin is AccessControl, ERC20Permit, IStablecoin {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Overrides `_spendAllowance` behaviour exempting the case where owner == spender
-    function _spendAllowance(
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal override {
+    function _spendAllowance(address owner, address spender, uint256 amount) internal override {
         if (owner == spender) return;
         super._spendAllowance(owner, spender, amount);
     }

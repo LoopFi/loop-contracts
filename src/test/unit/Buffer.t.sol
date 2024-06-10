@@ -12,7 +12,6 @@ import {CDM, getCredit, getDebt, getCreditLine} from "../../CDM.sol";
 import {Buffer, CREDIT_MANAGER_ROLE} from "../../Buffer.sol";
 
 contract BufferTest is Test {
-
     CDM cdm;
     Buffer buffer;
     address vault = makeAddr("vault");
@@ -49,17 +48,17 @@ contract BufferTest is Test {
                             HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _credit(address account) internal view returns(uint256) {
-        (int256 balance,) = cdm.accounts(account);
+    function _credit(address account) internal view returns (uint256) {
+        (int256 balance, ) = cdm.accounts(account);
         return getCredit(balance);
     }
 
-    function _debt(address account) internal view returns(uint256) {
-        (int256 balance,) = cdm.accounts(account);
+    function _debt(address account) internal view returns (uint256) {
+        (int256 balance, ) = cdm.accounts(account);
         return getDebt(balance);
     }
 
-    function _getCreditLine(address account) internal view returns(uint256) {
+    function _getCreditLine(address account) internal view returns (uint256) {
         (int256 balance, uint256 debtCeiling) = cdm.accounts(account);
         return getCreditLine(balance, debtCeiling);
     }
@@ -104,12 +103,12 @@ contract BufferTest is Test {
     }
 
     function _getOnlyRoleRevertMsg(address account, bytes32 role) internal pure returns (bytes memory) {
-        return abi.encodePacked(
-            "AccessControl: account ",
-            Strings.toHexString(account),
-            " is missing role ",
-            Strings.toHexString(uint256(role), 32)
-        );
+        return
+            abi.encodePacked(
+                "AccessControl: account ",
+                Strings.toHexString(account),
+                " is missing role ",
+                Strings.toHexString(uint256(role), 32)
+            );
     }
-
 }

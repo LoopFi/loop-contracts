@@ -11,8 +11,7 @@ import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 /// @notice Manages the registration and removal of vaults in the protocol, allowing for user data aggregation by iterating through vaults.
 contract VaultRegistry is AccessControl, IVaultRegistry {
     /// @notice Role for managing vaults
-    bytes32 public constant VAULT_MANAGER_ROLE =
-        keccak256("VAULT_MANAGER_ROLE");
+    bytes32 public constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
 
     /// @notice Mapping for quick vault address lookup
     mapping(ICDPVault => bool) private registeredVaults;
@@ -37,11 +36,8 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Adds a new vault to the registry
     /// @param vault The address of the vault to add
-    function addVault(
-        ICDPVault vault
-    ) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
-        if (registeredVaults[vault])
-            revert VaultRegistry__addVault_vaultAlreadyRegistered();
+    function addVault(ICDPVault vault) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
+        if (registeredVaults[vault]) revert VaultRegistry__addVault_vaultAlreadyRegistered();
 
         registeredVaults[vault] = true;
         vaultList.push(vault);
@@ -50,11 +46,8 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Removes a vault from the registry
     /// @param vault The address of the vault to remove
-    function removeVault(
-        ICDPVault vault
-    ) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
-        if (!registeredVaults[vault])
-            revert VaultRegistry__removeVault_vaultNotFound();
+    function removeVault(ICDPVault vault) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
+        if (!registeredVaults[vault]) revert VaultRegistry__removeVault_vaultNotFound();
 
         _removeVaultFromList(vault);
         registeredVaults[vault] = false;
@@ -63,12 +56,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Returns the list of all registered vaults for iteration
     /// @return The list of registered vault addresses
-    function getVaults()
-        external
-        view
-        override(IVaultRegistry)
-        returns (ICDPVault[] memory)
-    {
+    function getVaults() external view override(IVaultRegistry) returns (ICDPVault[] memory) {
         return vaultList;
     }
 
@@ -79,9 +67,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
     ) external view override(IVaultRegistry) returns (uint256 totalNormalDebt) {
         uint256 vaultLen = vaultList.length;
         for (uint256 i = 0; i < vaultLen; ) {
-            (, uint256 debt , , ) = ICDPVault(vaultList[i]).positions(
-                user
-            );
+            (, uint256 debt, , ) = ICDPVault(vaultList[i]).positions(user);
 
             totalNormalDebt += debt;
 

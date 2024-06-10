@@ -17,12 +17,7 @@ import {ICDPVault} from "../interfaces/ICDPVault.sol";
 /// @author Radiant
 /// based on the Sushi MasterChef
 ///	https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
-contract ChefIncentivesController is
-    Initializable,
-    PausableUpgradeable,
-    OwnableUpgradeable,
-    RecoverERC20
-{
+contract ChefIncentivesController is Initializable, PausableUpgradeable, OwnableUpgradeable, RecoverERC20 {
     using SafeERC20 for IERC20;
 
     // Info of each user.
@@ -65,22 +60,11 @@ contract ChefIncentivesController is
 
     /********************** Events ***********************/
     // Emitted when rewardPerSecond is updated
-    event RewardsPerSecondUpdated(
-        uint256 indexed rewardsPerSecond,
-        bool persist
-    );
+    event RewardsPerSecondUpdated(uint256 indexed rewardsPerSecond, bool persist);
 
-    event BalanceUpdated(
-        address indexed token,
-        address indexed user,
-        uint256 balance,
-        uint256 totalSupply
-    );
+    event BalanceUpdated(address indexed token, address indexed user, uint256 balance, uint256 totalSupply);
 
-    event EmissionScheduleAppended(
-        uint256[] startTimeOffsets,
-        uint256[] rewardsPerSeconds
-    );
+    event EmissionScheduleAppended(uint256[] startTimeOffsets, uint256[] rewardsPerSeconds);
 
     event ChefReserveLow(uint256 indexed _balance);
 
@@ -231,8 +215,7 @@ contract ChefIncentivesController is
 
     modifier isWhitelisted() {
         if (whitelistActive) {
-            if (!whitelist[msg.sender] && msg.sender != address(this))
-                revert NotWhitelisted();
+            if (!whitelist[msg.sender] && msg.sender != address(this)) revert NotWhitelisted();
         }
         _;
     }
@@ -332,10 +315,7 @@ contract ChefIncentivesController is
      * @param _tokens for reward pools
      * @param _allocPoints allocation points of the pools
      */
-    function batchUpdateAllocPoint(
-        address[] calldata _tokens,
-        uint256[] calldata _allocPoints
-    ) external onlyOwner {
+    function batchUpdateAllocPoint(address[] calldata _tokens, uint256[] calldata _allocPoints) external onlyOwner {
         if (_tokens.length != _allocPoints.length) revert ArrayLengthMismatch();
         _massUpdatePools();
         uint256 _totalAllocPoint = totalAllocPoint;
@@ -343,10 +323,7 @@ contract ChefIncentivesController is
         for (uint256 i; i < length; ) {
             VaultInfo storage pool = vaultInfo[_tokens[i]];
             if (pool.lastRewardTime == 0) revert UnknownPool();
-            _totalAllocPoint =
-                _totalAllocPoint -
-                pool.allocPoint +
-                _allocPoints[i];
+            _totalAllocPoint = _totalAllocPoint - pool.allocPoint + _allocPoints[i];
             pool.allocPoint = _allocPoints[i];
             unchecked {
                 i++;
@@ -362,10 +339,7 @@ contract ChefIncentivesController is
      * @param _rewardsPerSecond The amount of reward to be distributed per second.
      * @param _persist true if RPS is fixed, otherwise RPS is by emission schedule.
      */
-    function setRewardsPerSecond(
-        uint256 _rewardsPerSecond,
-        bool _persist
-    ) external onlyOwner {
+    function setRewardsPerSecond(uint256 _rewardsPerSecond, bool _persist) external onlyOwner {
         _massUpdatePools();
         rewardsPerSecond = _rewardsPerSecond;
         persistRewardsPerSecond = _persist;
@@ -380,11 +354,7 @@ contract ChefIncentivesController is
             uint256 length = emissionSchedule.length;
             uint256 i = emissionScheduleIndex;
             uint128 offset = uint128(block.timestamp - startTime);
-            for (
-                ;
-                i < length && offset >= emissionSchedule[i].startTimeOffset;
-
-            ) {
+            for (; i < length && offset >= emissionSchedule[i].startTimeOffset; ) {
                 unchecked {
                     i++;
                 }
@@ -392,9 +362,7 @@ contract ChefIncentivesController is
             if (i > emissionScheduleIndex) {
                 emissionScheduleIndex = i;
                 _massUpdatePools();
-                rewardsPerSecond = uint256(
-                    emissionSchedule[i - 1].rewardsPerSecond
-                );
+                rewardsPerSecond = uint256(emissionSchedule[i - 1].rewardsPerSecond);
             }
         }
     }
@@ -404,9 +372,7 @@ contract ChefIncentivesController is
      * @param _startTimeOffset time offset
      * @return true if the specified time offset is already registered
      */
-    function _checkDuplicateSchedule(
-        uint256 _startTimeOffset
-    ) internal view returns (bool) {
+    function _checkDuplicateSchedule(uint256 _startTimeOffset) internal view returns (bool) {
         uint256 length = emissionSchedule.length;
         for (uint256 i = 0; i < length; ) {
             if (emissionSchedule[i].startTimeOffset == _startTimeOffset) {
@@ -430,24 +396,18 @@ contract ChefIncentivesController is
         uint256[] calldata _rewardsPerSecond
     ) external onlyOwner {
         uint256 length = _startTimeOffsets.length;
-        if (length <= 0 || length != _rewardsPerSecond.length)
-            revert ArrayLengthMismatch();
+        if (length <= 0 || length != _rewardsPerSecond.length) revert ArrayLengthMismatch();
 
         for (uint256 i = 0; i < length; ) {
             if (i > 0) {
-                if (_startTimeOffsets[i - 1] > _startTimeOffsets[i])
-                    revert NotAscending();
+                if (_startTimeOffsets[i - 1] > _startTimeOffsets[i]) revert NotAscending();
             }
-            if (_startTimeOffsets[i] > type(uint128).max)
-                revert ExceedsMaxInt();
-            if (_rewardsPerSecond[i] > type(uint128).max)
-                revert ExceedsMaxInt();
-            if (_checkDuplicateSchedule(_startTimeOffsets[i]))
-                revert DuplicateSchedule();
+            if (_startTimeOffsets[i] > type(uint128).max) revert ExceedsMaxInt();
+            if (_rewardsPerSecond[i] > type(uint128).max) revert ExceedsMaxInt();
+            if (_checkDuplicateSchedule(_startTimeOffsets[i])) revert DuplicateSchedule();
 
             if (startTime > 0) {
-                if (_startTimeOffsets[i] < block.timestamp - startTime)
-                    revert InvalidStart();
+                if (_startTimeOffsets[i] < block.timestamp - startTime) revert InvalidStart();
             }
             emissionSchedule.push(
                 EmissionPoint({
@@ -467,10 +427,7 @@ contract ChefIncentivesController is
      * @param tokenAddress Token address for recover
      * @param tokenAmount Amount to recover
      */
-    function recoverERC20(
-        address tokenAddress,
-        uint256 tokenAmount
-    ) external onlyOwner {
+    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
         _recoverERC20(tokenAddress, tokenAmount);
     }
 
@@ -509,10 +466,7 @@ contract ChefIncentivesController is
      * @param pool pool info
      * @param _totalAllocPoint allocation point of the pool
      */
-    function _updatePool(
-        VaultInfo storage pool,
-        uint256 _totalAllocPoint
-    ) internal {
+    function _updatePool(VaultInfo storage pool, uint256 _totalAllocPoint) internal {
         uint256 timestamp = block.timestamp;
         uint256 endReward = endRewardTime();
         if (endReward <= timestamp) {
@@ -522,10 +476,7 @@ contract ChefIncentivesController is
             return;
         }
 
-        (uint256 reward, uint256 newAccRewardPerShare) = _newRewards(
-            pool,
-            _totalAllocPoint
-        );
+        (uint256 reward, uint256 newAccRewardPerShare) = _newRewards(pool, _totalAllocPoint);
         accountedRewards = accountedRewards + reward;
         pool.accRewardPerShare = pool.accRewardPerShare + newAccRewardPerShare;
         pool.lastRewardTime = timestamp;
@@ -539,10 +490,7 @@ contract ChefIncentivesController is
      * @param _tokens array of reward-bearing tokens
      * @return claimable rewards array
      */
-    function pendingRewards(
-        address _user,
-        address[] memory _tokens
-    ) public view returns (uint256[] memory) {
+    function pendingRewards(address _user, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory claimable = new uint256[](_tokens.length);
         uint256 length = _tokens.length;
         for (uint256 i; i < length; ) {
@@ -551,16 +499,10 @@ contract ChefIncentivesController is
             UserInfo storage user = userInfo[token][_user];
             uint256 accRewardPerShare = pool.accRewardPerShare;
             if (block.timestamp > pool.lastRewardTime) {
-                (, uint256 newAccRewardPerShare) = _newRewards(
-                    pool,
-                    totalAllocPoint
-                );
+                (, uint256 newAccRewardPerShare) = _newRewards(pool, totalAllocPoint);
                 accRewardPerShare = accRewardPerShare + newAccRewardPerShare;
             }
-            claimable[i] =
-                (user.amount * accRewardPerShare) /
-                ACC_REWARD_PRECISION -
-                user.rewardDebt;
+            claimable[i] = (user.amount * accRewardPerShare) / ACC_REWARD_PRECISION - user.rewardDebt;
             unchecked {
                 i++;
             }
@@ -573,13 +515,9 @@ contract ChefIncentivesController is
      * @param _user address for claim
      * @param _tokens array of reward-bearing tokens
      */
-    function claim(
-        address _user,
-        address[] memory _tokens
-    ) public whenNotPaused {
+    function claim(address _user, address[] memory _tokens) public whenNotPaused {
         if (eligibilityMode != EligibilityModes.DISABLED) {
-            if (!eligibleDataProvider.isEligibleForRewards(_user))
-                revert EligibleRequired();
+            if (!eligibleDataProvider.isEligibleForRewards(_user)) revert EligibleRequired();
             checkAndProcessEligibility(_user, true, true);
         }
 
@@ -597,8 +535,7 @@ contract ChefIncentivesController is
             if (pool.lastRewardTime == 0) revert UnknownPool();
             _updatePool(pool, _totalAllocPoint);
             UserInfo storage user = userInfo[_tokens[i]][_user];
-            uint256 rewardDebt = (user.amount * pool.accRewardPerShare) /
-                ACC_REWARD_PRECISION;
+            uint256 rewardDebt = (user.amount * pool.accRewardPerShare) / ACC_REWARD_PRECISION;
             pending = pending + rewardDebt - user.rewardDebt;
             user.rewardDebt = rewardDebt;
             user.lastClaimTime = currentTimestamp;
@@ -633,8 +570,7 @@ contract ChefIncentivesController is
     function setEligibilityExempt(address _contract, bool _value) public {
         // skip this if not processing eligibilty all the time
         if (eligibilityMode != EligibilityModes.FULL) return;
-        if (msg.sender != owner() && !authorizedContracts[msg.sender])
-            revert InsufficientPermission();
+        if (msg.sender != owner() && !authorizedContracts[msg.sender]) revert InsufficientPermission();
         eligibilityExempt[_contract] = _value;
     }
 
@@ -642,12 +578,8 @@ contract ChefIncentivesController is
      * @notice Updates whether the provided address is authorized to call setEligibilityExempt(), only callable by owner.
      * @param _address address of the user or contract whose authorization level is being changed
      */
-    function setContractAuthorization(
-        address _address,
-        bool _authorize
-    ) external onlyOwner {
-        if (authorizedContracts[_address] == _authorize)
-            revert AuthorizationAlreadySet();
+    function setContractAuthorization(address _address, bool _authorize) external onlyOwner {
+        if (authorizedContracts[_address] == _authorize) revert AuthorizationAlreadySet();
         authorizedContracts[_address] = _authorize;
         emit AuthorizedContractUpdated(_address, _authorize);
     }
@@ -661,30 +593,18 @@ contract ChefIncentivesController is
      * @param _balance balance of token
      * @param _totalSupply total supply of the token
      */
-    function handleActionAfter(
-        address _user,
-        uint256 _balance,
-        uint256 _totalSupply
-    ) external {
-        if (!validRTokens[msg.sender] && msg.sender != address(mfd))
-            revert NotRTokenOrMfd();
+    function handleActionAfter(address _user, uint256 _balance, uint256 _totalSupply) external {
+        if (!validRTokens[msg.sender] && msg.sender != address(mfd)) revert NotRTokenOrMfd();
 
         if (_user == address(mfd) || eligibilityExempt[_user]) {
             return;
         }
         if (eligibilityMode == EligibilityModes.FULL) {
-            bool lastEligibleStatus = eligibleDataProvider.lastEligibleStatus(
-                _user
-            );
+            bool lastEligibleStatus = eligibleDataProvider.lastEligibleStatus(_user);
             bool isCurrentlyEligible = eligibleDataProvider.refresh(_user);
             if (isCurrentlyEligible) {
                 if (lastEligibleStatus) {
-                    _handleActionAfterForToken(
-                        msg.sender,
-                        _user,
-                        _balance,
-                        _totalSupply
-                    );
+                    _handleActionAfterForToken(msg.sender, _user, _balance, _totalSupply);
                 } else {
                     _updateRegisteredBalance(_user);
                 }
@@ -692,12 +612,7 @@ contract ChefIncentivesController is
                 _processEligibility(_user, isCurrentlyEligible, true);
             }
         } else {
-            _handleActionAfterForToken(
-                msg.sender,
-                _user,
-                _balance,
-                _totalSupply
-            );
+            _handleActionAfterForToken(msg.sender, _user, _balance, _totalSupply);
         }
     }
 
@@ -725,9 +640,7 @@ contract ChefIncentivesController is
         uint256 amount = user.amount;
         uint256 accRewardPerShare = pool.accRewardPerShare;
         if (amount != 0) {
-            uint256 pending = (amount * accRewardPerShare) /
-                ACC_REWARD_PRECISION -
-                user.rewardDebt;
+            uint256 pending = (amount * accRewardPerShare) / ACC_REWARD_PRECISION - user.rewardDebt;
             if (pending != 0) {
                 userBaseClaimable[_user] = userBaseClaimable[_user] + pending;
             }
@@ -777,18 +690,14 @@ contract ChefIncentivesController is
     function _updateRegisteredBalance(address _user) internal {
         uint256 length = poolLength();
         for (uint256 i; i < length; ) {
-            (, uint256 newBal, , ) = ICDPVault(registeredTokens[i]).positions(
-                _user
-            );
+            (, uint256 newBal, , ) = ICDPVault(registeredTokens[i]).positions(_user);
             uint256 registeredBal = userInfo[registeredTokens[i]][_user].amount;
             if (newBal != 0 && newBal != registeredBal) {
                 _handleActionAfterForToken(
                     registeredTokens[i],
                     _user,
                     newBal,
-                    vaultInfo[registeredTokens[i]].totalSupply +
-                        newBal -
-                        registeredBal
+                    vaultInfo[registeredTokens[i]].totalSupply + newBal - registeredBal
                 );
             }
             unchecked {
@@ -803,9 +712,7 @@ contract ChefIncentivesController is
      * @dev Returns true if `_user` has some reward eligible tokens.
      * @param _user address of recipient
      */
-    function hasEligibleDeposits(
-        address _user
-    ) public view returns (bool hasDeposits) {
+    function hasEligibleDeposits(address _user) public view returns (bool hasDeposits) {
         uint256 length = poolLength();
         for (uint256 i; i < length; ) {
             if (userInfo[registeredTokens[i]][_user].amount != 0) {
@@ -871,10 +778,7 @@ contract ChefIncentivesController is
      * @param _execute true if it's actual execution
      * @return issueBaseBounty true for base bounty
      */
-    function claimBounty(
-        address _user,
-        bool _execute
-    ) public returns (bool issueBaseBounty) {
+    function claimBounty(address _user, bool _execute) public returns (bool issueBaseBounty) {
         if (msg.sender != address(bountyManager)) revert BountyOnly();
         issueBaseBounty = checkAndProcessEligibility(_user, _execute, true);
     }
@@ -893,12 +797,7 @@ contract ChefIncentivesController is
             UserInfo storage user = userInfo[token][_user];
 
             if (user.amount != 0) {
-                _handleActionAfterForToken(
-                    token,
-                    _user,
-                    0,
-                    pool.totalSupply - user.amount
-                );
+                _handleActionAfterForToken(token, _user, 0, pool.totalSupply - user.amount);
             }
             unchecked {
                 i++;
@@ -911,10 +810,7 @@ contract ChefIncentivesController is
      * @notice function to stop user emissions
      * @param _user address of user to stop emissions for
      */
-    function manualStopEmissionsFor(
-        address _user,
-        address[] memory _tokens
-    ) public isWhitelisted {
+    function manualStopEmissionsFor(address _user, address[] memory _tokens) public isWhitelisted {
         if (_user == address(0)) revert AddressZero();
         uint256 length = _tokens.length;
         for (uint256 i; i < length; ) {
@@ -927,13 +823,9 @@ contract ChefIncentivesController is
             uint256 amount = user.amount;
             if (amount != 0) {
                 uint256 accRewardPerShare = pool.accRewardPerShare;
-                uint256 pending = (amount * accRewardPerShare) /
-                    ACC_REWARD_PRECISION -
-                    user.rewardDebt;
+                uint256 pending = (amount * accRewardPerShare) / ACC_REWARD_PRECISION - user.rewardDebt;
                 if (pending != 0) {
-                    userBaseClaimable[_user] =
-                        userBaseClaimable[_user] +
-                        pending;
+                    userBaseClaimable[_user] = userBaseClaimable[_user] + pending;
                 }
                 uint256 newTotalSupply = pool.totalSupply - amount;
                 user.amount = 0;
@@ -978,10 +870,7 @@ contract ChefIncentivesController is
      * @notice Ending reward distribution time.
      */
     function endRewardTime() public returns (uint256) {
-        if (
-            endingTime.lastUpdatedTime + endingTime.updateCadence >
-            block.timestamp
-        ) {
+        if (endingTime.lastUpdatedTime + endingTime.updateCadence > block.timestamp) {
             return endingTime.estimatedTime;
         }
 
@@ -993,9 +882,7 @@ contract ChefIncentivesController is
 
             if (pool.lastRewardTime > lastAllPoolUpdate) {
                 extra +=
-                    ((pool.lastRewardTime - lastAllPoolUpdate) *
-                        pool.allocPoint *
-                        rewardsPerSecond) /
+                    ((pool.lastRewardTime - lastAllPoolUpdate) * pool.allocPoint * rewardsPerSecond) /
                     totalAllocPoint;
             }
             unchecked {
@@ -1008,9 +895,7 @@ contract ChefIncentivesController is
             endingTime.estimatedTime = type(uint256).max;
             return type(uint256).max;
         } else {
-            uint256 newEndTime = (unclaimedRewards + extra) /
-                rewardsPerSecond +
-                lastAllPoolUpdate;
+            uint256 newEndTime = (unclaimedRewards + extra) / rewardsPerSecond + lastAllPoolUpdate;
             endingTime.estimatedTime = newEndTime;
             return newEndTime;
         }
@@ -1063,9 +948,7 @@ contract ChefIncentivesController is
      * @param _user address of the user
      * @return pending reward amount
      */
-    function allPendingRewards(
-        address _user
-    ) public view returns (uint256 pending) {
+    function allPendingRewards(address _user) public view returns (uint256 pending) {
         pending = userBaseClaimable[_user];
         uint256[] memory claimable = pendingRewards(_user, registeredTokens);
         uint256 length = claimable.length;
@@ -1110,9 +993,7 @@ contract ChefIncentivesController is
                 rawReward = rewards;
             }
             newReward = (rawReward * pool.allocPoint) / _totalAllocPoint;
-            newAccRewardPerShare =
-                (newReward * ACC_REWARD_PRECISION) /
-                lpSupply;
+            newAccRewardPerShare = (newReward * ACC_REWARD_PRECISION) / lpSupply;
         }
     }
 

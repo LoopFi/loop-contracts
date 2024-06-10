@@ -14,11 +14,8 @@ import {LinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/poo
 
 import {ICDM} from "../interfaces/ICDM.sol";
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
-import {IFlashlender} from "../interfaces/IFlashlender.sol";
 import {CDPVault} from "../CDPVault.sol";
 
-import {Flashlender} from "../Flashlender.sol";
-import {Buffer} from "../Buffer.sol";
 import {MockOracle} from "./MockOracle.sol";
 import {WAD, wdiv} from "../utils/Math.sol";
 import {PoolV3} from "../PoolV3.sol";
@@ -35,7 +32,6 @@ contract CreditCreator {
 }
 
 contract TestBase is Test {
-
     address public treasury;
 
     AddressProviderV3 public addressProvider;
@@ -43,10 +39,6 @@ contract TestBase is Test {
     ContractsRegister public contractsRegister;
     PoolV3 internal liquidityPool;
     ERC20PresetMinterPauser internal mockWETH;
-
-    ProxyAdmin internal bufferProxyAdmin;
-
-    IFlashlender internal flashlender;
 
     ERC20PresetMinterPauser internal token;
     MockOracle internal oracle;
@@ -78,7 +70,7 @@ contract TestBase is Test {
         createAssets();
         createOracles();
         createCore();
-        labelContracts(); 
+        labelContracts();
     }
 
     function createAccounts() internal virtual {
@@ -96,7 +88,7 @@ contract TestBase is Test {
         addressProvider.setAddress(AP_WETH_TOKEN, address(mockWETH), false);
         addressProvider.setAddress(AP_TREASURY, treasury, false);
         contractsRegister = new ContractsRegister(address(addressProvider));
-        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), false);    
+        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), false);
     }
 
     function createOracles() internal virtual {
@@ -106,7 +98,7 @@ contract TestBase is Test {
 
     function createCore() internal virtual {
         // cdm = new CDM(address(this), address(this), address(this));
-        
+
         // stablecoin = new Stablecoin();
         // minter = new Minter(cdm, stablecoin, address(this), address(this));
         // stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(minter));
@@ -120,25 +112,22 @@ contract TestBase is Test {
         // )));
         // cdm.setParameter(address(buffer), "debtCeiling", initialGlobalDebtCeiling);
 
-        // // create an unbound credit line to use for testing        
+        // // create an unbound credit line to use for testing
         // creditCreator = new CreditCreator(cdm);
         // cdm.setParameter(address(creditCreator), "debtCeiling", uint256(type(int256).max));
 
-        
-        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(
-            {
-                U_1: 85_00,
-                U_2: 95_00,
-                R_base: 10_00,
-                R_slope1: 20_00,
-                R_slope2: 30_00,
-                R_slope3: 40_00,
-                _isBorrowingMoreU2Forbidden: false
-            }
-        );
+        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3({
+            U_1: 85_00,
+            U_2: 95_00,
+            R_base: 10_00,
+            R_slope1: 20_00,
+            R_slope2: 30_00,
+            R_slope3: 40_00,
+            _isBorrowingMoreU2Forbidden: false
+        });
         createAddressProvider();
 
-        liquidityPool= new PoolV3({
+        liquidityPool = new PoolV3({
             addressProvider_: address(addressProvider),
             underlyingToken_: address(mockWETH),
             interestRateModel_: address(irm),
@@ -161,25 +150,25 @@ contract TestBase is Test {
         uint64 liquidationPenalty,
         uint64 liquidationDiscount
     ) internal returns (CDPVault) {
-        return createCDPVault(
-            CDPVaultConstants({
-                pool: liquidityPool,
-                oracle: oracle,
-                token: token_,
-                tokenScale: 10**IERC20Metadata(address(token_)).decimals()
-
-            }), 
-            CDPVaultConfig({
-                debtFloor: debtFloor,
-                liquidationRatio: liquidationRatio,
-                liquidationPenalty: liquidationPenalty,
-                liquidationDiscount: liquidationDiscount,
-                roleAdmin: address(this),
-                vaultAdmin: address(this),
-                pauseAdmin: address(this)
-            }),
-            debtCeiling
-        );
+        return
+            createCDPVault(
+                CDPVaultConstants({
+                    pool: liquidityPool,
+                    oracle: oracle,
+                    token: token_,
+                    tokenScale: 10 ** IERC20Metadata(address(token_)).decimals()
+                }),
+                CDPVaultConfig({
+                    debtFloor: debtFloor,
+                    liquidationRatio: liquidationRatio,
+                    liquidationPenalty: liquidationPenalty,
+                    liquidationDiscount: liquidationDiscount,
+                    roleAdmin: address(this),
+                    vaultAdmin: address(this),
+                    pauseAdmin: address(this)
+                }),
+                debtCeiling
+            );
     }
 
     function createCDPVault(
@@ -201,7 +190,7 @@ contract TestBase is Test {
 
         vm.label({account: address(vault), newLabel: "CDPVault"});
     }
-    
+
     function labelContracts() internal virtual {
         vm.label({account: address(token), newLabel: "CollateralToken"});
         vm.label({account: address(oracle), newLabel: "Oracle"});
@@ -220,19 +209,16 @@ contract TestBase is Test {
         oracle.updateSpot(address(token), price);
     }
 
-    // function createCredit(address to, uint256 amount) public {
-    //     cdm.modifyBalance(address(creditCreator), to, amount);
-    // }
+    function createCredit(address to, uint256 amount) public {
+        mockWETH.mint(to, amount);
+    }
 
     function credit(address account) internal view returns (uint256) {
         uint256 balance = mockWETH.balanceOf(account);
         return balance;
     }
 
-    function virtualDebt(
-        CDPVault vault,
-        address position
-    ) internal view returns (uint256) {
+    function virtualDebt(CDPVault vault, address position) internal view returns (uint256) {
         return vault.virtualDebt(position);
     }
 
@@ -247,24 +233,26 @@ contract TestBase is Test {
     }
 
     function _getDefaultVaultConstants() internal view returns (CDPVaultConstants memory) {
-        return CDPVaultConstants({
-            pool: liquidityPool,
-            oracle: oracle,
-            token: token,
-            tokenScale: 10**IERC20Metadata(address(token)).decimals()
-        });
+        return
+            CDPVaultConstants({
+                pool: liquidityPool,
+                oracle: oracle,
+                token: token,
+                tokenScale: 10 ** IERC20Metadata(address(token)).decimals()
+            });
     }
 
     function _getDefaultVaultConfig() internal view returns (CDPVaultConfig memory) {
-        return CDPVaultConfig({
-            debtFloor: 0,
-            liquidationRatio: 1.25 ether,
-            liquidationPenalty: uint64(WAD),
-            liquidationDiscount: uint64(WAD),
-            roleAdmin: address(this),
-            vaultAdmin: address(this),
-            pauseAdmin: address(this)
-        });
+        return
+            CDPVaultConfig({
+                debtFloor: 0,
+                liquidationRatio: 1.25 ether,
+                liquidationPenalty: uint64(WAD),
+                liquidationDiscount: uint64(WAD),
+                roleAdmin: address(this),
+                vaultAdmin: address(this),
+                pauseAdmin: address(this)
+            });
     }
 
     function getContracts() public view returns (address[] memory contracts) {

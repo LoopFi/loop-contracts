@@ -528,24 +528,24 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         }
 
         if (profit > 0) _mint(treasury, convertToShares(profit)); // U:[LP-14B]
-        // } else if (loss > 0) {
-        //     address treasury_ = treasury;
-        //     uint256 sharesInTreasury = balanceOf(treasury_);
-        //     uint256 sharesToBurn = convertToShares(loss);
-        //     if (sharesToBurn > sharesInTreasury) {
-        //         unchecked {
-        //             emit IncurUncoveredLoss({
-        //                 creditManager: msg.sender,
-        //                 loss: convertToAssets(sharesToBurn - sharesInTreasury)
-        //             }); // U:[LP-14D]
-        //         }
-        //         sharesToBurn = sharesInTreasury;
-        //     }
-        //     _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
-        // }
+        } else if (loss > 0) {
+            address treasury_ = treasury;
+            uint256 sharesInTreasury = balanceOf(treasury_);
+            uint256 sharesToBurn = convertToShares(loss);
+            if (sharesToBurn > sharesInTreasury) {
+                unchecked {
+                    emit IncurUncoveredLoss({
+                        creditManager: msg.sender,
+                        loss: convertToAssets(sharesToBurn - sharesInTreasury)
+                    }); // U:[LP-14D]
+                }
+                sharesToBurn = sharesInTreasury;
+            }
+            _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
+        }
 
         _updateBaseInterest({
-            expectedLiquidityDelta: profit.toInt256() //- loss.toInt256(),
+            expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
         }); // U:[LP-14B,14C,14D]

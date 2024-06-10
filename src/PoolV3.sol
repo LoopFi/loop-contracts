@@ -224,7 +224,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         returns (uint256 shares)
     {
         uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
-        shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[LP-6]
+        shares = _convertToShares(assetsReceived); // U:[LP-6]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-6]
     }
 
@@ -253,7 +253,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
-        uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
+        uint256 assetsReceived = _convertToAssets(shares); // U:[LP-7]
         assets = _amountWithFee(assetsReceived); // U:[LP-7]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-7]
     }
@@ -288,7 +288,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     {
         uint256 assetsToUser = _amountWithFee(assets);
         uint256 assetsSent = _amountWithWithdrawalFee(assetsToUser); // U:[LP-8]
-        shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
+        shares = _convertToShares(assetsSent); // U:[LP-8]
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
@@ -310,7 +310,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
-        uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
+        uint256 assetsSent = _convertToAssets(shares); // U:[LP-9]
         uint256 assetsToUser = _amountMinusWithdrawalFee(assetsSent);
         assets = _amountMinusFee(assetsToUser); // U:[LP-9]
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-9]
@@ -318,22 +318,22 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
     function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
+        shares = _convertToShares(_amountMinusFee(assets)); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`
     function previewMint(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up)); // U:[LP-10]
+        return _amountWithFee(_convertToAssets(shares)); // U:[LP-10]
     }
 
     /// @notice Number of pool shares that would be burned on withdrawing `assets`
     function previewWithdraw(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets)), Math.Rounding.Up); // U:[LP-10]
+        return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets))); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be received after redeeming `shares`
     function previewRedeem(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares, Math.Rounding.Down))); // U:[LP-10]
+        return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares))); // U:[LP-10]
     }
 
     /// @notice Maximum amount of underlying that can be deposited to the pool, 0 if pool is on pause
@@ -352,15 +352,13 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             paused()
                 ? 0
                 : _amountMinusFee(
-                    _amountMinusWithdrawalFee(
-                        Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down))
-                    )
+                    _amountMinusWithdrawalFee(Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner))))
                 ); // U:[LP-11]
     }
 
     /// @notice Maximum number of shares that can be redeemed for underlying by `owner`, 0 if pool is on pause
     function maxRedeem(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity(), Math.Rounding.Down)); // U:[LP-11]
+        return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity())); // U:[LP-11]
     }
 
     /// @dev `deposit` / `mint` implementation
@@ -412,14 +410,14 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @dev Internal conversion function (from assets to shares) with support for rounding direction
     /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
-    function _convertToShares(uint256 assets) internal pure override returns (uint256 shares) {
+    function _convertToShares(uint256 assets) internal pure returns (uint256 shares) {
         // uint256 supply = totalSupply();
         return assets; //(assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
     }
 
     /// @dev Internal conversion function (from shares to assets) with support for rounding direction
     /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
-    function _convertToAssets(uint256 shares) internal pure override returns (uint256 assets) {
+    function _convertToAssets(uint256 shares) internal pure returns (uint256 assets) {
         //uint256 supply = totalSupply();
         return shares; //(supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
     }

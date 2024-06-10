@@ -77,7 +77,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     uint40 public override lastQuotaRevenueUpdate;
     /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
-    /// @notice Redeeming or withdrawal allowed
+    /// @notice Redeeming or withdrawing locked status
     bool public locked;
 
     /// @notice Pool quota keeper contract address
@@ -102,7 +102,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
-    /// @dev List of whitelisted account thallowdeem or withdraw when pool is locked
+    /// @dev Map of whitelisted accounts that are allowed to redeem or withdraw when pool is locked
     mapping(address => bool) internal _allowed;
 
     /// @dev Ensures that function can only be called by the pool quota keeper

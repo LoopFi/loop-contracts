@@ -43,7 +43,7 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
     function vaultConfig() external view returns (uint128 debtFloor, uint64 liquidationRatio);
 
-    function totalNormalDebt() external view returns (uint256);
+    function totalDebt() external view returns (uint256);
 
     function positions(
         address owner

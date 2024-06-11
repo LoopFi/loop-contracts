@@ -62,7 +62,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Returns the aggregated position stats for a user across all vaults
     /// @param user The position owner
-    function getUserTotalNormalDebt(
+    function getUserTotalDebt(
         address user
     ) external view override(IVaultRegistry) returns (uint256 totalNormalDebt) {
         uint256 vaultLen = vaultList.length;

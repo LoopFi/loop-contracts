@@ -185,7 +185,7 @@ contract EligibilityDataProvider is OwnableUpgradeable {
      * @return required USD value.
      */
     function requiredUsdValue(address user) public view returns (uint256 required) {
-        uint256 totalNormalDebt = vaultRegistry.getUserTotalNormalDebt(user);
+        uint256 totalNormalDebt = vaultRegistry.getUserTotalDebt(user);
         required = (totalNormalDebt * requiredDepositRatio) / RATIO_DIVISOR;
         return _lockedUsdValue(required);
     }

@@ -43,17 +43,26 @@ contract CDPVaultTest is TestBase {
         assertEq(collateralAfter, collateralBefore + amount);
     }
 
-    function _modifyCollateralAndDebt(CDPVault vault, int256 collateral, int256 normalDebt) internal {
+    function _modifyCollateralAndDebt(CDPVault vault, int256 collateral, int256 debt) internal {
+        if (debt < 0) {
+            mockWETH.mint(address(this), uint256(-debt));
+            mockWETH.approve(address(vault), uint256(-debt));
+        }
+
+        if (collateral > 0) {
+            token.mint(address(this), uint256(collateral));
+            token.approve(address(vault), uint256(collateral));
+        }
+
         (uint256 collateralBefore, uint256 debtBefore, , ) = vault.positions(address(this));
         uint256 virtualDebtBefore = virtualDebt(vault, address(this));
         uint256 vaultCreditBefore = credit(address(this));
-
-        vault.modifyCollateralAndDebt(address(this), address(this), address(this), collateral, normalDebt);
-
+        
+        vault.modifyCollateralAndDebt(address(this), address(this), address(this), collateral, debt);
         {
             (uint256 collateralAfter, uint256 debtAfter, , ) = vault.positions(address(this));
             assertEq(toInt256(collateralAfter), toInt256(collateralBefore) + collateral);
-            assertEq(toInt256(debtAfter), toInt256(debtBefore) + normalDebt);
+            assertEq(toInt256(debtAfter), toInt256(debtBefore) + debt);
         }
 
         uint256 virtualDebtAfter = virtualDebt(vault, address(this));
@@ -66,7 +75,7 @@ contract CDPVaultTest is TestBase {
         uint256 vaultCreditAfter = credit(address(this));
         assertEq(
             toInt256(vaultCreditBefore + virtualDebtAfter),
-            toInt256(vaultCreditAfter + virtualDebtBefore) + deltaDebt
+            toInt256(vaultCreditAfter + virtualDebtBefore)
         );
     }
 
@@ -297,146 +306,151 @@ contract CDPVaultTest is TestBase {
     //                         LIQUIDATION FUNCTIONS
     // //////////////////////////////////////////////////////////////*/
 
-    // function test_liquidatePosition_revertOnSafePosition() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    function test_liquidatePosition_revertOnSafePosition() public {
+        CDPVault vault = createCDPVault(
+            token,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            1 ether
+        );
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-    //     address position = address(this);
-    //     uint256 repayAmount = 40 ether;
+        address position = address(this);
+        uint256 repayAmount = 40 ether;
 
-    //     vm.expectRevert(
-    //         CDPVault.CDPVault__liquidatePosition_notUnsafe.selector
-    //     );
-    //     vault.liquidatePosition(position, repayAmount);
-    // }
+        vm.expectRevert(
+            CDPVault.CDPVault__liquidatePosition_notUnsafe.selector
+        );
+        vault.liquidatePosition(position, repayAmount);
+    }
 
-    // function test_liquidatePosition_revertOnInvalidSpotPrice() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    function test_liquidatePosition_revertOnInvalidSpotPrice() public {
+        CDPVault vault = createCDPVault(
+            token,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            1 ether
+        );
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 40 ether;
-    //     _updateSpot(0);
-    //     vm.expectRevert(
-    //         CDPVault.CDPVault__liquidatePosition_notUnsafe.selector
-    //     );
-    //     vault.liquidatePosition(position, repayAmount);
-    // }
+        // liquidate position
+        address position = address(this);
+        uint256 repayAmount = 40 ether;
+        _updateSpot(0);
+        vm.expectRevert(
+            CDPVault.CDPVault__liquidatePosition_invalidSpotPrice.selector
+        );
+        vault.liquidatePosition(position, repayAmount);
+    }
 
-    // function test_liquidatePosition_revertsOnInvalidArguments() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    function test_liquidatePosition_revertsOnInvalidArguments() public {
+        CDPVault vault = createCDPVault(
+            token,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            1 ether
+        );
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 0 ether;
-    //     vm.expectRevert(
-    //         CDPVault.CDPVault__liquidatePosition_invalidParameters.selector
-    //     );
-    //     vault.liquidatePosition(position, repayAmount);
-    // }
+        // liquidate position
+        address position = address(this);
+        uint256 repayAmount = 0 ether;
+        vm.expectRevert(
+            CDPVault.CDPVault__liquidatePosition_invalidParameters.selector
+        );
+        vault.liquidatePosition(position, repayAmount);
+    }
 
     // /*//////////////////////////////////////////////////////////////
     //          SCENARIO: PARTIAL LIQUIDATION OF VAULT
     // //////////////////////////////////////////////////////////////*/
 
-    // // Case 1: Fraction of maxDebtToRecover is repaid
-    // function test_liquidate_partial_1() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    // Case 1: Fraction of maxDebtToRecover is repaid
+    function test_liquidate_partial_1() public {
+        CDPVault vault = createCDPVault(
+            token,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            1 ether
+        );
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 40 ether;
-    //     _updateSpot(0.80 ether);
-    //     vault.liquidatePosition(position, repayAmount);
+        uint256 balance = mockWETH.balanceOf(address(this));
 
-    //     assertEq(debt(address(vault)), 40 ether); // debt - repayAmount
-    //     assertEq(vault.cash(address(this)), 50 ether);
-    //     assertEq(credit(address(this)), 40 ether); // creditBefore - repayAmount
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 50 ether);
-    //     assertEq(normalDebt, 40 ether);
-    // }
+        // liquidate position
+        address position = address(this);
+        uint256 repayAmount = 40 ether;
+        _updateSpot(0.80 ether);
+        mockWETH.approve(address(vault), repayAmount);
+
+        uint256 creditBefore = credit(address(this));
+        uint256 virtualDebtBefore = virtualDebt(vault, position);
+        vault.liquidatePosition(position, repayAmount);
+        uint256 creditAfter = credit(address(this));
+
+        (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
+            position
+        );
+
+        uint256 virtualDebt = virtualDebt(vault, position);
+
+        assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
+        assertEq(creditBefore - creditAfter, 40 ether);
+        assertEq(collateral, 50 ether);
+        assertEq(token.balanceOf(address(vault)), 50 ether);
+    }
 
     // // Case 2: Same as Case 1 but multiple liquidation calls
-    // function test_liquidate_partial_2() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    function test_liquidate_partial_2() public {
+        CDPVault vault = createCDPVault(
+            token,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            1 ether
+        );
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-    //     // liquidate position
-    //     address position = address(this);
-    //     _updateSpot(0.80 ether);
-    //     vault.liquidatePosition(position, 10 ether);
-    //     vault.liquidatePosition(position, 30 ether);
+        uint256 creditBefore = credit(address(this));
+        // liquidate position
+        address position = address(this);
+        _updateSpot(0.80 ether);
+        mockWETH.approve(address(vault), 80 ether);
+        vault.liquidatePosition(position, 10 ether);
+        vault.liquidatePosition(position, 30 ether);
 
-    //     assertEq(debt(address(vault)), 40 ether); // debt - repayAmount
-    //     assertEq(vault.cash(address(this)), 50 ether);
-    //     assertEq(credit(address(this)), 40 ether); // creditBefore - repayAmount
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 50 ether);
-    //     assertEq(normalDebt, 40 ether);
-    // }
+        uint256 creditAfter = credit(address(this));
+
+        uint256 virtualDebtAfter = virtualDebt(vault, position);
+        assertEq(virtualDebtAfter, 40 ether); // debt - repayAmount
+        assertEq(creditBefore - creditAfter, 80 ether - 40 ether);
+        assertEq(creditAfter, 40 ether); // creditBefore - repayAmount
+        (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
+            position
+        );
+
+        assertEq(collateral, 50 ether);
+        assertEq(debtAfter, 40 ether);
+    }
 
     // // Case 3: Same as Case 1 but liquidationDiscount is applied
     // function test_liquidate_partial_3() public {

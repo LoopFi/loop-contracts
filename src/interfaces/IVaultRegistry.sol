@@ -20,7 +20,7 @@ interface IVaultRegistry {
 
     /// @notice Returns the total normal debt of a user.
     /// @param user The position owner
-    function getUserTotalNormalDebt(address user) external view returns (uint256 totalNormalDebt);
+    function getUserTotalDebt(address user) external view returns (uint256 totalNormalDebt);
 
     /// @notice Returns if a vault is registered.
     /// @param vault The address of the vault to check.

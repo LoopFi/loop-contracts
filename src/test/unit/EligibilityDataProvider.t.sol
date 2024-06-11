@@ -69,7 +69,7 @@ contract EligibilityDataProviderTest is TestBase {
     function _mockTotalNormalDebt(address user, uint256 totalNormalDebt) internal {
         vm.mockCall(
             mockVaultRegistry,
-            abi.encodeWithSelector(IVaultRegistry.getUserTotalNormalDebt.selector, user),
+            abi.encodeWithSelector(IVaultRegistry.getUserTotalDebt.selector, user),
             abi.encode(totalNormalDebt)
         );
     }

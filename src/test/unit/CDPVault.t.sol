@@ -391,8 +391,6 @@ contract CDPVaultTest is TestBase {
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
 
-        uint256 balance = mockWETH.balanceOf(address(this));
-
         // liquidate position
         address position = address(this);
         uint256 repayAmount = 40 ether;
@@ -407,8 +405,6 @@ contract CDPVaultTest is TestBase {
         (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
             position
         );
-
-        uint256 virtualDebt = virtualDebt(vault, position);
 
         assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
         assertEq(creditBefore - creditAfter, 40 ether);

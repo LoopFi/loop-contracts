@@ -185,14 +185,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             liquidationDiscount: config.liquidationDiscount
         });
 
-        // _setIRS(
-        //     IRS({
-        //         baseRate: toUint64(config.baseRate),
-        //         lastUpdated: toUint64(block.timestamp),
-        //         rateAccumulator: toUint64(WAD)
-        //     })
-        // );
-
         // Access Control Role Admin
         _grantRole(DEFAULT_ADMIN_ROLE, config.roleAdmin);
         _grantRole(VAULT_CONFIG_ROLE, config.vaultAdmin);
@@ -226,16 +218,17 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     }
 
     /*//////////////////////////////////////////////////////////////
-                      CASH BALANCE ADMINISTRATION
+                      COLLATERAL BALANCE ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposits collateral tokens into this contract and increases a users cash balance
+    /// @notice Deposits collateral tokens into this contract and increases a users collateral balance
     /// @dev The caller needs to approve this contract to transfer tokens on their behalf
-    /// @param to Address of the user to attribute the cash to
+    /// @param to Address of the user to attribute the collateral to
     /// @param amount Amount of tokens to deposit [tokenScale]
-    /// @return cashAmount Amount of cash deposited [wad]
-    function deposit(address to, uint256 amount) external whenNotPaused returns (uint256 cashAmount) {
-        int256 deltaCollateral = toInt256(amount);
+    /// @return tokenAmount Amount of collateral deposited [wad]
+    function deposit(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
+        tokenAmount = wdiv(amount, tokenScale);
+        int256 deltaCollateral = toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: to,
             collateralizer: msg.sender,
@@ -243,17 +236,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: deltaCollateral,
             deltaDebt: 0
         });
-
-        //todo: perform the conversion
-        cashAmount = amount;
     }
 
-    /// @notice Withdraws collateral tokens from this contract and decreases a users cash balance
+    /// @notice Withdraws collateral tokens from this contract and decreases a users collateral balance
     /// @param to Address of the user to withdraw tokens to
     /// @param amount Amount of tokens to withdraw [wad]
     /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
-        int256 deltaCollateral = -toInt256(amount);
+        tokenAmount = wmul(amount, tokenScale);
+        int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: msg.sender,
             collateralizer: to,
@@ -261,8 +252,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: deltaCollateral,
             deltaDebt: 0
         });
-        //todo: perform conversion
-        tokenAmount = amount;
     }
 
     function borrow(address borrower, address position, uint256 amount) external {
@@ -551,7 +540,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
-        // transfer the cash amount from the vault to the liquidator
+        // transfer the collateral amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
 

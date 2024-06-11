@@ -5,10 +5,9 @@ import {Test} from "forge-std/Test.sol";
 
 import {Permission} from "../../utils/Permission.sol";
 
-contract PermissionedContract is Permission { }
+contract PermissionedContract is Permission {}
 
 contract PermissionTest is Test {
-
     PermissionedContract permission;
 
     address user;
@@ -58,5 +57,4 @@ contract PermissionTest is Test {
         assertEq(permission.hasPermission(address(this), address(this)), true);
         assertEq(permission.hasPermission(address(this), user), false);
     }
-
 }

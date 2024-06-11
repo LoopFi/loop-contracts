@@ -7,7 +7,6 @@ import {WAD, add, wmul, wdiv, Math__add_overflow_signed, Math__mul_overflow, Mat
 
 // Wrapper contract to allow us to use try catch while fuzzing
 contract Wrapper {
-
     function _add(uint256 x, int256 y) external pure returns (uint256) {
         return add(x, y);
     }
@@ -22,7 +21,6 @@ contract Wrapper {
 }
 
 contract MathTest is Test {
-
     Wrapper wrapper;
 
     function setUp() public {
@@ -44,7 +42,7 @@ contract MathTest is Test {
 
     function test_wmul(uint256 x, uint256 y) public {
         try wrapper._wmul(x, y) returns (uint256 z) {
-            assertEq(z, x * y / WAD);
+            assertEq(z, (x * y) / WAD);
         } catch {
             vm.expectRevert(Math__mul_overflow.selector);
             wmul(x, y);
@@ -55,7 +53,7 @@ contract MathTest is Test {
         if (y == 0) return; // don't allow divide by zero
 
         try wrapper._wdiv(x, y) returns (uint256 z) {
-            assertEq(z, x * WAD / y);
+            assertEq(z, (x * WAD) / y);
         } catch {
             vm.expectRevert(Math__div_overflow.selector);
             wdiv(x, y);

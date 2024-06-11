@@ -7,7 +7,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
 
-enum ApprovalType { STANDARD, PERMIT, PERMIT2 }
+enum ApprovalType {
+    STANDARD,
+    PERMIT,
+    PERMIT2
+}
 
 struct PermitParams {
     ApprovalType approvalType;
@@ -20,7 +24,6 @@ struct PermitParams {
 }
 
 abstract contract TransferAction {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -41,23 +44,35 @@ abstract contract TransferAction {
 
     /// @notice Perform a permit2, a ERC20 permit transferFrom, or a standard transferFrom
     function _transferFrom(
-        address token, address from, address to, uint256 amount, PermitParams memory params
+        address token,
+        address from,
+        address to,
+        uint256 amount,
+        PermitParams memory params
     ) internal {
         if (params.approvalType == ApprovalType.PERMIT2) {
             // Consume a permit2 message and transfer tokens.
             ISignatureTransfer(permit2).permitTransferFrom(
                 ISignatureTransfer.PermitTransferFrom({
-                    permitted: ISignatureTransfer.TokenPermissions({ token: token, amount: params.approvalAmount }),
+                    permitted: ISignatureTransfer.TokenPermissions({token: token, amount: params.approvalAmount}),
                     nonce: params.nonce,
                     deadline: params.deadline
                 }),
-                ISignatureTransfer.SignatureTransferDetails({ to: to, requestedAmount: amount }),
+                ISignatureTransfer.SignatureTransferDetails({to: to, requestedAmount: amount}),
                 from,
                 bytes.concat(params.r, params.s, bytes1(params.v)) // Construct signature
             );
         } else if (params.approvalType == ApprovalType.PERMIT) {
             // Consume a standard ERC20 permit message
-            IERC20Permit(token).safePermit(from, to, params.approvalAmount, params.deadline, params.v, params.r, params.s);
+            IERC20Permit(token).safePermit(
+                from,
+                to,
+                params.approvalAmount,
+                params.deadline,
+                params.v,
+                params.r,
+                params.s
+            );
             IERC20(token).safeTransferFrom(from, to, amount);
         } else {
             // No signature provided, just transfer tokens.

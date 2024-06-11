@@ -5,7 +5,7 @@ import "../interfaces/IOracle.sol";
 
 contract MockOracle is IOracle {
     mapping(address token => uint256 spot) private _spot;
-    
+
     function updateSpot(address token, uint256 spot_) external {
         _spot[token] = spot_;
     }
@@ -17,5 +17,4 @@ contract MockOracle is IOracle {
     function getStatus(address /*token*/) public pure returns (bool) {
         return true;
     }
-    
 }

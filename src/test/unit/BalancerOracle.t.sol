@@ -45,26 +45,28 @@ contract BalancerOracleTest is TestBase {
         balancerVault = vm.addr(uint256(keccak256("balancerVault")));
         chainlinkOracle = vm.addr(uint256(keccak256("chainlinkOracle")));
 
-        vm.mockCall(
-            pool, 
-            abi.encodeWithSelector(IWeightedPool.getPoolId.selector),
-            abi.encode(poolId)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IWeightedPool.getPoolId.selector), abi.encode(poolId));
 
         address[] memory tokens = new address[](3);
-        tokens[0] = token0; tokens[1] = token1; tokens[2] = token2;
+        tokens[0] = token0;
+        tokens[1] = token1;
+        tokens[2] = token2;
         uint256[] memory balances = new uint256[](3);
-        
+
         vm.mockCall(
-            balancerVault, 
+            balancerVault,
             abi.encodeWithSelector(IVault.getPoolTokens.selector, poolId),
             abi.encode(tokens, balances, 0)
         );
 
-        balancerOracle = BalancerOracle(address(new ERC1967Proxy(
-            address(new BalancerOracle(balancerVault, chainlinkOracle, pool, updateWaitWindow, stalePeriod)),
-            abi.encodeWithSelector(BalancerOracle.initialize.selector, address(this), address(this))
-        )));
+        balancerOracle = BalancerOracle(
+            address(
+                new ERC1967Proxy(
+                    address(new BalancerOracle(balancerVault, chainlinkOracle, pool, updateWaitWindow, stalePeriod)),
+                    abi.encodeWithSelector(BalancerOracle.initialize.selector, address(this), address(this))
+                )
+            )
+        );
 
         balancerOracle.grantRole(KEEPER_ROLE, keeper);
     }
@@ -83,10 +85,14 @@ contract BalancerOracleTest is TestBase {
     }
 
     function test_initialize_accounts(address admin, address manager) public {
-        balancerOracle = BalancerOracle(address(new ERC1967Proxy(
-            address(new BalancerOracle(balancerVault, chainlinkOracle, pool, updateWaitWindow, stalePeriod)),
-            abi.encodeWithSelector(ChainlinkOracle.initialize.selector, admin, manager)
-        )));
+        balancerOracle = BalancerOracle(
+            address(
+                new ERC1967Proxy(
+                    address(new BalancerOracle(balancerVault, chainlinkOracle, pool, updateWaitWindow, stalePeriod)),
+                    abi.encodeWithSelector(ChainlinkOracle.initialize.selector, admin, manager)
+                )
+            )
+        );
 
         assertTrue(balancerOracle.hasRole(MANAGER_ROLE, manager));
 
@@ -109,7 +115,7 @@ contract BalancerOracleTest is TestBase {
         vm.warp(block.timestamp + updateWaitWindow);
         balancerOracle.update();
         vm.stopPrank();
-        
+
         assertEq(balancerOracle.getStatus(token), true);
     }
 
@@ -126,7 +132,7 @@ contract BalancerOracleTest is TestBase {
         assertEq(balancerOracle.getStatus(token), true);
 
         vm.warp(block.timestamp + stalePeriod + 1);
-        
+
         assertEq(balancerOracle.getStatus(token), false);
     }
 
@@ -188,9 +194,7 @@ contract BalancerOracleTest is TestBase {
         _mockUpdateCalls();
         vm.startPrank(keeper);
         balancerOracle.update();
-        vm.expectRevert(
-            abi.encodeWithSelector(BalancerOracle.BalancerOracle__update_InUpdateWaitWindow.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BalancerOracle.BalancerOracle__update_InUpdateWaitWindow.selector));
         balancerOracle.update();
         vm.stopPrank();
     }
@@ -215,7 +219,7 @@ contract BalancerOracleTest is TestBase {
         // Status check fail if the safe price is not updated
         assertFalse(balancerOracle.getStatus(address(0)));
     }
-    
+
     function test_getStatus_returnFalseOnStaleSafePrice() public {
         _mockUpdateCalls();
         vm.startPrank(keeper);
@@ -245,9 +249,7 @@ contract BalancerOracleTest is TestBase {
     }
 
     function test_spot_revertsOnInvalidSafePrice() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(BalancerOracle.BalancerOracle__spot_invalidPrice.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BalancerOracle.BalancerOracle__spot_invalidPrice.selector));
         balancerOracle.spot(address(0));
     }
 
@@ -264,9 +266,7 @@ contract BalancerOracleTest is TestBase {
         vm.warp(block.timestamp + stalePeriod + 1);
 
         // Price is stale now, spot() should revert
-        vm.expectRevert(
-            abi.encodeWithSelector(BalancerOracle.BalancerOracle__spot_invalidPrice.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BalancerOracle.BalancerOracle__spot_invalidPrice.selector));
         balancerOracle.spot(address(0));
     }
 
@@ -275,62 +275,32 @@ contract BalancerOracleTest is TestBase {
 
         // update the mock weights call to return an unsupported amount
         uint256[] memory weights = new uint256[](4);
-        weights[0] = weights[1] = weights[2] = weights[3] =  1 ether / 2;
-        vm.mockCall(
-            pool, 
-            abi.encodeWithSelector(IWeightedPool.getNormalizedWeights.selector),
-            abi.encode(weights)
-        );
+        weights[0] = weights[1] = weights[2] = weights[3] = 1 ether / 2;
+        vm.mockCall(pool, abi.encodeWithSelector(IWeightedPool.getNormalizedWeights.selector), abi.encode(weights));
 
         vm.startPrank(keeper);
-        vm.expectRevert(
-            abi.encodeWithSelector(BalancerOracle.BalancerOracle__getTokenPrice_invalidIndex.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BalancerOracle.BalancerOracle__getTokenPrice_invalidIndex.selector));
         balancerOracle.update();
     }
 
     function _mockUpdateCalls() internal {
         uint256[] memory weights = new uint256[](2);
         weights[0] = weights[1] = 1 ether / 2;
-        vm.mockCall(
-            pool, 
-            abi.encodeWithSelector(IWeightedPool.getNormalizedWeights.selector),
-            abi.encode(weights)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IWeightedPool.getNormalizedWeights.selector), abi.encode(weights));
 
         uint256 totalSupply = 1 ether;
-        vm.mockCall(
-            pool, 
-            abi.encodeWithSelector(IWeightedPool.totalSupply.selector),
-            abi.encode(totalSupply)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IWeightedPool.totalSupply.selector), abi.encode(totalSupply));
 
         uint256 poolInvariant = 1 ether;
-        vm.mockCall(
-            pool, 
-            abi.encodeWithSelector(IWeightedPool.getInvariant.selector),
-            abi.encode(poolInvariant)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IWeightedPool.getInvariant.selector), abi.encode(poolInvariant));
 
         uint256 token0Price = 1 ether;
-        vm.mockCall(
-            chainlinkOracle, 
-            abi.encodeWithSelector(IOracle.spot.selector, token0),
-            abi.encode(token0Price)
-        );
+        vm.mockCall(chainlinkOracle, abi.encodeWithSelector(IOracle.spot.selector, token0), abi.encode(token0Price));
 
         uint256 token1Price = 1 ether;
-        vm.mockCall(
-            chainlinkOracle, 
-            abi.encodeWithSelector(IOracle.spot.selector, token1),
-            abi.encode(token1Price)
-        );
+        vm.mockCall(chainlinkOracle, abi.encodeWithSelector(IOracle.spot.selector, token1), abi.encode(token1Price));
 
         uint256 token2Price = 1 ether;
-        vm.mockCall(
-            chainlinkOracle, 
-            abi.encodeWithSelector(IOracle.spot.selector, token2),
-            abi.encode(token2Price)
-        );
+        vm.mockCall(chainlinkOracle, abi.encodeWithSelector(IOracle.spot.selector, token2), abi.encode(token2Price));
     }
 }

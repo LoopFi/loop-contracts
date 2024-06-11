@@ -13,7 +13,6 @@ import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
 /// @notice Lightweight oracle that uses Chainlink as a data source
 /// The oracle is upgradable if the current implementation does not return a valid price
 contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -70,8 +69,8 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal override virtual onlyRole(MANAGER_ROLE){
-        if(_getStatus()) revert ChainlinkOracle__authorizeUpgrade_validStatus();
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
+        if (_getStatus()) revert ChainlinkOracle__authorizeUpgrade_validStatus();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -81,7 +80,7 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @param /*token*/ Token address, ignored for this oracle
     /// @dev The status is valid if the price is validated and not stale
-    function getStatus(address /*token*/) public override virtual view returns (bool status){
+    function getStatus(address /*token*/) public view virtual override returns (bool status) {
         return _getStatus();
     }
 
@@ -100,7 +99,11 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @return price Asset price [WAD]
     function _fetchAndValidate() internal view returns (bool isValid, uint256 price) {
         try AggregatorV3Interface(aggregator).latestRoundData() returns (
-            uint80 roundId, int256 answer, uint256 /*startedAt*/, uint256 updatedAt, uint80 answeredInRound
+            uint80 roundId,
+            int256 answer,
+            uint256 /*startedAt*/,
+            uint256 updatedAt,
+            uint80 answeredInRound
         ) {
             isValid = (answer > 0 && answeredInRound >= roundId && block.timestamp - updatedAt <= stalePeriod);
             return (isValid, wdiv(uint256(answer), aggregatorScale));
@@ -112,8 +115,7 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @return status Whether the oracle is valid
     /// @dev The status is valid if the price is validated and not stale
-    function _getStatus() private view returns (bool status){
-        (status,) = _fetchAndValidate();
+    function _getStatus() private view returns (bool status) {
+        (status, ) = _fetchAndValidate();
     }
-
 }

@@ -9,7 +9,6 @@ import {IPRBProxyPlugin} from "prb-proxy/interfaces/IPRBProxyPlugin.sol";
 /// @title PRBProxyERCPlugin
 /// @notice Plugin that implements ERC1155 and ERC721 support for the proxy
 contract ERC165Plugin is ERC1155Holder, ERC721Holder, IPRBProxyPlugin {
-    
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/

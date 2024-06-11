@@ -14,7 +14,6 @@ import {wmul} from "./utils/Math.sol";
 /// @notice `Flashlender` enables flashlender minting / borrowing of Stablecoin and internal Credit
 /// Uses DssFlash.sol from DSS (MakerDAO) as a blueprint
 contract Flashlender is IFlashlender, ReentrancyGuard {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -52,7 +51,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(IMinter minter_, uint256 protocolFee_)  {
+    constructor(IMinter minter_, uint256 protocolFee_) {
         minter = minter_;
         ICDM cdm_ = cdm = minter_.cdm();
         IStablecoin stablecoin_ = stablecoin = minter_.stablecoin();
@@ -81,10 +80,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     /// @param token Address of the token to borrow (has to be the address of Stablecoin)
     /// @param *amount Amount to borrow [wad]
     /// @return fee to borrow `amount` of `token`
-    function flashFee(
-        address token,
-        uint256 amount
-    ) external view override returns (uint256) {
+    function flashFee(address token, uint256 amount) external view override returns (uint256) {
         if (token != address(stablecoin)) revert Flash__flashFee_unsupportedToken();
         return wmul(amount, protocolFee);
     }

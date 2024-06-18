@@ -18,7 +18,7 @@ import {BaseAction} from "./BaseAction.sol";
 import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
 import {PoolAction, PoolActionParams} from "./PoolAction.sol";
 
-import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "../interfaces/IFlashlender.sol";
+import {IFlashlender, IERC3156FlashBorrower} from "../interfaces/IFlashlender.sol";
 
 /// @notice Struct containing parameters used for adding or removing a position's collateral
 ///         and optionally swapping an arbitrary token to the collateral token
@@ -64,7 +64,7 @@ struct LeverParams {
 /// @notice Base contract for interacting with CDPVaults via a proxy
 /// @dev This contract is designed to be called via a proxy contract and can be dangerous to call directly
 ///      This contract does not support fee-on-transfer tokens
-abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower, TransferAction, BaseAction {
+abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseAction {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -116,9 +116,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
     constructor(address flashlender_, address swapAction_, address poolAction_) {
         flashlender = IFlashlender(flashlender_);
-        stablecoin = flashlender.stablecoin();
-        minter = flashlender.minter();
-        cdm = flashlender.cdm();
+        stablecoin = IStablecoin(address(0));
+        minter = IMinter(address(0));
+        cdm = ICDM(address(0));
         self = address(this);
         swapAction = SwapAction(swapAction_);
         poolAction = PoolAction(poolAction_);
@@ -393,11 +393,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         uint stableCoinAmount = _normalDebtToDebt(leverParams.vault, leverParams.primarySwap.amount);
-        flashlender.creditFlashLoan(
-            ICreditFlashBorrower(self),
-            stableCoinAmount,
-            abi.encode(leverParams, subCollateral, residualRecipient)
-        );
+        // flashlender.creditFlashLoan(
+        //     ICreditFlashBorrower(self),
+        //     stableCoinAmount,
+        //     abi.encode(leverParams, subCollateral, residualRecipient)
+        // );
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
     }
 

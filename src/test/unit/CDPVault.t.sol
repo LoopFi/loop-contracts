@@ -151,9 +151,7 @@ contract CDPVaultTest is TestBase {
         token.approve(address(vault), 100 ether);
         address position = address(new PositionOwner(vault));
         vault.deposit(position, 100 ether);
-
         vault.borrow(address(this), position, 50 ether);
-
         uint256 credit = credit(address(this));
         assertEq(credit, 50 ether);
     }

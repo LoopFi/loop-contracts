@@ -11,10 +11,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {LinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/pool/LinearInterestRateModelV3.sol";
+import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";
+
 
 import {ICDM} from "../interfaces/ICDM.sol";
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
 import {CDPVault} from "../CDPVault.sol";
+import {Flashlender} from "../Flashlender.sol";
 
 import {MockOracle} from "./MockOracle.sol";
 import {WAD, wdiv} from "../utils/Math.sol";
@@ -39,6 +42,8 @@ contract TestBase is Test {
     ContractsRegister public contractsRegister;
     PoolV3 internal liquidityPool;
     ERC20PresetMinterPauser internal mockWETH;
+
+    Flashlender internal flashlender;
 
     ERC20PresetMinterPauser internal token;
     MockOracle internal oracle;
@@ -97,25 +102,6 @@ contract TestBase is Test {
     }
 
     function createCore() internal virtual {
-        // cdm = new CDM(address(this), address(this), address(this));
-
-        // stablecoin = new Stablecoin();
-        // minter = new Minter(cdm, stablecoin, address(this), address(this));
-        // stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(minter));
-        // flashlender = new Flashlender(minter, 0);
-        // cdm.setParameter(address(flashlender), "debtCeiling", uint256(type(int256).max));
-        // bufferProxyAdmin = new ProxyAdmin();
-        // buffer = Buffer(address(new TransparentUpgradeableProxy(
-        //     address(new Buffer(cdm)),
-        //     address(bufferProxyAdmin),
-        //     abi.encodeWithSelector(Buffer.initialize.selector, address(this), address(this))
-        // )));
-        // cdm.setParameter(address(buffer), "debtCeiling", initialGlobalDebtCeiling);
-
-        // // create an unbound credit line to use for testing
-        // creditCreator = new CreditCreator(cdm);
-        // cdm.setParameter(address(creditCreator), "debtCeiling", uint256(type(int256).max));
-
         LinearInterestRateModelV3 irm = new LinearInterestRateModelV3({
             U_1: 85_00,
             U_2: 95_00,
@@ -140,6 +126,9 @@ contract TestBase is Test {
         mockWETH.mint(address(this), availableLiquidity);
         mockWETH.approve(address(liquidityPool), availableLiquidity);
         liquidityPool.deposit(availableLiquidity, address(this));
+
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
+        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
     }
 
     function createCDPVault(
@@ -181,12 +170,6 @@ contract TestBase is Test {
         if (debtCeiling > 0) {
             constants.pool.setCreditManagerDebtLimit(address(vault), debtCeiling);
         }
-
-        // cdm.modifyPermission(address(vault), true);
-
-        // (int256 balance, uint256 debtCeiling_) = cdm.accounts(address(vault));
-        // assertEq(balance, 0);
-        // assertEq(debtCeiling_, debtCeiling);
 
         vm.label({account: address(vault), newLabel: "CDPVault"});
     }

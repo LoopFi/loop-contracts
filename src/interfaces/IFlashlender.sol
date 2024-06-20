@@ -53,8 +53,6 @@ interface IFlashlender is IERC3156FlashLender {
 
     function CALLBACK_SUCCESS() external view returns (bytes32);
 
-    function CALLBACK_SUCCESS_CREDIT() external view returns (bytes32);
-
     function maxFlashLoan(address token) external view override returns (uint256);
 
     function flashFee(address token, uint256 amount) external view override returns (uint256);
@@ -71,7 +69,6 @@ abstract contract FlashLoanReceiverBase is IERC3156FlashBorrower {
     IFlashlender public immutable flashlender;
 
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
     constructor(address flashlender_) {
         flashlender = IFlashlender(flashlender_);

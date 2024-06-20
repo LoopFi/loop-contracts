@@ -33,15 +33,6 @@ abstract contract TestReceiver is FlashLoanReceiverBase {
             token.mint(address(this), amount);
         }
     }
-
-    function _mintCreditFee(uint256 fee) internal {
-        if (fee > 0) {
-            IPoolV3 pool = IFlashlender(flashlender).pool();
-            ERC20PresetMinterPauser token = ERC20PresetMinterPauser(address(flashlender.underlyingToken()));
-            token.mint(address(pool), fee);
-            pool.repayCreditAccount(fee, fee, 0);
-        }
-    }
 }
 
 
@@ -304,95 +295,48 @@ contract FlashlenderTest is TestBase {
         assertEq(virtualDebt(vault, address(flashlenderFive)), 0);
     }
 
-    // // test mint() for amount_ == 0
-    // function test_mint_zero_amount() public {
-    //     flashlender.creditFlashLoan(immediatePaybackReceiver, 0, "");
-    //     flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), 0, "");
-    // }
+    function test_mint_reentrancy2() public {
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        flashlender.flashLoan(reentrancyReceiver, address(underlyingToken), 100 ether, "");
+    }
 
-    // // test mint() for amount_ > max borrowable amount
-    // function test_mint_amount_over_max1() public {
-    //     cdm.setParameter(address(flashlender), "debtCeiling", 10 ether);
-    //     uint256 amount = flashlender.maxFlashLoan(address(stablecoin)) + 1 ether;
-    //     vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-    //     flashlender.creditFlashLoan(immediatePaybackReceiver, amount, "");
-    // }
+    // test trading flash minted stablecoin for token and minting more stablecoin
+    function test_dex_trade() public {
+        // Set the owner temporarily to allow the receiver to mint
+        flashlender.flashLoan(dexTradeReceiver, address(underlyingToken), 100 ether, "");
+    }
 
-    // function test_mint_amount_over_max2() public {
-    //     cdm.setParameter(address(flashlender), "debtCeiling", 10 ether);
-    //     uint256 amount = flashlender.maxFlashLoan(address(stablecoin)) + 1 ether;
-    //     vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-    //     flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), amount, "");
-    // }
+    function test_max_flash_loan(address addr) public {
+        vm.assume(address(flashlender) != addr);
+        assertEq(flashlender.maxFlashLoan(address(underlyingToken)), uint256(type(int256).max));
+        assertEq(flashlender.maxFlashLoan(addr), 0);
+    }
 
-    // // test max == 0 means flash minting is halted
-    // function test_mint_max_zero1() public {
-    //     cdm.setParameter(address(flashlender), "debtCeiling", 0);
-    //     vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-    //     flashlender.creditFlashLoan(immediatePaybackReceiver, 10 ether, "");
-    // }
+    function test_flash_fee() public {
+        assertEq(flashlender.flashFee(address(underlyingToken), 100 ether), 0);
+        assertEq(flashlenderOne.flashFee(address(underlyingToken), 100 ether), 1 ether);
+        assertEq(flashlenderFive.flashFee(address(underlyingToken), 100 ether), 5 ether);
+    }
 
-    // function test_mint_max_zero2() public {
-    //     cdm.setParameter(address(flashlender), "debtCeiling", 0);
-    //     vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-    //     flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), 10 ether, "");
-    // }
+    function test_flash_fee_unsupported_token(address randomToken) public {
+        vm.assume(address(randomToken) != address(underlyingToken));
+        vm.expectRevert(Flashlender.Flash__flashFee_unsupportedToken.selector);
+        flashlender.flashFee(randomToken, 100 ether); // Any other address should fail
+    }
 
-    // // test reentrancy disallowed
-    // function test_mint_reentrancy1() public {
-    //     vm.expectRevert("ReentrancyGuard: reentrant call");
-    //     flashlender.creditFlashLoan(reentrancyReceiver, 100 ether, "");
-    // }
+    function test_bad_token(address randomToken) public {
+        vm.assume(address(randomToken) != address(underlyingToken));
+        vm.expectRevert(Flashlender.Flash__flashLoan_unsupportedToken.selector);
+        flashlender.flashLoan(immediatePaybackReceiver, address(randomToken), 100 ether, "");
+    }
 
-    // function test_mint_reentrancy2() public {
-    //     vm.expectRevert("ReentrancyGuard: reentrant call");
-    //     flashlender.flashLoan(reentrancyReceiver, address(stablecoin), 100 ether, "");
-    // }
+    function test_bad_return_hash1() public {
+        vm.expectRevert(Flashlender.Flash__flashLoan_callbackFailed.selector);
+        flashlender.flashLoan(badReturn, address(underlyingToken), 100 ether, "");
+    }
 
-    // // test trading flash minted stablecoin for token and minting more stablecoin
-    // function test_dex_trade() public {
-    //     // Set the owner temporarily to allow the receiver to mint
-    //     flashlender.flashLoan(dexTradeReceiver, address(stablecoin), 100 ether, "");
-    // }
-
-    // function test_max_flash_loan() public {
-    //     assertEq(flashlender.maxFlashLoan(address(stablecoin)), uint256(type(int256).max));
-    //     assertEq(flashlender.maxFlashLoan(address(minter)), 0); // Any other address should be 0 as per the spec
-    // }
-
-    // function test_flash_fee() public {
-    //     assertEq(flashlender.flashFee(address(stablecoin), 100 ether), 0);
-    //     assertEq(flashlenderOne.flashFee(address(stablecoin), 100 ether), 1 ether);
-    //     assertEq(flashlenderFive.flashFee(address(stablecoin), 100 ether), 5 ether);
-    // }
-
-    // function test_flash_fee_unsupported_token() public {
-    //     vm.expectRevert(Flashlender.Flash__flashFee_unsupportedToken.selector);
-    //     flashlender.flashFee(address(minter), 100 ether); // Any other address should fail
-    // }
-
-    // function test_bad_token() public {
-    //     vm.expectRevert(Flashlender.Flash__flashLoan_unsupportedToken.selector);
-    //     flashlender.flashLoan(immediatePaybackReceiver, address(minter), 100 ether, "");
-    // }
-
-    // function test_bad_return_hash1() public {
-    //     vm.expectRevert(Flashlender.Flash__creditFlashLoan_callbackFailed.selector);
-    //     flashlender.creditFlashLoan(badReturn, 100 ether, "");
-    // }
-
-    // function test_bad_return_hash2() public {
-    //     vm.expectRevert(Flashlender.Flash__flashLoan_callbackFailed.selector);
-    //     flashlender.flashLoan(badReturn, address(stablecoin), 100 ether, "");
-    // }
-
-    // function test_no_callbacks1() public {
-    //     vm.expectRevert();
-    //     flashlender.creditFlashLoan(ICreditFlashBorrower(address(noCallbacks)), 100 ether, "");
-    // }
-
-    // function test_no_callbacks2() public {
-    //     vm.expectRevert();
-    //     flashlender.flashLoan(IERC3156FlashBorrower(address(noCallbacks)), address(stablecoin), 100 ether, "");
-    // }
+    function test_no_callbacks1() public {
+        vm.expectRevert();
+        flashlender.flashLoan(IERC3156FlashBorrower(address(noCallbacks)), address(underlyingToken), 100 ether, "");
+    }
 }

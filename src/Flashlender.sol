@@ -20,7 +20,6 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
     // ERC3156 Callbacks
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
     /// @notice The Pool contract
     IPoolV3 public immutable pool;
@@ -78,7 +77,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         return wmul(amount, protocolFee);
     }
 
-    /// @notice Flashlender lends `token` (Stablecoin) to `receiver`
+    /// @notice Flashlender lends `token` to `receiver`
     /// @dev Reverts if `Flashlender` gets reentered in the same transaction or if token is not Stablecoin
     /// @param receiver Address of the receiver of the flash loan
     /// @param token Address of the token to borrow (has to be the address of Stablecoin)

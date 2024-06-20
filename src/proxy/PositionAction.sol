@@ -393,11 +393,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         uint stableCoinAmount = _normalDebtToDebt(leverParams.vault, leverParams.primarySwap.amount);
-        // flashlender.creditFlashLoan(
-        //     ICreditFlashBorrower(self),
-        //     stableCoinAmount,
-        //     abi.encode(leverParams, subCollateral, residualRecipient)
-        // );
+        flashlender.flashLoan(
+            IERC3156FlashBorrower(self),
+            address(stablecoin),
+            stableCoinAmount,
+            abi.encode(leverParams, subCollateral, residualRecipient)
+        );
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
     }
 

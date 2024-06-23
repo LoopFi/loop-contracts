@@ -24,6 +24,7 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AddressProviderV3} from "@gearbox-protocol/core-v3/contracts/core/AddressProviderV3.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
+import {PoolQuotaKeeperMock} from "src/test/PoolQuotaKeeperMock.sol";
 
 contract CreditCreator {
     constructor(ICDM cdm) {
@@ -42,7 +43,7 @@ contract TestBase is Test {
 
     ERC20PresetMinterPauser internal token;
     MockOracle internal oracle;
-
+    PoolQuotaKeeperMock internal quotaKeeper;
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
 
@@ -70,6 +71,7 @@ contract TestBase is Test {
         createAssets();
         createOracles();
         createCore();
+        createAndSetPoolQuotaKeeper();
         labelContracts();
     }
 
@@ -94,6 +96,11 @@ contract TestBase is Test {
     function createOracles() internal virtual {
         oracle = new MockOracle();
         setOraclePrice(WAD);
+    }
+
+    function createAndSetPoolQuotaKeeper() internal virtual {
+        quotaKeeper = new PoolQuotaKeeperMock(address(liquidityPool), address(mockWETH));
+        liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
     }
 
     function createCore() internal virtual {

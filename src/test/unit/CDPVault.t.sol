@@ -36,10 +36,10 @@ contract CDPVaultTest is TestBase {
 
     function _depositCollateral(CDPVault vault, uint256 amount) internal {
         token.mint(address(this), amount);
-        (uint256 collateralBefore, , , ) = vault.positions(address(this));
+        (uint256 collateralBefore, , , , , ) = vault.positions(address(this));
         token.approve(address(vault), amount);
         vault.deposit(address(this), amount);
-        (uint256 collateralAfter, , , ) = vault.positions(address(this));
+        (uint256 collateralAfter, , , , , ) = vault.positions(address(this));
         assertEq(collateralAfter, collateralBefore + amount);
     }
 
@@ -54,13 +54,13 @@ contract CDPVaultTest is TestBase {
             token.approve(address(vault), uint256(collateral));
         }
 
-        (uint256 collateralBefore, uint256 debtBefore, , ) = vault.positions(address(this));
+        (uint256 collateralBefore, uint256 debtBefore, , , , ) = vault.positions(address(this));
         uint256 virtualDebtBefore = virtualDebt(vault, address(this));
         uint256 vaultCreditBefore = credit(address(this));
-        
+
         vault.modifyCollateralAndDebt(address(this), address(this), address(this), collateral, debt);
         {
-            (uint256 collateralAfter, uint256 debtAfter, , ) = vault.positions(address(this));
+            (uint256 collateralAfter, uint256 debtAfter, , , , ) = vault.positions(address(this));
             assertEq(toInt256(collateralAfter), toInt256(collateralBefore) + collateral);
             assertEq(toInt256(debtAfter), toInt256(debtBefore) + debt);
         }
@@ -73,10 +73,7 @@ contract CDPVaultTest is TestBase {
         }
 
         uint256 vaultCreditAfter = credit(address(this));
-        assertEq(
-            toInt256(vaultCreditBefore + virtualDebtAfter),
-            toInt256(vaultCreditAfter + virtualDebtBefore)
-        );
+        assertEq(toInt256(vaultCreditBefore + virtualDebtAfter), toInt256(vaultCreditAfter + virtualDebtBefore));
     }
 
     function _updateSpot(uint256 price) internal {
@@ -84,7 +81,7 @@ contract CDPVaultTest is TestBase {
     }
 
     function _collateralizationRatio(CDPVault vault) internal view returns (uint256) {
-        (uint256 collateral, , , ) = vault.positions(address(this));
+        (uint256 collateral, , , , , ) = vault.positions(address(this));
         if (collateral == 0) return type(uint256).max;
         return wdiv(wmul(collateral, vault.spotPrice()), virtualDebt(vault, address(this)));
     }
@@ -140,7 +137,7 @@ contract CDPVaultTest is TestBase {
         address position = address(new PositionOwner(vault));
         vault.deposit(position, 100 ether);
 
-        (uint256 collateral, , , ) = vault.positions(position);
+        (uint256 collateral, , , , , ) = vault.positions(position);
         assertEq(collateral, 100 ether);
     }
 
@@ -168,7 +165,7 @@ contract CDPVaultTest is TestBase {
 
         vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
 
-        (uint256 collateral, uint256 debt, , ) = vault.positions(position);
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(position);
         assertEq(collateral, 100 ether);
         assertEq(debt, 80 ether);
         uint256 credit = credit(address(this));
@@ -250,7 +247,7 @@ contract CDPVaultTest is TestBase {
         // repay debt
         vault.modifyCollateralAndDebt(address(this), address(this), address(this), -200 ether, -toInt256(virtualDebt));
 
-        (uint256 collateral, uint256 debt, , ) = vault.positions(address(this));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(this));
         assertEq(collateral, 0);
         assertEq(debt, 0);
     }
@@ -307,14 +304,7 @@ contract CDPVaultTest is TestBase {
     // //////////////////////////////////////////////////////////////*/
 
     function test_liquidatePosition_revertOnSafePosition() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            1 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -322,21 +312,12 @@ contract CDPVaultTest is TestBase {
         address position = address(this);
         uint256 repayAmount = 40 ether;
 
-        vm.expectRevert(
-            CDPVault.CDPVault__liquidatePosition_notUnsafe.selector
-        );
+        vm.expectRevert(CDPVault.CDPVault__liquidatePosition_notUnsafe.selector);
         vault.liquidatePosition(position, repayAmount);
     }
 
     function test_liquidatePosition_revertOnInvalidSpotPrice() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            1 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -345,21 +326,12 @@ contract CDPVaultTest is TestBase {
         address position = address(this);
         uint256 repayAmount = 40 ether;
         _updateSpot(0);
-        vm.expectRevert(
-            CDPVault.CDPVault__liquidatePosition_invalidSpotPrice.selector
-        );
+        vm.expectRevert(CDPVault.CDPVault__liquidatePosition_invalidSpotPrice.selector);
         vault.liquidatePosition(position, repayAmount);
     }
 
     function test_liquidatePosition_revertsOnInvalidArguments() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            1 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -367,9 +339,7 @@ contract CDPVaultTest is TestBase {
         // liquidate position
         address position = address(this);
         uint256 repayAmount = 0 ether;
-        vm.expectRevert(
-            CDPVault.CDPVault__liquidatePosition_invalidParameters.selector
-        );
+        vm.expectRevert(CDPVault.CDPVault__liquidatePosition_invalidParameters.selector);
         vault.liquidatePosition(position, repayAmount);
     }
 
@@ -379,14 +349,7 @@ contract CDPVaultTest is TestBase {
 
     // Case 1: Fraction of maxDebtToRecover is repaid
     function test_liquidate_partial_1() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            1 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -402,9 +365,7 @@ contract CDPVaultTest is TestBase {
         vault.liquidatePosition(position, repayAmount);
         uint256 creditAfter = credit(address(this));
 
-        (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
-            position
-        );
+        (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
 
         assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
         assertEq(creditBefore - creditAfter, 40 ether);
@@ -414,14 +375,7 @@ contract CDPVaultTest is TestBase {
 
     // // Case 2: Same as Case 1 but multiple liquidation calls
     function test_liquidate_partial_2() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            1 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -440,9 +394,7 @@ contract CDPVaultTest is TestBase {
         assertEq(virtualDebtAfter, 40 ether); // debt - repayAmount
         assertEq(creditBefore - creditAfter, 80 ether - 40 ether);
         assertEq(creditAfter, 40 ether); // creditBefore - repayAmount
-        (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
-            position
-        );
+        (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
 
         assertEq(collateral, 50 ether);
         assertEq(debtAfter, 40 ether);
@@ -450,14 +402,7 @@ contract CDPVaultTest is TestBase {
 
     // Case 3: Same as Case 1 but liquidationDiscount is applied
     function test_liquidate_partial_3() public {
-        CDPVault vault = createCDPVault(
-            token,
-            150 ether,
-            0,
-            1.25 ether,
-            1 ether,
-            0.95 ether
-        );
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 0.95 ether);
 
         // create position
         _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
@@ -471,18 +416,13 @@ contract CDPVaultTest is TestBase {
         vault.liquidatePosition(position, repayAmount);
         uint256 creditAfter = credit(address(this));
 
-        uint256 collateralReceived = wdiv(
-            repayAmount,
-            wmul(vault.spotPrice(), uint256(95 * 10 ** 16))
-        );
+        uint256 collateralReceived = wdiv(repayAmount, wmul(vault.spotPrice(), uint256(95 * 10 ** 16)));
 
         uint256 virtualDebtAfter = virtualDebt(vault, position);
         assertEq(virtualDebtAfter, 80 ether - repayAmount); // debt - repayAmount
         assertEq(creditBefore - creditAfter, 80 ether - repayAmount);
         assertEq(creditAfter, repayAmount); // creditBefore - repayAmount
-        (uint256 collateral, uint256 debtAfter, , ) = vault.positions(
-            position
-        );
+        (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
         assertEq(collateral, 100 ether - collateralReceived);
         assertEq(debtAfter, 40 ether);
     }

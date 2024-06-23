@@ -57,6 +57,7 @@ function calculateNormalDebt(uint256 debt, uint64 rateAccumulator) pure returns 
 
 /// @title CDPVault
 /// @notice Base logic of a borrow vault for depositing collateral and drawing credit against it
+/// @dev All accrued interests is taken by the protocol as profit to be distributed to LP stakers, dLP stakers and the DAO
 contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
@@ -78,10 +79,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     uint256 constant INDEX_PRECISION = 10 ** 9;
 
-    /// @dev Percentage of accrued interest in bps taken by the protocol as profit to be distributed to LP stakers, dLP stakers and the DAO
-    uint16 internal constant feeInterest = 1e4; // 10% fee on accrued interest
-
-    uint16 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
+    //uint16 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
 
     IPoolV3 public immutable pool;
     IERC20 public immutable poolUnderlying;
@@ -460,10 +458,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         cdd.cumulativeQuotaInterest += position.cumulativeQuotaInterest;
 
         cdd.accruedInterest = CreditLogic.calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
-        cdd.accruedFees = (cdd.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        cdd.accruedFees = cdd.accruedInterest;
 
         cdd.accruedInterest += cdd.cumulativeQuotaInterest;
-        cdd.accruedFees += (cdd.cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
+        cdd.accruedFees += cdd.cumulativeQuotaInterest;
     }
 
     /// @dev Returns quotas data for credit manager and credit account

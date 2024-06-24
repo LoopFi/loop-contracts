@@ -36,6 +36,10 @@ module.exports = {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
         }
       }
+    },
+    "Gearbox": {
+      "initialGlobalDebtCeiling": toWad('100000000'),
+      "treasury": "0x0000000000000000000000000000000000000123"
     }
   },
   "Vendors": {
@@ -98,11 +102,9 @@ module.exports = {
             "liquidationRatio": toWad('1.25'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
-            "baseRate": toWad('1.000000000626221517'), // 2%
             "roleAdmin": "deployer",
             "vaultAdmin": "deployer",
-            "pauseAdmin": "deployer",
-            "vaultUnwinder": "deployer",
+            "pauseAdmin": "deployer"
         },
         "debtCeiling": toWad('5000000')
       }
@@ -133,11 +135,9 @@ module.exports = {
             "liquidationRatio": toWad('1.25'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
-            "baseRate": toWad('1.000000000626221517'), // 2%
             "roleAdmin": "deployer",
             "vaultAdmin": "deployer",
             "pauseAdmin": "deployer",
-            "vaultUnwinder": "deployer",
         },
         "debtCeiling": toWad('5000000')
       }
@@ -170,11 +170,9 @@ module.exports = {
             "liquidationRatio": toWad('1.05'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
-            "baseRate": toWad('1.000000000157721789'), // 0.5%
             "roleAdmin": "deployer",
             "vaultAdmin": "deployer",
             "pauseAdmin": "deployer",
-            "vaultUnwinder": "deployer",
         },
         "debtCeiling": toWad('10000000')
       }

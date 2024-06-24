@@ -25,9 +25,9 @@ import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // LIBS & TRAITS
-import {CreditLogic} from "@gearbox-protocol/core-v3/contracts//libraries/CreditLogic.sol";
-import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts//traits/ACLNonReentrantTrait.sol";
-import {ContractsRegisterTrait} from "@gearbox-protocol/core-v3/contracts//traits/ContractsRegisterTrait.sol";
+import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
+import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts/traits/ACLNonReentrantTrait.sol";
+import {ContractsRegisterTrait} from "@gearbox-protocol/core-v3/contracts/traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -35,7 +35,7 @@ import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearb
 import {ICDM} from "./interfaces/ICDM.sol";
 
 // EXCEPTIONS
-import "@gearbox-protocol/core-v3/contracts//interfaces/IExceptions.sol";
+import "@gearbox-protocol/core-v3/contracts/interfaces/IExceptions.sol";
 
 /// @dev Struct that holds borrowed amount and debt limit
 struct DebtParams {
@@ -828,7 +828,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Sets new total debt limit
-    function _setTotalDebtLimit(uint256 limit) internal {
+        function _setTotalDebtLimit(uint256 limit) internal {
         uint128 newLimit = _convertToU128(limit);
         if (newLimit == _totalDebt.limit) return;
 

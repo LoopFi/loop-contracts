@@ -3,11 +3,8 @@ pragma solidity ^0.8.19;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {IFlashlender, IERC3156FlashBorrower} from "./interfaces/IFlashlender.sol";
-
-import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";
-
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 import {wmul} from "./utils/Math.sol";
 
 /// @title Flashlender

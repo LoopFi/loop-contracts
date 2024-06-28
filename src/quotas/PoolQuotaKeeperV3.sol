@@ -12,7 +12,7 @@ import {ContractsRegisterTrait} from "@gearbox-protocol/core-v3/contracts/traits
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
-import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "src/interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IGaugeV3.sol";
 import {ICreditManagerV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ICreditManagerV3.sol";
 
@@ -42,8 +42,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Address of the pool
     address public immutable override pool;
 
-    /// @dev The list of all allowed credit managers
-    EnumerableSet.AddressSet internal creditManagerSet;
+    // /// @dev The list of all allowed credit managers
+    // EnumerableSet.AddressSet internal creditManagerSet;
 
     /// @dev The list of all quoted tokens
     EnumerableSet.AddressSet internal quotaTokensSet;
@@ -52,7 +52,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     mapping(address => TokenQuotaParams) internal totalQuotaParams;
 
     /// @dev Mapping from (creditAccount, token) to account's token quota params
-    mapping(address => mapping(address => AccountQuota)) internal accountQuotas;
+    // mapping(address => mapping(address => AccountQuota)) internal accountQuotas;
 
     /// @notice Address of the gauge
     address public override gauge;
@@ -66,11 +66,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         _;
     }
 
-    /// @dev Ensures that function caller is an allowed credit manager
-    modifier creditManagerOnly() {
-        _revertIfCallerNotCreditManager();
-        _;
-    }
+    // /// @dev Ensures that function caller is an allowed credit manager
+    // modifier creditManagerOnly() {
+    //     _revertIfCallerNotCreditManager();
+    //     _;
+    // }
 
     /// @notice Constructor
     /// @param _pool Pool address
@@ -81,220 +81,220 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         underlying = IPoolV3(_pool).asset(); // U:[PQK-1]
     }
 
-    // ----------------- //
-    // QUOTAS MANAGEMENT //
-    // ----------------- //
+    // // ----------------- //
+    // // QUOTAS MANAGEMENT //
+    // // ----------------- //
 
-    /// @notice Updates credit account's quota for a token
-    ///         - Updates account's interest index
-    ///         - Updates account's quota by requested delta subject to the total quota limit (which is considered
-    ///           to be zero for tokens added to the quota keeper but not yet activated via `updateRates`)
-    ///         - Checks that the resulting quota is no less than the user-specified min desired value
-    ///           and no more than system-specified max allowed value
-    ///         - Updates pool's quota revenue
-    /// @param creditAccount Credit account to update the quota for
-    /// @param token Token to update the quota for
-    /// @param requestedChange Requested quota change in pool's underlying asset units
-    /// @param minQuota Minimum deisred quota amount
-    /// @param maxQuota Maximum allowed quota amount
-    /// @return caQuotaInterestChange Token quota interest accrued by account since the last update
-    /// @return fees Quota increase fees, if any
-    /// @return enableToken Whether the token needs to be enabled as collateral
-    /// @return disableToken Whether the token needs to be disabled as collateral
-    function updateQuota(
-        address creditAccount,
-        address token,
-        int96 requestedChange,
-        uint96 minQuota,
-        uint96 maxQuota
-    )
-        external
-        override
-        creditManagerOnly // U:[PQK-4]
-        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
-    {
-        int96 quotaChange;
-        (caQuotaInterestChange, fees, quotaChange, enableToken, disableToken) = _updateQuota(
-            creditAccount,
-            token,
-            requestedChange,
-            minQuota,
-            maxQuota
-        );
+    // /// @notice Updates credit account's quota for a token
+    // ///         - Updates account's interest index
+    // ///         - Updates account's quota by requested delta subject to the total quota limit (which is considered
+    // ///           to be zero for tokens added to the quota keeper but not yet activated via `updateRates`)
+    // ///         - Checks that the resulting quota is no less than the user-specified min desired value
+    // ///           and no more than system-specified max allowed value
+    // ///         - Updates pool's quota revenue
+    // /// @param creditAccount Credit account to update the quota for
+    // /// @param token Token to update the quota for
+    // /// @param requestedChange Requested quota change in pool's underlying asset units
+    // /// @param minQuota Minimum deisred quota amount
+    // /// @param maxQuota Maximum allowed quota amount
+    // /// @return caQuotaInterestChange Token quota interest accrued by account since the last update
+    // /// @return fees Quota increase fees, if any
+    // /// @return enableToken Whether the token needs to be enabled as collateral
+    // /// @return disableToken Whether the token needs to be disabled as collateral
+    // function updateQuota(
+    //     address creditAccount,
+    //     address token,
+    //     int96 requestedChange,
+    //     uint96 minQuota,
+    //     uint96 maxQuota
+    // )
+    //     external
+    //     override
+    //     creditManagerOnly // U:[PQK-4]
+    //     returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
+    // {
+    //     int96 quotaChange;
+    //     (caQuotaInterestChange, fees, quotaChange, enableToken, disableToken) = _updateQuota(
+    //         creditAccount,
+    //         token,
+    //         requestedChange,
+    //         minQuota,
+    //         maxQuota
+    //     );
 
-        if (quotaChange != 0) {
-            emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: quotaChange});
-        }
-    }
+    //     if (quotaChange != 0) {
+    //         emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: quotaChange});
+    //     }
+    // }
 
-    /// @dev Implementation of `updateQuota`
-    function _updateQuota(
-        address creditAccount,
-        address token,
-        int96 requestedChange,
-        uint96 minQuota,
-        uint96 maxQuota
-    )
-        internal
-        returns (uint128 caQuotaInterestChange, uint128 fees, int96 quotaChange, bool enableToken, bool disableToken)
-    {
-        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+    // /// @dev Implementation of `updateQuota`
+    // function _updateQuota(
+    //     address creditAccount,
+    //     address token,
+    //     int96 requestedChange,
+    //     uint96 minQuota,
+    //     uint96 maxQuota
+    // )
+    //     internal
+    //     returns (uint128 caQuotaInterestChange, uint128 fees, int96 quotaChange, bool enableToken, bool disableToken)
+    // {
+    //     AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+    //     TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
-        uint96 quoted = accountQuota.quota;
+    //     uint96 quoted = accountQuota.quota;
 
-        (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) = _getTokenQuotaParamsOrRevert(
-            tokenQuotaParams
-        );
+    //     (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) = _getTokenQuotaParamsOrRevert(
+    //         tokenQuotaParams
+    //     );
 
-        uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
+    //     uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
-        // Accrued quota interest depends on the quota and thus must be computed before updating it
-        caQuotaInterestChange = QuotasLogic.calcAccruedQuotaInterest(
-            quoted,
-            cumulativeIndexNow,
-            accountQuota.cumulativeIndexLU
-        ); // U:[PQK-15]
+    //     // Accrued quota interest depends on the quota and thus must be computed before updating it
+    //     caQuotaInterestChange = QuotasLogic.calcAccruedQuotaInterest(
+    //         quoted,
+    //         cumulativeIndexNow,
+    //         accountQuota.cumulativeIndexLU
+    //     ); // U:[PQK-15]
 
-        uint96 newQuoted;
-        quotaChange = requestedChange;
-        if (quotaChange > 0) {
-            (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-            quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+    //     uint96 newQuoted;
+    //     quotaChange = requestedChange;
+    //     if (quotaChange > 0) {
+    //         (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
+    //         quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
-            fees = uint128((uint256(uint96(quotaChange)) * quotaIncreaseFee) / PERCENTAGE_FACTOR); // U:[PQK-15]
+    //         fees = uint128((uint256(uint96(quotaChange)) * quotaIncreaseFee) / PERCENTAGE_FACTOR); // U:[PQK-15]
 
-            newQuoted = quoted + uint96(quotaChange);
-            if (quoted == 0 && newQuoted != 0) {
-                enableToken = true; // U:[PQK-15]
-            }
+    //         newQuoted = quoted + uint96(quotaChange);
+    //         if (quoted == 0 && newQuoted != 0) {
+    //             enableToken = true; // U:[PQK-15]
+    //         }
 
-            tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
-        } else {
-            if (quotaChange == type(int96).min) {
-                quotaChange = -int96(quoted);
-            }
+    //         tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
+    //     } else {
+    //         if (quotaChange == type(int96).min) {
+    //             quotaChange = -int96(quoted);
+    //         }
 
-            uint96 absoluteChange = uint96(-quotaChange);
-            newQuoted = quoted - absoluteChange;
-            tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
+    //         uint96 absoluteChange = uint96(-quotaChange);
+    //         newQuoted = quoted - absoluteChange;
+    //         tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
 
-            if (quoted != 0 && newQuoted == 0) {
-                disableToken = true; // U:[PQK-15]
-            }
-        }
+    //         if (quoted != 0 && newQuoted == 0) {
+    //             disableToken = true; // U:[PQK-15]
+    //         }
+    //     }
 
-        if (newQuoted < minQuota || newQuoted > maxQuota) revert QuotaIsOutOfBoundsException(); // U:[PQK-15]
+    //     if (newQuoted < minQuota || newQuoted > maxQuota) revert QuotaIsOutOfBoundsException(); // U:[PQK-15]
 
-        accountQuota.quota = newQuoted; // U:[PQK-15]
-        accountQuota.cumulativeIndexLU = cumulativeIndexNow; // U:[PQK-15]
+    //     accountQuota.quota = newQuoted; // U:[PQK-15]
+    //     accountQuota.cumulativeIndexLU = cumulativeIndexNow; // U:[PQK-15]
 
-        int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange(rate, int256(quotaChange)); // U:[PQK-15]
-        if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
-        }
-    }
+    //     int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange(rate, int256(quotaChange)); // U:[PQK-15]
+    //     if (quotaRevenueChange != 0) {
+    //         IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+    //     }
+    // }
 
-    /// @notice Removes credit account's quotas for provided tokens
-    ///         - Sets account's tokens quotas to zero
-    ///         - Optionally sets quota limits for tokens to zero, effectively preventing further exposure
-    ///           to them in extreme cases (e.g., liquidations with loss)
-    ///         - Does not update account's interest indexes (can be skipped since quotas are zero)
-    ///         - Decreases pool's quota revenue
-    /// @param creditAccount Credit account to remove quotas for
-    /// @param tokens Array of tokens to remove quotas for
-    /// @param setLimitsToZero Whether tokens quota limits should be set to zero
-    function removeQuotas(
-        address creditAccount,
-        address[] calldata tokens,
-        bool setLimitsToZero
-    )
-        external
-        override
-        creditManagerOnly // U:[PQK-4]
-    {
-        int256 quotaRevenueChange;
+    // /// @notice Removes credit account's quotas for provided tokens
+    // ///         - Sets account's tokens quotas to zero
+    // ///         - Optionally sets quota limits for tokens to zero, effectively preventing further exposure
+    // ///           to them in extreme cases (e.g., liquidations with loss)
+    // ///         - Does not update account's interest indexes (can be skipped since quotas are zero)
+    // ///         - Decreases pool's quota revenue
+    // /// @param creditAccount Credit account to remove quotas for
+    // /// @param tokens Array of tokens to remove quotas for
+    // /// @param setLimitsToZero Whether tokens quota limits should be set to zero
+    // function removeQuotas(
+    //     address creditAccount,
+    //     address[] calldata tokens,
+    //     bool setLimitsToZero
+    // )
+    //     external
+    //     override
+    //     creditManagerOnly // U:[PQK-4]
+    // {
+    //     int256 quotaRevenueChange;
 
-        uint256 len = tokens.length;
-        for (uint256 i; i < len; ) {
-            address token = tokens[i];
+    //     uint256 len = tokens.length;
+    //     for (uint256 i; i < len; ) {
+    //         address token = tokens[i];
 
-            AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
-            TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+    //         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+    //         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
-            uint96 quoted = accountQuota.quota;
-            if (quoted != 0) {
-                uint16 rate = tokenQuotaParams.rate;
-                quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
-                tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
-                accountQuota.quota = 0; // U:[PQK-16]
-                emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
-            }
+    //         uint96 quoted = accountQuota.quota;
+    //         if (quoted != 0) {
+    //             uint16 rate = tokenQuotaParams.rate;
+    //             quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
+    //             tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
+    //             accountQuota.quota = 0; // U:[PQK-16]
+    //             emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
+    //         }
 
-            if (setLimitsToZero) {
-                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 0}); // U:[PQK-16]
-            }
+    //         if (setLimitsToZero) {
+    //             _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 0}); // U:[PQK-16]
+    //         }
 
-            unchecked {
-                ++i;
-            }
-        }
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
 
-        if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-16]
-        }
-    }
+    //     if (quotaRevenueChange != 0) {
+    //         IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-16]
+    //     }
+    // }
 
-    /// @notice Updates credit account's interest indexes for provided tokens
-    /// @param creditAccount Credit account to accrue interest for
-    /// @param tokens Array tokens to accrue interest for
-    function accrueQuotaInterest(
-        address creditAccount,
-        address[] calldata tokens
-    )
-        external
-        override
-        creditManagerOnly // U:[PQK-4]
-    {
-        uint256 len = tokens.length;
-        uint40 lastQuotaRateUpdate_ = lastQuotaRateUpdate;
+    // /// @notice Updates credit account's interest indexes for provided tokens
+    // /// @param creditAccount Credit account to accrue interest for
+    // /// @param tokens Array tokens to accrue interest for
+    // function accrueQuotaInterest(
+    //     address creditAccount,
+    //     address[] calldata tokens
+    // )
+    //     external
+    //     override
+    //     creditManagerOnly // U:[PQK-4]
+    // {
+    //     uint256 len = tokens.length;
+    //     uint40 lastQuotaRateUpdate_ = lastQuotaRateUpdate;
 
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                address token = tokens[i];
+    //     unchecked {
+    //         for (uint256 i; i < len; ++i) {
+    //             address token = tokens[i];
 
-                AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
-                TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+    //             AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+    //             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
-                (uint16 rate, uint192 tqCumulativeIndexLU, ) = _getTokenQuotaParamsOrRevert(tokenQuotaParams); // U:[PQK-17]
+    //             (uint16 rate, uint192 tqCumulativeIndexLU, ) = _getTokenQuotaParamsOrRevert(tokenQuotaParams); // U:[PQK-17]
 
-                accountQuota.cumulativeIndexLU = QuotasLogic.cumulativeIndexSince(
-                    tqCumulativeIndexLU,
-                    rate,
-                    lastQuotaRateUpdate_
-                ); // U:[PQK-17]
-            }
-        }
-    }
+    //             accountQuota.cumulativeIndexLU = QuotasLogic.cumulativeIndexSince(
+    //                 tqCumulativeIndexLU,
+    //                 rate,
+    //                 lastQuotaRateUpdate_
+    //             ); // U:[PQK-17]
+    //         }
+    //     }
+    // }
 
-    /// @notice Returns credit account's token quota and interest accrued since the last update
-    /// @param creditAccount Account to compute the values for
-    /// @param token Token to compute the values for
-    /// @return quoted Account's token quota
-    /// @return outstandingInterest Quota interest accrued since the last update
-    function getQuotaAndOutstandingInterest(
-        address creditAccount,
-        address token
-    ) external view override returns (uint96 quoted, uint128 outstandingInterest) {
-        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+    // /// @notice Returns credit account's token quota and interest accrued since the last update
+    // /// @param creditAccount Account to compute the values for
+    // /// @param token Token to compute the values for
+    // /// @return quoted Account's token quota
+    // /// @return outstandingInterest Quota interest accrued since the last update
+    // function getQuotaAndOutstandingInterest(
+    //     address creditAccount,
+    //     address token
+    // ) external view override returns (uint96 quoted, uint128 outstandingInterest) {
+    //     AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
 
-        uint192 cumulativeIndexNow = cumulativeIndex(token);
+    //     uint192 cumulativeIndexNow = cumulativeIndex(token);
 
-        quoted = accountQuota.quota;
-        uint192 aqCumulativeIndexLU = accountQuota.cumulativeIndexLU;
+    //     quoted = accountQuota.quota;
+    //     uint192 aqCumulativeIndexLU = accountQuota.cumulativeIndexLU;
 
-        outstandingInterest = QuotasLogic.calcAccruedQuotaInterest(quoted, cumulativeIndexNow, aqCumulativeIndexLU); // U:[PQK-15]
-    }
+    //     outstandingInterest = QuotasLogic.calcAccruedQuotaInterest(quoted, cumulativeIndexNow, aqCumulativeIndexLU); // U:[PQK-15]
+    // }
 
     /// @notice Returns current quota interest index for a token in ray
     function cumulativeIndex(address token) public view override returns (uint192) {
@@ -319,14 +319,14 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         return quotaTokensSet.contains(token);
     }
 
-    /// @notice Returns account's quota params for a token
-    function getQuota(
-        address creditAccount,
-        address token
-    ) external view override returns (uint96 quota, uint192 cumulativeIndexLU) {
-        AccountQuota storage aq = accountQuotas[creditAccount][token];
-        return (aq.quota, aq.cumulativeIndexLU);
-    }
+    // /// @notice Returns account's quota params for a token
+    // function getQuota(
+    //     address creditAccount,
+    //     address token
+    // ) external view override returns (uint96 quota, uint192 cumulativeIndexLU) {
+    //     AccountQuota storage aq = accountQuotas[creditAccount][token];
+    //     return (aq.quota, aq.cumulativeIndexLU);
+    // }
 
     /// @notice Returns global quota params for a token
     function getTokenQuotaParams(
@@ -366,7 +366,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             (uint16 rate, , ) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
             (uint256 totalQuoted, ) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
 
-            quotaRevenue += (totalQuoted * rate) / PERCENTAGE_FACTOR;
+            quotaRevenue += (IPoolV3(pool).totalBorrowed() * rate) / PERCENTAGE_FACTOR;
 
             unchecked {
                 ++i;
@@ -374,10 +374,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         }
     }
 
-    /// @notice Returns the list of allowed credit managers
-    function creditManagers() external view override returns (address[] memory) {
-        return creditManagerSet.values(); // U:[PQK-10]
-    }
+    // /// @notice Returns the list of allowed credit managers
+    // function creditManagers() external view override returns (address[] memory) {
+    //     return creditManagerSet.values(); // U:[PQK-10]
+    // }
 
     // ------------- //
     // CONFIGURATION //
@@ -415,7 +415,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         address[] memory tokens = quotaTokensSet.values();
         uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // U:[PQK-7]
 
-        uint256 quotaRevenue;
+        uint256 quotaRevenue; // U:[PQK-7]
         uint256 timestampLU = lastQuotaRateUpdate;
         uint256 len = tokens.length;
 
@@ -434,7 +434,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             tokenQuotaParams.rate = rate; // U:[PQK-7]
 
-            quotaRevenue += (uint256(tokenQuotaParams.totalQuoted) * rate) / PERCENTAGE_FACTOR; // U:[PQK-7]
+            quotaRevenue += (IPoolV3(pool).totalBorrowed() * rate) / PERCENTAGE_FACTOR; // U:[PQK-7]
 
             emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 
@@ -462,80 +462,80 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         }
     }
 
-    /// @notice Adds an address to the set of allowed credit managers
-    /// @param _creditManager Address of the new credit manager
-    function addCreditManager(
-        address _creditManager
-    )
-        external
-        override
-        configuratorOnly // U:[PQK-2]
-        nonZeroAddress(_creditManager)
-        registeredCreditManagerOnly(_creditManager) // U:[PQK-9]
-    {
-        if (ICreditManagerV3(_creditManager).pool() != pool) {
-            revert IncompatibleCreditManagerException(); // U:[PQK-9]
-        }
+    // /// @notice Adds an address to the set of allowed credit managers
+    // /// @param _creditManager Address of the new credit manager
+    // function addCreditManager(
+    //     address _creditManager
+    // )
+    //     external
+    //     override
+    //     configuratorOnly // U:[PQK-2]
+    //     nonZeroAddress(_creditManager)
+    //     registeredCreditManagerOnly(_creditManager) // U:[PQK-9]
+    // {
+    //     if (ICreditManagerV3(_creditManager).pool() != pool) {
+    //         revert IncompatibleCreditManagerException(); // U:[PQK-9]
+    //     }
 
-        if (!creditManagerSet.contains(_creditManager)) {
-            creditManagerSet.add(_creditManager); // U:[PQK-10]
-            emit AddCreditManager(_creditManager); // U:[PQK-10]
-        }
-    }
+    //     if (!creditManagerSet.contains(_creditManager)) {
+    //         creditManagerSet.add(_creditManager); // U:[PQK-10]
+    //         emit AddCreditManager(_creditManager); // U:[PQK-10]
+    //     }
+    // }
 
-    /// @notice Sets the total quota limit for a token
-    /// @param token Address of token to set the limit for
-    /// @param limit The limit to set
-    function setTokenLimit(
-        address token,
-        uint96 limit
-    )
-        external
-        override
-        controllerOnly // U:[PQK-2]
-    {
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
-        _setTokenLimit(tokenQuotaParams, token, limit);
-    }
+    // /// @notice Sets the total quota limit for a token
+    // /// @param token Address of token to set the limit for
+    // /// @param limit The limit to set
+    // function setTokenLimit(
+    //     address token,
+    //     uint96 limit
+    // )
+    //     external
+    //     override
+    //     controllerOnly // U:[PQK-2]
+    // {
+    //     TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+    //     _setTokenLimit(tokenQuotaParams, token, limit);
+    // }
 
-    /// @dev Implementation of `setTokenLimit`
-    function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
-        if (!isInitialised(tokenQuotaParams)) {
-            revert TokenIsNotQuotedException(); // U:[PQK-11]
-        }
+    // /// @dev Implementation of `setTokenLimit`
+    // function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
+    //     if (!isInitialised(tokenQuotaParams)) {
+    //         revert TokenIsNotQuotedException(); // U:[PQK-11]
+    //     }
 
-        if (tokenQuotaParams.limit != limit) {
-            tokenQuotaParams.limit = limit; // U:[PQK-12]
-            emit SetTokenLimit(token, limit); // U:[PQK-12]
-        }
-    }
+    //     if (tokenQuotaParams.limit != limit) {
+    //         tokenQuotaParams.limit = limit; // U:[PQK-12]
+    //         emit SetTokenLimit(token, limit); // U:[PQK-12]
+    //     }
+    // }
 
-    /// @notice Sets the one-time quota increase fee for a token
-    /// @param token Token to set the fee for
-    /// @param fee The new fee value in bps
-    function setTokenQuotaIncreaseFee(
-        address token,
-        uint16 fee
-    )
-        external
-        override
-        controllerOnly // U:[PQK-2]
-    {
-        if (fee > PERCENTAGE_FACTOR) {
-            revert IncorrectParameterException();
-        }
+    // /// @notice Sets the one-time quota increase fee for a token
+    // /// @param token Token to set the fee for
+    // /// @param fee The new fee value in bps
+    // function setTokenQuotaIncreaseFee(
+    //     address token,
+    //     uint16 fee
+    // )
+    //     external
+    //     override
+    //     controllerOnly // U:[PQK-2]
+    // {
+    //     if (fee > PERCENTAGE_FACTOR) {
+    //         revert IncorrectParameterException();
+    //     }
 
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
+    //     TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
 
-        if (!isInitialised(tokenQuotaParams)) {
-            revert TokenIsNotQuotedException();
-        }
+    //     if (!isInitialised(tokenQuotaParams)) {
+    //         revert TokenIsNotQuotedException();
+    //     }
 
-        if (tokenQuotaParams.quotaIncreaseFee != fee) {
-            tokenQuotaParams.quotaIncreaseFee = fee; // U:[PQK-13]
-            emit SetQuotaIncreaseFee(token, fee); // U:[PQK-13]
-        }
-    }
+    //     if (tokenQuotaParams.quotaIncreaseFee != fee) {
+    //         tokenQuotaParams.quotaIncreaseFee = fee; // U:[PQK-13]
+    //         emit SetQuotaIncreaseFee(token, fee); // U:[PQK-13]
+    //     }
+    // }
 
     // --------- //
     // INTERNALS //
@@ -578,12 +578,12 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         }
     }
 
-    /// @dev Reverts if `msg.sender` is not an allowed credit manager
-    function _revertIfCallerNotCreditManager() internal view {
-        if (!creditManagerSet.contains(msg.sender)) {
-            revert CallerNotCreditManagerException(); // U:[PQK-4]
-        }
-    }
+    // /// @dev Reverts if `msg.sender` is not an allowed credit manager
+    // function _revertIfCallerNotCreditManager() internal view {
+    //     if (!creditManagerSet.contains(msg.sender)) {
+    //         revert CallerNotCreditManagerException(); // U:[PQK-4]
+    //     }
+    // }
 
     /// @dev Reverts if `msg.sender` is not gauge
     function _revertIfCallerNotGauge() internal view {

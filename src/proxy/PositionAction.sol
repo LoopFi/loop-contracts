@@ -3,11 +3,9 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 import {IPermission} from "../interfaces/IPermission.sol";
-import {ICDM} from "../interfaces/ICDM.sol";
-import {IMinter} from "../interfaces/IMinter.sol";
-import {IStablecoin} from "../interfaces/IStablecoin.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
 
 import {toInt256, wmul, min} from "../utils/Math.sol";
@@ -78,14 +76,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
     bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
-    /// @notice The CDM contract
-    ICDM public immutable cdm;
     /// @notice The flashloan contract
     IFlashlender public immutable flashlender;
-    /// @notice Stablecoin token
-    IStablecoin public immutable stablecoin;
-    /// @notice Stablecoin mint
-    IMinter public immutable minter;
+    /// @notice The Pool contract
+    IPoolV3 public immutable pool;
+    /// @notice The Pool token
+    IERC20 public immutable underlyingToken;
     /// @notice The address of this contract
     address public immutable self;
     /// @notice The SwapAction contract
@@ -116,14 +112,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
 
     constructor(address flashlender_, address swapAction_, address poolAction_) {
         flashlender = IFlashlender(flashlender_);
-        stablecoin = IStablecoin(address(0));
-        minter = IMinter(address(0));
-        cdm = ICDM(address(0));
+        pool = flashlender.pool();
+        underlyingToken = IERC20(pool.underlyingToken());
         self = address(this);
         swapAction = SwapAction(swapAction_);
         poolAction = PoolAction(poolAction_);
-        cdm.modifyPermission(address(minter), true);
-        cdm.modifyPermission(flashlender_, true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -215,8 +208,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @param vault The CDP Vault
     /// @param creditParams The borrow parameters
     function borrow(address position, address vault, CreditParams calldata creditParams) external onlyDelegatecall {
-        uint256 addNormalDebt = _debtToNormalDebt(vault, creditParams.amount);
-        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(addNormalDebt));
+        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(creditParams.amount));
         _borrow(creditParams);
     }
 
@@ -232,7 +224,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
         _repay(vault, creditParams, permitParams);
-        IPermission(address(cdm)).modifyPermission(position, vault, true);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
@@ -240,7 +231,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             0,
             -toInt256(creditParams.amount)
         );
-        IPermission(address(cdm)).modifyPermission(position, vault, false);
     }
 
     /// @notice Adds collateral and debt to a CDP Vault
@@ -256,13 +246,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
         uint256 collateral = _deposit(vault, collateralParams, permitParams);
-        uint256 addNormalDebt = _debtToNormalDebt(vault, creditParams.amount);
+        uint256 addDebt = creditParams.amount;
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             toInt256(collateral),
-            toInt256(addNormalDebt)
+            toInt256(addDebt)
         );
         _borrow(creditParams);
     }
@@ -281,7 +271,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
         _repay(vault, creditParams, permitParams);
-        IPermission(address(cdm)).modifyPermission(position, vault, true);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
@@ -289,7 +278,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             -toInt256(collateralParams.amount),
             -toInt256(creditParams.amount)
         );
-        IPermission(address(cdm)).modifyPermission(position, vault, false);
         _withdraw(vault, collateralParams);
     }
 
@@ -334,7 +322,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         // validate the primary swap
         if (
             leverParams.primarySwap.swapType != SwapType.EXACT_IN ||
-            leverParams.primarySwap.assetIn != address(stablecoin) ||
+            leverParams.primarySwap.assetIn != address(underlyingToken) ||
             leverParams.primarySwap.recipient != self
         ) revert PositionAction__increaseLever_invalidPrimarySwap();
 
@@ -359,7 +347,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         flashlender.flashLoan(
             IERC3156FlashBorrower(self),
-            address(stablecoin),
+            address(underlyingToken),
             leverParams.primarySwap.amount,
             abi.encode(leverParams, upFrontToken, upFrontAmount)
         );
@@ -392,11 +380,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
 
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
-        uint stableCoinAmount = _normalDebtToDebt(leverParams.vault, leverParams.primarySwap.amount);
+        uint loanAmount = leverParams.primarySwap.amount;
         flashlender.flashLoan(
             IERC3156FlashBorrower(self),
-            address(stablecoin),
-            stableCoinAmount,
+            address(underlyingToken),
+            loanAmount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
@@ -441,7 +429,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         uint256 collateral = _onIncreaseLever(leverParams, upFrontToken, upFrontAmount, swapAmountOut);
 
         // derive the amount of normal debt from the amount of Stablecoin swapped
-        uint256 addNormalDebt = _debtToNormalDebt(leverParams.vault, leverParams.primarySwap.amount);
+        uint256 addDebt = leverParams.primarySwap.amount;
 
         // add collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
@@ -449,14 +437,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             address(this),
             address(this),
             toInt256(collateral),
-            toInt256(addNormalDebt)
+            toInt256(addDebt)
         );
-
-        // mint stablecoin to pay back the flash loans
-        minter.exit(address(this), leverParams.primarySwap.amount);
-
-        // Approve stablecoin to be used to pay back the flash loan.
-        stablecoin.approve(address(flashlender), leverParams.primarySwap.amount);
 
         return CALLBACK_SUCCESS;
     }
@@ -476,7 +458,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         );
 
         // sub collateral and debt
-        cdm.modifyPermission(leverParams.vault, true);
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
             address(this),
@@ -484,7 +465,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             -toInt256(subCollateral),
             -toInt256(leverParams.primarySwap.amount)
         );
-        cdm.modifyPermission(leverParams.vault, false);
 
         leverParams.primarySwap.amount = amount;
         // withdraw collateral and handle any CDP specific actions
@@ -500,8 +480,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         uint256 residualAmount = withdrawnCollateral - swapAmountIn;
 
         // mint stablecoin from collateral to pay back the flash loan
-        stablecoin.approve(address(minter), leverParams.primarySwap.amount);
-        minter.enter(address(this), leverParams.primarySwap.amount);
+        // stablecoin.approve(address(minter), leverParams.primarySwap.amount);
+        // minter.enter(address(this), leverParams.primarySwap.amount);
 
         // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
         if (residualAmount > 0) {
@@ -577,16 +557,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @notice Mints Stablecoin and optionally swaps Stablecoin to an arbitrary token
     /// @param creditParams The credit parameters
     function _borrow(CreditParams calldata creditParams) internal {
-        IPermission(address(cdm)).modifyPermission(address(this), address(minter), true);
         if (creditParams.auxSwap.assetIn == address(0)) {
-            minter.exit(creditParams.creditor, creditParams.amount);
-            IPermission(address(cdm)).modifyPermission(address(this), address(minter), false);
+            underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
-            minter.exit(address(this), creditParams.amount);
-            IPermission(address(cdm)).modifyPermission(address(this), address(minter), false);
-
-            // hanlde exit swap
-            if (creditParams.auxSwap.assetIn != address(stablecoin)) revert PositionAction__borrow_InvalidAuxSwap();
+            // handle exit swap
+            if (creditParams.auxSwap.assetIn != address(underlyingToken)) revert PositionAction__borrow_InvalidAuxSwap();
             _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, creditParams.auxSwap));
         }
     }
@@ -603,19 +578,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
 
             amount = _transferAndSwap(creditParams.creditor, creditParams.auxSwap, permitParams);
         } else {
-            // calculate the amount of stablecoin to repay
-            uint64 rateAccumulator = ICDPVault(vault).virtualRateAccumulator();
-            amount = wmul(rateAccumulator, creditParams.amount);
-
             if (creditParams.creditor != address(this)) {
                 // transfer stablecoin directly from creditor
-                _transferFrom(address(stablecoin), creditParams.creditor, address(this), amount, permitParams);
+                _transferFrom(address(underlyingToken), creditParams.creditor, address(this), creditParams.amount, permitParams);
             }
         }
-
-        // generate credit from stablecoin to repay with
-        stablecoin.approve(address(minter), amount);
-        minter.enter(address(this), amount);
     }
 
     /// @dev Sends remaining tokens back to `sender` instead of leaving them on the proxy
@@ -640,19 +607,5 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         } else {
             amountOut = retAmount;
         }
-    }
-
-    /// @notice Compute normalized debt of a `Position` using the up to date interest rate state
-    /// @param vault CDPVault on which the position is opened
-    /// @param debt Debt to convert to normal debt using `Position` in `Vault`'s rateAccumulator and accruedRebate [wad]
-    /// @return normalDebt Normalized debt of the position [wad]
-    function _debtToNormalDebt(address vault, uint256 debt) internal view returns (uint256 normalDebt) {
-        uint64 rateAccumulator = ICDPVault(vault).virtualRateAccumulator();
-        normalDebt = calculateNormalDebt(debt, rateAccumulator);
-    }
-
-    function _normalDebtToDebt(address vault, uint256 normalDebt) internal view returns (uint256 debt) {
-        uint64 rateAccumulator = ICDPVault(vault).virtualRateAccumulator();
-        debt = calculateDebt(normalDebt, rateAccumulator);
     }
 }

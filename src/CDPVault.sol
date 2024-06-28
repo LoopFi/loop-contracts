@@ -495,8 +495,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 deltaDebt = wmul(repayAmount, liqConfig_.liquidationPenalty);
         uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
 
-       
-
         // verify that the position is indeed unsafe
         if (_isCollateralized(debtData.debt, wmul(position.collateral, spotPrice_), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
@@ -547,8 +545,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // Mint the penalty from the vault to the treasury
         // cdm.modifyBalance(address(this), address(buffer), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
-
-        
     }
 
     /// @dev Computes new debt principal and interest index after increasing debt
@@ -582,6 +578,16 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     ) internal pure returns (uint256) {
         if (amount == 0) return 0;
         return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
+    }
+
+    /// @dev Calculates the accrued interest for a position
+    function getAccruedInterest(address position) public view returns (uint256) {
+        Position memory pos = positions[position];
+        return calcAccruedInterest(
+            pos.debt,
+            pos.cumulativeIndexLastUpdate,
+            pool.baseInterestIndex()
+        );
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt

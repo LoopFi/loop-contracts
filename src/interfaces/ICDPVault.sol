@@ -69,6 +69,11 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
 /// @title ICDPVault
 /// @notice Interface for the CDPVault
-interface ICDPVault is ICDPVaultBase, IInterestRateModel {
+interface ICDPVault is ICDPVaultBase {
     function paused() external view returns (bool);
+
+    function virtualDebt(address position) external view returns (uint256);
+
+    function getAccruedInterest(address position) external view returns (uint256 accruedInterest);
+
 }

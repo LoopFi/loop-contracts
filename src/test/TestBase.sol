@@ -45,6 +45,7 @@ contract TestBase is Test {
     Flashlender internal flashlender;
 
     ERC20PresetMinterPauser internal token;
+    ERC20PresetMinterPauser internal underlyingToken;
     MockOracle internal oracle;
 
     uint256[] internal timestamps;
@@ -121,6 +122,8 @@ contract TestBase is Test {
             symbol_: "lpETH "
         });
 
+        underlyingToken = mockWETH;
+
         uint256 availableLiquidity = 1_000_000 ether;
         mockWETH.mint(address(this), availableLiquidity);
         mockWETH.approve(address(liquidityPool), availableLiquidity);
@@ -175,6 +178,7 @@ contract TestBase is Test {
 
     function labelContracts() internal virtual {
         vm.label({account: address(token), newLabel: "CollateralToken"});
+        vm.label({account: address(mockWETH), newLabel: "UnderlyingToken"});
         vm.label({account: address(oracle), newLabel: "Oracle"});
     }
 

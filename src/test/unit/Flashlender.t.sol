@@ -183,8 +183,6 @@ contract FlashlenderTest is TestBase {
     Flashlender flashlenderOne; // w/ 1% fee
     Flashlender flashlenderFive; // w/ 5% fee
 
-    ERC20PresetMinterPauser public underlyingToken;
-
     // override cdm to manually mint fees and flashlender with fees
     function createCore() internal override {
         super.createCore();

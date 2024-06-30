@@ -58,6 +58,9 @@ contract IntegrationTestBase is TestBase {
 
     // balancer parameters
     IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
+    IComposableStablePoolFactory internal constant stablePoolFactory = IComposableStablePoolFactory(0x8df6EfEc5547e31B0eb7d1291B511FF8a2bf987c);
+    IComposableStablePool internal stablePool;
+
     IWeightedPoolFactory internal constant weightedPoolFactory = IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
     IComposableStablePool internal weightedPool;
 
@@ -86,12 +89,19 @@ contract IntegrationTestBase is TestBase {
         swapAction = new SwapAction(balancerVault, univ3Router);
         poolAction = new PoolAction(BALANCER_VAULT);
 
+        // configure balancer pools
+        stablePool = _createBalancerTokenPool();
+        stablePoolId = stablePool.getPoolId();
+        weightedPool = _createBalancerTokenWeightedPool();
+        weightedPoolId = weightedPool.getPoolId();
+
         vm.label(address(USDC), "USDC");
         vm.label(address(DAI), "DAI");
         vm.label(address(USDT), "USDT");
         vm.label(address(WETH), "WETH");
         vm.label(address(WSTETH), "wstETH");
         vm.label(address(curve3Pool), "Curve3Pool");
+        vm.label(address(stablePool), "balancerStablePool");
         vm.label(address(swapAction), "SwapAction");
         vm.label(address(poolAction), "PoolAction");
 
@@ -133,14 +143,85 @@ contract IntegrationTestBase is TestBase {
         retAmount = swapAction.swap(swapParams);
     }
 
-    function _createBalancerWeightedPool(address token) internal returns (IComposableStablePool pool_) {
-        uint256 wethLiquidityAmt = wdiv(uint256(5_000_000_000 ether),_getWETHRateInUSD());
+    /// @dev create a Stablecoin, USDC, DAI stable pool on Balancer with deep liquidity
+    function _createBalancerTokenPool() internal returns (IComposableStablePool stablePool_) {
+
+        // mint the liquidity
+        deal(address(DAI), address(this), 5_000_000 * 1e18);
+        deal(address(USDC), address(this), 5_000_000 * 1e6);
+        deal(address(USDT), address(this), 5_000_000 * 1e6);
+        token.mint(address(this), 5_000_000 * 1e18);
+
+        uint256[] memory maxAmountsIn = new uint256[](4);
+        address[] memory assets = new address[](4);
+        assets[0] = address(DAI);
+        assets[1] = address(USDC);
+        assets[2] = address(USDT);
+
+        // find the position to place token address, list is already sorted smallest to largest
+        bool tokenPlaced;
+        address tempAsset;
+        for (uint256 i; i < assets.length; i++) {
+            if (!tokenPlaced) {
+
+                // check if we can to insert stablecoin at this position
+                if (uint160(assets[i]) > uint160(address(token))) {
+                    // insert stablecoin into list
+                    tokenPlaced = true;
+                    tempAsset = assets[i];
+                    assets[i] = address(token);
+
+                } else if (i == assets.length - 1) {
+                    // stablecoin still not inserted, but we are at the end of the list, insert it here
+                    assets[i] = address(token);
+                }
+
+            } else {
+                // stablecoin has been inserted, move every asset index up
+                address placeholder = assets[i];
+                assets[i] = tempAsset;
+                tempAsset = placeholder;
+            }
+        }
+
+        // set maxAmountIn and approve balancer vault
+        for (uint256 i; i < assets.length; i++) {
+            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
+            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+        }
+
+        // create the pool
+        stablePool_ = stablePoolFactory.create(
+            "Test Token Pool",
+            "FUDT",
+            assets,
+            200,
+            3e14, // swapFee (0.03%)
+            address(this) // owner
+        );
+
+        // send liquidity to the stable pool
+        balancerVault.joinPool(
+            stablePool_.getPoolId(),
+            address(this),
+            address(this),
+            JoinPoolRequest({
+                assets: assets,
+                maxAmountsIn: maxAmountsIn,
+                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
+                fromInternalBalance: false
+            })
+        );
+    }
+
+    function _createBalancerTokenWeightedPool() internal returns (IComposableStablePool pool_) {
+        uint256 wethLiquidityAmt = 5_000_000_000 ether;
         deal(address(WETH), address(this), wethLiquidityAmt);
         deal(address(token), address(this), wethLiquidityAmt);
 
         uint256[] memory maxAmountsIn = new uint256[](2);
         address[] memory assets = new address[](2);
-        assets[0] = address(WSTETH);
+        assets[0] = address(WETH);
         uint256[] memory weights = new uint256[](2);
         weights[0] = 500000000000000000;
         weights[1] = 500000000000000000;

@@ -135,17 +135,19 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
 
     /// @notice Hook to deposit collateral into CDPVault, handles any CDP specific actions
     /// @param vault The CDP Vault
+    /// @param position The CDP Vault position
     /// @param src Token passed in by the caller
     /// @param amount The amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address src, uint256 amount) internal virtual returns (uint256);
+    function _onDeposit(address vault, address position, address src, uint256 amount) internal virtual returns (uint256);
 
     /// @notice Hook to withdraw collateral from CDPVault, handles any CDP specific actions
     /// @param vault The CDP Vault
+    /// @param position The CDP Vault position
     /// @param dst Token the caller expects to receive
     /// @param amount The amount of collateral to deposit [wad]
     /// @return Amount of collateral (or dst) withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address dst, uint256 amount) internal virtual returns (uint256);
+    function _onWithdraw(address vault, address position, address dst, uint256 amount) internal virtual returns (uint256);
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault, handles any CDP specific actions
     /// @param leverParams LeverParams struct
@@ -180,8 +182,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         CollateralParams calldata collateralParams,
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
-        uint256 collateral = _deposit(vault, collateralParams, permitParams);
-        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), toInt256(collateral), 0);
+        _deposit(vault, position, collateralParams, permitParams);
     }
 
     /// @notice Removes collateral from a CDP Vault
@@ -193,14 +194,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         address vault,
         CollateralParams calldata collateralParams
     ) external onlyDelegatecall {
-        ICDPVault(vault).modifyCollateralAndDebt(
-            position,
-            address(this),
-            address(this),
-            -toInt256(collateralParams.amount),
-            0
-        );
-        _withdraw(vault, collateralParams);
+        _withdraw(vault, position, collateralParams);
     }
 
     /// @notice Adds debt to a CDP Vault by minting Stablecoin (and optionally swaps Stablecoin to an arbitrary token)
@@ -208,8 +202,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @param vault The CDP Vault
     /// @param creditParams The borrow parameters
     function borrow(address position, address vault, CreditParams calldata creditParams) external onlyDelegatecall {
-        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(creditParams.amount));
-        _borrow(creditParams);
+        _borrow(vault, position, creditParams);
     }
 
     /// @notice Repays debt to a CDP Vault via Stablecoin (optionally swapping an arbitrary token to Stablecoin)
@@ -223,14 +216,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         CreditParams calldata creditParams,
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
-        _repay(vault, creditParams, permitParams);
-        ICDPVault(vault).modifyCollateralAndDebt(
-            position,
-            address(this),
-            address(this),
-            0,
-            -toInt256(creditParams.amount)
-        );
+        _repay(vault, position, creditParams, permitParams);
     }
 
     /// @notice Adds collateral and debt to a CDP Vault
@@ -245,16 +231,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         CreditParams calldata creditParams,
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
-        uint256 collateral = _deposit(vault, collateralParams, permitParams);
-        uint256 addDebt = creditParams.amount;
-        ICDPVault(vault).modifyCollateralAndDebt(
-            position,
-            address(this),
-            address(this),
-            toInt256(collateral),
-            toInt256(addDebt)
-        );
-        _borrow(creditParams);
+        _deposit(vault, position, collateralParams, permitParams);
+        _borrow(vault, position, creditParams);
     }
 
     /// @notice Removes collateral and debt from a CDP Vault
@@ -270,15 +248,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         CreditParams calldata creditParams,
         PermitParams calldata permitParams
     ) external onlyDelegatecall {
-        _repay(vault, creditParams, permitParams);
-        ICDPVault(vault).modifyCollateralAndDebt(
-            position,
-            address(this),
-            address(this),
-            -toInt256(collateralParams.amount),
-            -toInt256(creditParams.amount)
-        );
-        _withdraw(vault, collateralParams);
+        _repay(vault, position, creditParams, permitParams);
+        _withdraw(vault, position, collateralParams);
     }
 
     /// @notice Allows for multiple calls to be made to cover use cases not covered by the other functions
@@ -510,6 +481,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @return The amount of collateral deposited [wad]
     function _deposit(
         address vault,
+        address position,
         CollateralParams calldata collateralParams,
         PermitParams calldata permitParams
     ) internal returns (uint256) {
@@ -531,15 +503,15 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             );
         }
 
-        return _onDeposit(vault, collateralParams.targetToken, amount);
+        return _onDeposit(vault, position, collateralParams.targetToken, amount);
     }
 
     /// @notice Withdraws collateral from CDPVault (optionally swaps collateral to an arbitrary token)
     /// @param vault The CDP Vault
     /// @param collateralParams The collateral parameters
     /// @return The amount of collateral withdrawn [token.decimals()]
-    function _withdraw(address vault, CollateralParams calldata collateralParams) internal returns (uint256) {
-        uint256 collateral = _onWithdraw(vault, collateralParams.targetToken, collateralParams.amount);
+    function _withdraw(address vault, address position, CollateralParams calldata collateralParams) internal returns (uint256) {
+        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
@@ -554,10 +526,17 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         return collateral;
     }
 
+    event debug(string, uint256);
+    event debug(string, address);
+
     /// @notice Mints Stablecoin and optionally swaps Stablecoin to an arbitrary token
+    /// @param vault The CDP Vault
+    /// @param position The CDP Vault
     /// @param creditParams The credit parameters
-    function _borrow(CreditParams calldata creditParams) internal {
+    function _borrow(address vault, address position, CreditParams calldata creditParams) internal {
+        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(creditParams.amount));
         if (creditParams.auxSwap.assetIn == address(0)) {
+            underlyingToken.approve(address(this), creditParams.amount);
             underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
             // handle exit swap
@@ -570,7 +549,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @param vault The CDP Vault
     /// @param creditParams The credit parameters
     /// @param permitParams The permit parameters
-    function _repay(address vault, CreditParams calldata creditParams, PermitParams calldata permitParams) internal {
+    function _repay(address vault, address position, CreditParams calldata creditParams, PermitParams calldata permitParams) internal {
         // transfer arbitrary token and swap to stablecoin
         uint256 amount;
         if (creditParams.auxSwap.assetIn != address(0)) {
@@ -583,6 +562,15 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
                 _transferFrom(address(underlyingToken), creditParams.creditor, address(this), creditParams.amount, permitParams);
             }
         }
+
+        underlyingToken.approve(address(vault), creditParams.amount);
+        ICDPVault(vault).modifyCollateralAndDebt(
+            position,
+            address(this),
+            address(this),
+            0,
+            -toInt256(creditParams.amount)
+        );
     }
 
     /// @dev Sends remaining tokens back to `sender` instead of leaving them on the proxy

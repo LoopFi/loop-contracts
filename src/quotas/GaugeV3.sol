@@ -48,17 +48,17 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
     /// @notice Constructor
     /// @param _pool Address of the lending pool
-    /// @param _gearStaking Address of the GEAR staking contract
+    /// @param _voter Address of the voter contract
     constructor(
         address _pool,
-        address _gearStaking
+        address _voter
     )
         ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
-        nonZeroAddress(_gearStaking) // U:[GA-01]
+        nonZeroAddress(_voter) // U:[GA-01]
     {
         pool = _pool; // U:[GA-01]
-        voter = _gearStaking; // U:[GA-01]
-        epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-01]
+        voter = _voter; // U:[GA-01]
+        epochLastUpdate = IGearStakingV3(_voter).getCurrentEpoch(); // U:[GA-01]
         epochFrozen = true; // U:[GA-01]
         emit SetFrozenEpoch(true); // U:[GA-01]
     }

@@ -364,7 +364,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
             (uint16 rate, , ) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
-            (uint256 totalQuoted, ) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
+            //(uint256 totalQuoted, ) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
 
             quotaRevenue += (IPoolV3(pool).totalBorrowed() * rate) / PERCENTAGE_FACTOR;
 
@@ -565,18 +565,18 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         }
     }
 
-    /// @dev Efficiently loads quota and limit of a token from storage
-    function _getTokenQuotaTotalAndLimit(
-        TokenQuotaParams storage tokenQuotaParams
-    ) internal view returns (uint96 totalQuoted, uint96 limit) {
-        // totalQuoted = tokenQuotaParams.totalQuoted;
-        // limit = tokenQuotaParams.limit;
-        assembly {
-            let data := sload(add(tokenQuotaParams.slot, 1))
-            totalQuoted := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFF)
-            limit := shr(96, data)
-        }
-    }
+    // /// @dev Efficiently loads quota and limit of a token from storage
+    // function _getTokenQuotaTotalAndLimit(
+    //     TokenQuotaParams storage tokenQuotaParams
+    // ) internal view returns (uint96 totalQuoted, uint96 limit) {
+    //     // totalQuoted = tokenQuotaParams.totalQuoted;
+    //     // limit = tokenQuotaParams.limit;
+    //     assembly {
+    //         let data := sload(add(tokenQuotaParams.slot, 1))
+    //         totalQuoted := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFF)
+    //         limit := shr(96, data)
+    //     }
+    // }
 
     // /// @dev Reverts if `msg.sender` is not an allowed credit manager
     // function _revertIfCallerNotCreditManager() internal view {

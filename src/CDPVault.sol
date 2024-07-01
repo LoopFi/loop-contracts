@@ -18,6 +18,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {console} from "forge-std/console.sol";
 
 interface IPoolV3Loop is IPoolV3 {
     function mintProfit(uint256 profit) external;
@@ -108,7 +109,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint192 cumulativeQuotaIndexNow;
         uint192 cumulativeQuotaIndexLU;
         uint256 accruedInterest;
-        uint256 accruedFees;
+        //   uint256 accruedFees;
     }
 
     // Position Accounting
@@ -405,7 +406,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             if (amount == maxRepayment) {
                 newDebt = 0;
                 newCumulativeIndex = debtData.cumulativeIndexNow;
-                profit = debtData.accruedFees;
+                profit = debtData.accruedInterest;
                 newCumulativeQuotaInterest = 0;
             } else {
                 (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = calcDecrease(
@@ -456,12 +457,13 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         (cdd.cumulativeQuotaInterest, cdd.cumulativeQuotaIndexNow) = _getQuotedTokensData(cdd);
 
         cdd.cumulativeQuotaInterest += position.cumulativeQuotaInterest;
-
+        console.log(cdd.cumulativeQuotaInterest, "cumulativeQuotaInterest");
         cdd.accruedInterest = CreditLogic.calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
-        cdd.accruedFees = cdd.accruedInterest;
+        console.log(cdd.accruedInterest, "accruedInterest");
+        // cdd.accruedFees = cdd.accruedInterest;
 
         cdd.accruedInterest += cdd.cumulativeQuotaInterest;
-        cdd.accruedFees += cdd.cumulativeQuotaInterest;
+        //  cdd.accruedFees += cdd.cumulativeQuotaInterest;
     }
 
     /// @dev Returns quotas data for credit manager and credit account
@@ -500,7 +502,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
         cumulativeQuotaIndexNow = IPoolQuotaKeeperV3(poolQuotaKeeper()).cumulativeIndex(address(token));
-
+        console.log(cumulativeQuotaIndexNow, "cumulativeQuotaIndexNow");
+        console.log(cdd.cumulativeQuotaIndexLU, "cumulativeQuotaIndexLU");
         uint128 outstandingInterestDelta = QuotasLogic.calcAccruedQuotaInterest(
             uint96(cdd.debt),
             cumulativeQuotaIndexNow,
@@ -606,7 +609,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         if (deltaDebt == maxRepayment) {
             newDebt = 0;
             newCumulativeIndex = debtData.cumulativeIndexNow;
-            profit = debtData.accruedFees;
+            profit = debtData.accruedInterest;
             position.cumulativeQuotaInterest = 0;
         } else {
             (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
@@ -783,11 +786,28 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @dev Computes total debt, given raw debt data
     /// @param debtData See `DebtData` (must have debt data filled)
     function calcTotalDebt(DebtData memory debtData) internal pure returns (uint256) {
-        return debtData.debt + debtData.accruedInterest + debtData.accruedFees;
+        return debtData.debt + debtData.accruedInterest; //+ debtData.accruedFees;
     }
 
     /// @notice Returns address of the quota keeper connected to the pool
     function poolQuotaKeeper() public view returns (address) {
         return IPoolV3(pool).poolQuotaKeeper(); // U:[CM-47]
+    }
+
+    /// @notice Returns quotas interest
+    function quotasInterest(address position) external view returns (uint256) {
+        DebtData memory debtData = _calcDebt(positions[position]);
+        return debtData.cumulativeQuotaInterest;
+    }
+
+    function getDebtData(address position) external view returns (DebtData memory) {
+        return _calcDebt(positions[position]);
+    }
+
+    function getDebtInfo(
+        address position
+    ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {
+        DebtData memory debtData = _calcDebt(positions[position]);
+        return (debtData.debt, debtData.accruedInterest, debtData.cumulativeQuotaInterest);
     }
 }

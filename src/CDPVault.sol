@@ -451,78 +451,29 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         cdd.debt = position.debt;
         cdd.cumulativeIndexNow = index;
         cdd.cumulativeIndexLastUpdate = position.cumulativeIndexLastUpdate;
-        //cdd.cumulativeQuotaIndexLU; = position.cumulativeQuotaIndexLU;;
         cdd.cumulativeQuotaIndexLU = position.cumulativeQuotaIndexLU;
         // Get cumulative quota interest
         (cdd.cumulativeQuotaInterest, cdd.cumulativeQuotaIndexNow) = _getQuotedTokensData(cdd);
 
         cdd.cumulativeQuotaInterest += position.cumulativeQuotaInterest;
-        console.log(cdd.cumulativeQuotaInterest, "cumulativeQuotaInterest");
+
         cdd.accruedInterest = CreditLogic.calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
-        console.log(cdd.accruedInterest, "accruedInterest");
-        // cdd.accruedFees = cdd.accruedInterest;
 
         cdd.accruedInterest += cdd.cumulativeQuotaInterest;
-        //  cdd.accruedFees += cdd.cumulativeQuotaInterest;
     }
 
     /// @dev Returns quotas data for credit manager and credit account
     function _getQuotedTokensData(
         DebtData memory cdd
     ) internal view returns (uint128 outstandingQuotaInterest, uint192 cumulativeQuotaIndexNow) {
-        // _quotedTokensMask = quotedTokensMask; // U:[CM-24]
-
-        // uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
-        // if (tokensToCheckMask == 0) {
-        //     return (quotedTokens, 0, quotasPacked, _quotedTokensMask);
-        // }
-
-        // uint256 tokensIdx;
-        // uint256 tokensLen = tokensToCheckMask.calcEnabledTokens(); // U:[CM-24]
-        // quotedTokens = new address[](tokensLen); // U:[CM-24]
-        // quotasPacked = new uint256[](tokensLen); // U:[CM-24]
-
-        // uint256 hintsIdx;
-        // uint256 hintsLen = collateralHints.length;
-
-        // // puts credit account on top of the stack to avoid the "stack too deep" error
-        // address _creditAccount = creditAccount;
-
-        // unchecked {
-        // while (tokensToCheckMask != 0) {
-        // uint256 tokenMask;
-        // if (hintsIdx < hintsLen) {
-        //     tokenMask = collateralHints[hintsIdx++];
-        //     if (tokensToCheckMask & tokenMask == 0) continue;
-        // } else {
-        //     // mask with only the LSB of `tokensToCheckMask` enabled
-        //     tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
-        // }
-
-        // (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
-
         cumulativeQuotaIndexNow = IPoolQuotaKeeperV3(poolQuotaKeeper()).cumulativeIndex(address(token));
-        console.log(cumulativeQuotaIndexNow, "cumulativeQuotaIndexNow");
-        console.log(cdd.cumulativeQuotaIndexLU, "cumulativeQuotaIndexLU");
         uint128 outstandingInterestDelta = QuotasLogic.calcAccruedQuotaInterest(
             uint96(cdd.debt),
             cumulativeQuotaIndexNow,
             cdd.cumulativeQuotaIndexLU
         );
 
-        //(uint256 quoted, uint128 outstandingInterestDelta) = IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(address(this), token,cdd.debt); // U:[CM-24]
-
-        //  quotedTokens[tokensIdx] = token; // U:[CM-24]
-        //  quotasPacked[tokensIdx] = CollateralLogic.packQuota(uint96(quota), lt);
-
-        // quota interest is of roughly the same scale as quota, which is stored as `uint96`,
-        // thus this addition is very unlikely to overflow and can be unchecked
         outstandingQuotaInterest = outstandingInterestDelta; // U:[CM-24]
-
-        // ++tokensIdx;
-        // tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
-        //  }
-        // }
     }
 
     function _updatePosition(address position) internal view returns (Position memory updatedPos) {
@@ -636,39 +587,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         IPoolV3Loop(address(pool)).mintProfit(penalty);
     }
 
-    // /// @dev Computes new debt principal and interest index after increasing debt
-    // ///      - The new debt principal is simply `debt + amount`
-    // ///      - The new credit account's interest index is a solution to the equation
-    // ///        `debt * (indexNow / indexLastUpdate - 1) = (debt + amount) * (indexNow / indexNew - 1)`,
-    // ///        which essentially writes that interest accrued since last update remains the same
-    // /// @param amount Amount to increase debt by
-    // /// @param debt Debt principal before increase
-    // /// @param cumulativeIndexNow The current interest index
-    // /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
-    // /// @return newDebt Debt principal after increase
-    // /// @return newCumulativeIndex New credit account's interest index
-    // function calcIncrease(
-    //     uint256 amount,
-    //     uint256 debt,
-    //     uint256 cumulativeIndexNow,
-    //     uint256 cumulativeIndexLastUpdate
-    // ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex) {
-    //     if (debt == 0) return (amount, cumulativeIndexNow);
-    //     newDebt = debt + amount; // U:[CL-2]
-    //     newCumulativeIndex = ((cumulativeIndexNow * newDebt * INDEX_PRECISION) /
-    //         ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)); // U:[CL-2]
-    // }
-
-    // /// @dev Computes interest accrued since the last update
-    // function calcAccruedInterest(
-    //     uint256 amount,
-    //     uint256 cumulativeIndexLastUpdate,
-    //     uint256 cumulativeIndexNow
-    // ) internal pure returns (uint256) {
-    //     if (amount == 0) return 0;
-    //     return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
-    // }
-
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt
     ///      - Debt comprises of multiple components which are repaid in the following order:
     ///        quota update fees => quota interest => base interest => debt principal.
@@ -698,28 +616,13 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint128 cumulativeQuotaInterest
     )
         internal
-        pure
+        view
         returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint128 newCumulativeQuotaInterest)
     {
         uint256 amountToRepay = amount;
 
-        // unchecked {
-        //     if (quotaFees != 0) {
-        //         if (amountToRepay > quotaFees) {
-        //             newQuotaFees = 0; // U:[CL-3]
-        //             amountToRepay -= quotaFees;
-        //             profit = quotaFees; // U:[CL-3]
-        //         } else {
-        //             newQuotaFees = quotaFees - uint128(amountToRepay); // U:[CL-3]
-        //             profit = amountToRepay; // U:[CL-3]
-        //             amountToRepay = 0;
-        //         }
-        //     }
-        // }
-
         if (cumulativeQuotaInterest != 0 && amountToRepay != 0) {
             // All interest accrued on the quota interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
-            // uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= cumulativeQuotaInterest) {
                 amountToRepay -= cumulativeQuotaInterest; // U:[CL-3]
@@ -728,7 +631,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 newCumulativeQuotaInterest = 0; // U:[CL-3]
             } else {
                 // If amount is not enough to repay quota interest + DAO fee, then send all to the stakers
-                //uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
                 uint256 quotaInterestPaid = amountToRepay; // U:[CL-3]
                 profit += amountToRepay; // U:[CL-3]
                 amountToRepay = 0; // U:[CL-3]
@@ -746,8 +648,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 cumulativeIndexNow: cumulativeIndexNow
             }); // U:[CL-3]
             // All interest accrued on the base interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
-            //uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3]
-
             if (amountToRepay >= interestAccrued) {
                 amountToRepay -= interestAccrued;
 
@@ -755,20 +655,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
                 newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
             } else {
-                // If amount is not enough to repay base interest + DAO fee, then it is split pro-rata between them
-
-                // uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
-                // uint256 amountToPool = amountToRepay - accruedInterest; // U:[CL-3]
                 // If amount is not enough to repay quota interest + DAO fee, then send all to the stakers
                 profit += interestAccrued; // U:[CL-3]
                 amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex = cumulativeIndexNow;
-                // (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
-                // (INDEX_PRECISION *
-                //     cumulativeIndexNow -
-                //     (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) /
-                //     debt); // U:[CL-3]
             }
         } else {
             newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3]

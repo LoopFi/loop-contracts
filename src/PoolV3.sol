@@ -611,6 +611,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         return _calcBaseInterestAccrued(timestampLU); // U:[LP-17]
     }
 
+    function calcAccruedQuotaInterest() external view returns (uint256) {
+        return _calcQuotaRevenueAccrued();
+    }
+
     /// @dev Updates base interest rate based on expected and available liquidity deltas
     ///      - Adds expected liquidity delta to stored expected liquidity
     ///      - If time has passed since the last base interest update, adds accrued interest
@@ -628,6 +632,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
         if (block.timestamp != lastBaseInterestUpdate_) {
             _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[LP-18]
+            lastBaseInterestUpdate = uint40(block.timestamp); 
         }
 
         if (block.timestamp != lastQuotaRevenueUpdate) {

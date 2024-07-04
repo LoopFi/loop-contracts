@@ -190,7 +190,6 @@ contract TokenomicsTest is IntegrationTestBase {
     // mocked contracts
     address public lockZap;
     address public dao;
-    address public treasury;
 
     // MultiFeeDistribution params
     uint256 public rewardsDuration = 30 days;
@@ -228,7 +227,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
         // setup the vault registry
         vaultRegistry = new VaultRegistry();
-        vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0, 1 ether);
+        vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
         vaultRegistry.addVault(ICDPVault(address(vault)));
 
         multiFeeDistribution = MultiFeeDistribution(address(new ERC1967Proxy(
@@ -323,7 +322,6 @@ contract TokenomicsTest is IntegrationTestBase {
         token.mint(user, collateral);
         vm.startPrank(user);
         token.approve(address(vault), collateral);
-        vault.deposit(user, collateral);
         vault.modifyCollateralAndDebt(user, user, user, int256(collateral), int256(normalDebt));
         vm.stopPrank();
     }

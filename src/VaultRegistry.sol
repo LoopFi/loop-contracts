@@ -36,7 +36,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Adds a new vault to the registry
     /// @param vault The address of the vault to add
-    function addVault(ICDPVault vault) override(IVaultRegistry) external onlyRole(VAULT_MANAGER_ROLE) {
+    function addVault(ICDPVault vault) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
         if (registeredVaults[vault]) revert VaultRegistry__addVault_vaultAlreadyRegistered();
 
         registeredVaults[vault] = true;
@@ -46,7 +46,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Removes a vault from the registry
     /// @param vault The address of the vault to remove
-    function removeVault(ICDPVault vault) override(IVaultRegistry) external onlyRole(VAULT_MANAGER_ROLE) {
+    function removeVault(ICDPVault vault) external override(IVaultRegistry) onlyRole(VAULT_MANAGER_ROLE) {
         if (!registeredVaults[vault]) revert VaultRegistry__removeVault_vaultNotFound();
 
         _removeVaultFromList(vault);
@@ -56,20 +56,20 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
 
     /// @notice Returns the list of all registered vaults for iteration
     /// @return The list of registered vault addresses
-    function getVaults() override(IVaultRegistry) external view returns (ICDPVault[] memory) {
+    function getVaults() external view override(IVaultRegistry) returns (ICDPVault[] memory) {
         return vaultList;
     }
 
     /// @notice Returns the aggregated position stats for a user across all vaults
     /// @param user The position owner
-    function getUserTotalNormalDebt(address user) override(IVaultRegistry) external view returns(
-        uint256 totalNormalDebt
-    ) {
+    function getUserTotalDebt(
+        address user
+    ) external view override(IVaultRegistry) returns (uint256 totalNormalDebt) {
         uint256 vaultLen = vaultList.length;
-        for (uint256 i = 0; i < vaultLen; ){
-            (, uint256 normalDebt) = ICDPVault(vaultList[i]).positions(user);
+        for (uint256 i = 0; i < vaultLen; ) {
+            (, uint256 debt, , ) = ICDPVault(vaultList[i]).positions(user);
 
-            totalNormalDebt += normalDebt;
+            totalNormalDebt += debt;
 
             unchecked {
                 ++i;
@@ -92,5 +92,9 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
                 ++i;
             }
         }
+    }
+
+    function isVaultRegistered(address vault) external view returns (bool) {
+        return registeredVaults[ICDPVault(vault)];
     }
 }

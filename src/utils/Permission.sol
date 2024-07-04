@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import "../interfaces/IPermission.sol";
 
 abstract contract Permission is IPermission {
-
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/

@@ -149,7 +149,11 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
         emit SetParameter(parameter, data);
     }
 
-    function setVaultConfig(uint32 _claimerIncentive, uint32 _lockerIncentive, address _lockerRewards) public onlyRole(VAULT_ADMIN_ROLE)  returns (bool) {
+    function setVaultConfig(
+        uint32 _claimerIncentive,
+        uint32 _lockerIncentive,
+        address _lockerRewards
+    ) public onlyRole(VAULT_ADMIN_ROLE) returns (bool) {
         if (_claimerIncentive > maxClaimerIncentive) revert AuraVault__setVaultConfig_invalidClaimerIncentive();
         if (_lockerIncentive > maxLockerIncentive) revert AuraVault__setVaultConfig_invalidLockerIncentive();
         if (_lockerRewards == address(0x0)) revert AuraVault__setVaultConfig_invalidLockerRewards();
@@ -168,7 +172,7 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
     /**
      * @notice Total amount of the underlying asset that is "managed" by Vault.
      */
-    function totalAssets() public view virtual override(IERC4626, ERC4626) returns (uint256){
+    function totalAssets() public view virtual override(IERC4626, ERC4626) returns (uint256) {
         return IPool(rewardPool).balanceOf(address(this));
     }
 
@@ -290,14 +294,15 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
         IPool(rewardPool).deposit(amountIn, address(this));
 
         // Distribute BAL rewards
-        IERC20(BAL).safeTransfer(_config.lockerRewards, amounts[0] * _config.lockerIncentive / INCENTIVE_BASIS);
+        IERC20(BAL).safeTransfer(_config.lockerRewards, (amounts[0] * _config.lockerIncentive) / INCENTIVE_BASIS);
         IERC20(BAL).safeTransfer(msg.sender, amounts[0]);
 
         // Distribute AURA rewards
-        if(block.timestamp <= INFLATION_PROTECTION_TIME) {
-            IERC20(AURA).safeTransfer(_config.lockerRewards, amounts[1] * _config.lockerIncentive / INCENTIVE_BASIS);
+        if (block.timestamp <= INFLATION_PROTECTION_TIME) {
+            IERC20(AURA).safeTransfer(_config.lockerRewards, (amounts[1] * _config.lockerIncentive) / INCENTIVE_BASIS);
             IERC20(AURA).safeTransfer(msg.sender, amounts[1]);
-        } else { // after INFLATION_PROTECTION_TIME
+        } else {
+            // after INFLATION_PROTECTION_TIME
             IERC20(AURA).safeTransfer(_config.lockerRewards, IERC20(AURA).balanceOf(address(this)));
         }
 
@@ -311,14 +316,20 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
         VaultConfig memory config = vaultConfig;
         uint256 balReward = IPool(rewardPool).earned(address(this)) + IERC20(BAL).balanceOf(address(this));
         // No AURA rewards after INFLATION_PROTECTION_TIME
-        uint256 auraReward = (block.timestamp > INFLATION_PROTECTION_TIME)? 0 : _previewMining(balReward) + IERC20(AURA).balanceOf(address(this));
+        uint256 auraReward = (block.timestamp > INFLATION_PROTECTION_TIME)
+            ? 0
+            : _previewMining(balReward) + IERC20(AURA).balanceOf(address(this));
         amount = _previewReward(balReward, auraReward, config);
     }
 
-    function _previewReward(uint256 balReward, uint256 auraReward, VaultConfig memory config) private view returns (uint256 amount) {
-        amount = balReward * _chainlinkSpot() / IOracle(feed).spot(asset());
-        amount = amount + auraReward * _getAuraSpot() / IOracle(feed).spot(asset());
-        amount = amount * (INCENTIVE_BASIS - config.claimerIncentive) / INCENTIVE_BASIS;
+    function _previewReward(
+        uint256 balReward,
+        uint256 auraReward,
+        VaultConfig memory config
+    ) private view returns (uint256 amount) {
+        amount = (balReward * _chainlinkSpot()) / IOracle(feed).spot(asset());
+        amount = amount + (auraReward * _getAuraSpot()) / IOracle(feed).spot(asset());
+        amount = (amount * (INCENTIVE_BASIS - config.claimerIncentive)) / INCENTIVE_BASIS;
     }
 
     /**
@@ -338,11 +349,11 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
             // e.g. (new) reduction = (500 - 100) * 2.5 + 700 = 1700;
             // e.g. (new) reduction = (500 - 250) * 2.5 + 700 = 1325;
             // e.g. (new) reduction = (500 - 400) * 2.5 + 700 = 950;
-            uint256 reduction = (TOTAL_CLIFFS - cliff) * 5 / 2 + 700;
+            uint256 reduction = ((TOTAL_CLIFFS - cliff) * 5) / 2 + 700;
             // e.g. (new) amount = 1e19 * 1700 / 500 =  34e18;
             // e.g. (new) amount = 1e19 * 1325 / 500 =  26.5e18;
             // e.g. (new) amount = 1e19 * 950 / 500  =  19e17;
-            amount = _amount * reduction / TOTAL_CLIFFS;
+            amount = (_amount * reduction) / TOTAL_CLIFFS;
             // e.g. amtTillMax = 5e25 - 1e25 = 4e25
             uint256 amtTillMax = EMISSIONS_MAX_SUPPLY - emissionsMinted;
             if (amount > amtTillMax) {
@@ -354,27 +365,26 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
     function _chainlinkSpot() private view returns (uint256 price) {
         bool isValid;
         try AggregatorV3Interface(BAL_CHAINLINK_FEED).latestRoundData() returns (
-            uint80 /*roundId*/, int256 answer, uint256 /*startedAt*/, uint256 /*updatedAt*/, uint80 /*answeredInRound*/
+            uint80 /*roundId*/,
+            int256 answer,
+            uint256 /*startedAt*/,
+            uint256 /*updatedAt*/,
+            uint80 /*answeredInRound*/
         ) {
             price = wdiv(uint256(answer), BAL_CHAINLINK_DECIMALS);
             isValid = (price > 0);
-        } catch { }
+        } catch {}
 
-        if (!isValid)
-            revert AuraVault__chainlinkSpot_invalidPrice();
+        if (!isValid) revert AuraVault__chainlinkSpot_invalidPrice();
     }
 
     function _getAuraSpot() internal view returns (uint256 price) {
         uint256 ethPrice;
-        (, int256 answer, , ,) = AggregatorV3Interface(ETH_CHAINLINK_FEED).latestRoundData();
+        (, int256 answer, , , ) = AggregatorV3Interface(ETH_CHAINLINK_FEED).latestRoundData();
         ethPrice = wdiv(uint256(answer), ETH_CHAINLINK_DECIMALS);
 
         IPriceOracle.OracleAverageQuery[] memory queries = new IPriceOracle.OracleAverageQuery[](1);
-        queries[0] = IPriceOracle.OracleAverageQuery(
-            IPriceOracle.Variable.PAIR_PRICE,
-            1800,
-            0
-        );
+        queries[0] = IPriceOracle.OracleAverageQuery(IPriceOracle.Variable.PAIR_PRICE, 1800, 0);
         uint256[] memory results = IPriceOracle(auraPriceOracle).getTimeWeightedAverage(queries);
 
         price = wmul(results[0], ethPrice);
@@ -383,5 +393,4 @@ contract AuraVault is IERC4626, ERC4626, AccessControl {
     /*//////////////////////////////////////////////////////////////
                              REWARD COMPOUNDING
     //////////////////////////////////////////////////////////////*/
-
 }

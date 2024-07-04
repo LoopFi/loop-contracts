@@ -13,7 +13,6 @@ import {IWeightedPool} from "../vendor/IWeightedPool.sol";
 bytes32 constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
 contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -39,14 +38,13 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     address internal immutable token0;
 
     address internal immutable token1;
-    
+
     address internal immutable token2;
 
     // todo: can be packed in a single struct
     uint256 public safePrice;
     uint256 public currentPrice;
     uint256 public lastUpdate;
-    
 
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
@@ -68,22 +66,20 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     constructor(
-        address balancerVault_, 
+        address balancerVault_,
         address chainlinkOracle_,
-        address pool_, 
+        address pool_,
         uint256 updateWaitWindow_,
         uint256 stalePeriod_
     ) initializer {
         balancerVault = IVault(balancerVault_);
-        updateWaitWindow  = updateWaitWindow_;
+        updateWaitWindow = updateWaitWindow_;
         stalePeriod = stalePeriod_;
         chainlinkOracle = IOracle(chainlinkOracle_);
         pool = pool_;
         poolId = IWeightedPool(pool).getPoolId();
 
-        (address[] memory tokens, , ) = balancerVault.getPoolTokens(
-            poolId
-        );
+        (address[] memory tokens, , ) = balancerVault.getPoolTokens(poolId);
 
         // store the tokens
         uint256 len = tokens.length;
@@ -111,12 +107,12 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal override virtual onlyRole(MANAGER_ROLE){
-        if(_getStatus()) revert BalancerOracle__authorizeUpgrade_validStatus();
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
+        if (_getStatus()) revert BalancerOracle__authorizeUpgrade_validStatus();
     }
 
     function update() external virtual onlyRole(KEEPER_ROLE) returns (uint256 safePrice_) {
-        if(block.timestamp - lastUpdate < updateWaitWindow) revert BalancerOracle__update_InUpdateWaitWindow();
+        if (block.timestamp - lastUpdate < updateWaitWindow) revert BalancerOracle__update_InUpdateWaitWindow();
         // update the safe price first
         safePrice = safePrice_ = currentPrice;
         lastUpdate = block.timestamp;
@@ -136,13 +132,7 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
             totalPi = wmul(totalPi, indivPi);
         }
 
-        currentPrice = wdiv(
-            wmul(
-                totalPi,  
-                IWeightedPool(pool).getInvariant()
-            ), 
-            totalSupply
-        );
+        currentPrice = wdiv(wmul(totalPi, IWeightedPool(pool).getInvariant()), totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -152,12 +142,12 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @param /*token*/ Token address, ignored for this oracle
     /// @dev The status is valid if the price is validated and not stale
-    function getStatus(address /*token*/) public override virtual view returns (bool status){
+    function getStatus(address /*token*/) public view virtual override returns (bool status) {
         // add stale check?
         return _getStatus();
     }
 
-    function _getStatus() internal view returns (bool status){
+    function _getStatus() internal view returns (bool status) {
         status = (safePrice != 0) && block.timestamp - lastUpdate < stalePeriod;
     }
 
@@ -166,13 +156,13 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @return price Asset price [WAD]
     /// @dev reverts if the price is invalid
     function spot(address /*token*/) external view virtual override returns (uint256 price) {
-        if (!_getStatus()){
+        if (!_getStatus()) {
             revert BalancerOracle__spot_invalidPrice();
         }
         return safePrice;
     }
 
-    function _getTokenPrice(uint256 index) internal view returns (uint256 price){
+    function _getTokenPrice(uint256 index) internal view returns (uint256 price) {
         address token;
         if (index == 0) token = token0;
         else if (index == 1) token = token1;

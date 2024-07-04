@@ -10,12 +10,12 @@ import {IBuffer} from "./IBuffer.sol";
 import {IPause} from "./IPause.sol";
 import {IPermission} from "./IPermission.sol";
 import {IInterestRateModel} from "./IInterestRateModel.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // Deployment related structs
 struct CDPVaultConstants {
-    ICDM cdm;
+    IPoolV3 pool;
     IOracle oracle;
-    IBuffer buffer;
     IERC20 token;
     uint256 tokenScale;
 }
@@ -25,36 +25,32 @@ struct CDPVaultConfig {
     uint64 liquidationRatio;
     uint64 liquidationPenalty;
     uint64 liquidationDiscount;
-    uint256 baseRate;
     address roleAdmin;
     address vaultAdmin;
     address pauseAdmin;
-    address vaultUnwinder;
 }
 
 /// @title ICDPVaultBase
 /// @notice Interface for the CDPVault without `paused` to avoid unnecessary overriding of `paused` in CDPVault
 interface ICDPVaultBase is IAccessControl, IPause, IPermission {
+    function pool() external view returns (IPoolV3);
 
-    function cdm() external view returns (ICDM);
-    
     function oracle() external view returns (IOracle);
-    
-    function buffer() external view returns (IBuffer);
-    
+
     function token() external view returns (IERC20);
-    
+
     function tokenScale() external view returns (uint256);
 
-    function vaultConfig() external view returns (
-        uint128 debtFloor, uint64 liquidationRatio
-    );
+    function vaultConfig() external view returns (uint128 debtFloor, uint64 liquidationRatio);
 
-    function totalNormalDebt() external view returns (uint256);
+    function totalDebt() external view returns (uint256);
 
-    function cash(address owner) external view returns (uint256);
-
-    function positions(address owner) external view returns (uint256 collateral, uint256 normalDebt);
+    function positions(
+        address owner
+    )
+        external
+        view
+        returns (uint256 collateral, uint256 debt, uint256 lastDebtUpdate, uint256 cumulativeIndexLastUpdate);
 
     function deposit(address to, uint256 amount) external returns (uint256);
 
@@ -73,7 +69,11 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
 /// @title ICDPVault
 /// @notice Interface for the CDPVault
-interface ICDPVault is ICDPVaultBase, IInterestRateModel {
-
+interface ICDPVault is ICDPVaultBase {
     function paused() external view returns (bool);
+
+    function virtualDebt(address position) external view returns (uint256);
+
+    function getAccruedInterest(address position) external view returns (uint256 accruedInterest);
+
 }

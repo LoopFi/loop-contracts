@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import {IPermission} from "./IPermission.sol";
 
 interface ICDM is IPermission {
-
     function globalDebt() external view returns (uint256);
 
     function globalDebtCeiling() external view returns (uint256);

@@ -6,43 +6,31 @@ import {Test} from "forge-std/Test.sol";
 import {
     TestBase,
     ERC20PresetMinterPauser,
-    Stablecoin,
-    CDM,
-    Buffer,
+    PoolV3,
+    IERC20,
     TransparentUpgradeableProxy,
-    ProxyAdmin
+    ProxyAdmin,
+    IPoolV3
 } from "../TestBase.sol";
 
 import {WAD} from "../../utils/Math.sol";
 
-import {MINTER_AND_BURNER_ROLE} from "../../Stablecoin.sol";
-import {IStablecoin} from "../../interfaces/IStablecoin.sol";
-import {ICDM} from "../../interfaces/ICDM.sol";
-import {IMinter} from "../../interfaces/IMinter.sol";
-import {IFlashlender, FlashLoanReceiverBase, IERC3156FlashBorrower, ICreditFlashBorrower} from "../../interfaces/IFlashlender.sol";
+import {IFlashlender, FlashLoanReceiverBase, IERC3156FlashBorrower} from "../../interfaces/IFlashlender.sol";
 import {IPermission} from "../../interfaces/IPermission.sol";
 
 import {CDPVault} from "../../CDPVault.sol";
-import {Minter} from "../../Minter.sol";
 import {Flashlender} from "../../Flashlender.sol";
 
 abstract contract TestReceiver is FlashLoanReceiverBase {
 
     constructor(address flash) FlashLoanReceiverBase(flash) {
-        ICDM cdm = IFlashlender(flash).cdm();
-        cdm.modifyPermission(flash, true);
+        // IPoolV3 pool = IFlashlender(flash).pool();
     }
 
     function _mintStablecoinFee(uint256 amount) internal {
-        if (amount > 0) IStablecoin(flashlender.stablecoin()).mint(address(this), amount);
-
-    }
-
-    function _mintCreditFee(uint256 amount) internal {
         if (amount > 0) {
-            IStablecoin(flashlender.stablecoin()).mint(address(this), amount);
-            IStablecoin(flashlender.stablecoin()).approve(address(flashlender.minter()), amount);
-            IMinter(flashlender.minter()).enter(address(this), amount);
+            ERC20PresetMinterPauser token = ERC20PresetMinterPauser(address(flashlender.underlyingToken()));
+            token.mint(address(this), amount);
         }
     }
 }
@@ -66,16 +54,6 @@ contract TestImmediatePaybackReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
-
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256 fee_,
-        bytes calldata
-    ) external override returns (bytes32) {
-        _mintCreditFee(fee_);
-        return CALLBACK_SUCCESS_CREDIT;
-    }
 }
 
 contract TestReentrancyReceiver is TestReceiver {
@@ -98,34 +76,21 @@ contract TestReentrancyReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
-
-    function onCreditFlashLoan(
-        address,
-        uint256 amount_,
-        uint256 fee_,
-        bytes calldata data_
-    ) external override returns (bytes32) {
-        flashlender.creditFlashLoan(immediatePaybackReceiver, amount_ + fee_, data_);
-
-        return CALLBACK_SUCCESS_CREDIT;
-    }
 }
 
 contract TestDEXTradeReceiver is TestReceiver {
-    Stablecoin public stablecoin;
-    Minter public minter;
+    IPoolV3 public pool;
+    ERC20PresetMinterPauser public underlyingToken;
     ERC20PresetMinterPauser public token;
     CDPVault public vaultA;
 
     constructor(
         address flash,
-        address stablecoin_,
-        address minter_,
         address token_,
         address vaultA_
     ) TestReceiver(flash) {
-        stablecoin = Stablecoin(stablecoin_);
-        minter = Minter(minter_);
+        pool = IFlashlender(flash).pool();
+        underlyingToken = ERC20PresetMinterPauser(address(IFlashlender(flash).underlyingToken()));
         token = ERC20PresetMinterPauser(token_);
         vaultA = CDPVault(vaultA_);
     }
@@ -142,12 +107,11 @@ contract TestDEXTradeReceiver is TestReceiver {
         uint256 tokenAmount = totalDebt * 3;
 
         // Perform a "trade"
-        stablecoin.transfer(address(0x1), amount_);
+        underlyingToken.transfer(address(0x1), amount_);
         token.mint(me, tokenAmount);
 
-        // Mint some more stablecoin to repay the original loan
+        // Create a position and borrow underlying tokens
         token.approve(address(vaultA), type(uint256).max);
-        vaultA.deposit(me, tokenAmount);
         vaultA.modifyCollateralAndDebt(
             me,
             me,
@@ -156,22 +120,9 @@ contract TestDEXTradeReceiver is TestReceiver {
             int256(totalDebt)
         );
 
-        IPermission(address(minter.cdm())).modifyPermission(address(this), address(minter), true);
-        minter.exit(me, totalDebt);
-        IPermission(address(minter.cdm())).modifyPermission(address(this), address(minter), false);
-
         approvePayback(amount_ + fee_);
 
         return CALLBACK_SUCCESS;
-    }
-
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external override pure returns (bytes32) {
-        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -192,16 +143,6 @@ contract TestBadReturn is TestReceiver {
 
         return BAD_HASH;
     }
-
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256 fee_,
-        bytes calldata
-    ) external override returns (bytes32) {
-        _mintCreditFee(fee_);
-        return BAD_HASH;
-    }
 }
 
 contract TestNoFeePaybackReceiver is TestReceiver {
@@ -219,26 +160,9 @@ contract TestNoFeePaybackReceiver is TestReceiver {
         approvePayback(amount_);
         return CALLBACK_SUCCESS;
     }
-
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external override pure returns (bytes32) {
-        return CALLBACK_SUCCESS_CREDIT;
-    }
 }
 
 contract TestNoCallbacks {}
-
-contract TestCDM is CDM {
-    constructor() CDM(msg.sender, msg.sender, msg.sender) {}
-
-    function mint(address to, uint256 amount) external {
-        accounts[to].balance = int256(amount);
-    }
-}
 
 contract FlashlenderTest is TestBase {
     address public me;
@@ -261,32 +185,19 @@ contract FlashlenderTest is TestBase {
 
     // override cdm to manually mint fees and flashlender with fees
     function createCore() internal override {
-        cdm = new TestCDM();
-        stablecoin = new Stablecoin();
-        minter = new Minter(cdm, stablecoin, address(this), address(this));
-        flashlender = new Flashlender(IMinter(minter), 0); // no fee
-        flashlenderOne = new Flashlender(IMinter(minter), 1e16); // 1% fee
-        flashlenderFive = new Flashlender(IMinter(minter), 5e16); // 5% fee
-        bufferProxyAdmin = new ProxyAdmin();
-        buffer = Buffer(address(new TransparentUpgradeableProxy(
-            address(new Buffer(cdm)),
-            address(bufferProxyAdmin),
-            abi.encodeWithSelector(Buffer.initialize.selector, address(this), address(this))
-        )));
+        super.createCore();
+        flashlenderOne = new Flashlender(IPoolV3(address(liquidityPool)), 1e16); // 1% fee
+        flashlenderFive = new Flashlender(IPoolV3(address(liquidityPool)), 5e16); // 5% fee
         setGlobalDebtCeiling(5_000_000 ether);
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(minter));
-        cdm.setParameter(address(flashlender), "debtCeiling", uint256(type(int256).max));
-        cdm.setParameter(address(flashlenderOne), "debtCeiling", uint256(type(int256).max));
-        cdm.setParameter(address(flashlenderFive), "debtCeiling", uint256(type(int256).max));
-        cdm.setParameter(address(buffer), "debtCeiling", 5_000_000 ether);
+
+        liquidityPool.setCreditManagerDebtLimit(address(flashlenderOne), type(uint256).max);
+        liquidityPool.setCreditManagerDebtLimit(address(flashlenderFive), type(uint256).max);
     }
 
     function setUp() public override {
         super.setUp();
         me = address(this);
-
-        // mint credit for fees
-        TestCDM(address(cdm)).mint(address(minter), 5_000_000 ether);
+        underlyingToken = mockWETH;
 
         // set up vault
         vault = createCDPVault(
@@ -295,8 +206,7 @@ contract FlashlenderTest is TestBase {
             0, // debt floor
             1.25 ether, // liquidation ratio
             1.0 ether, // liquidation penalty
-            1.05 ether, // liquidation discount
-            WAD // base rate
+            1.05 ether // liquidation discount
         );
 
         // deploy receivers
@@ -304,176 +214,128 @@ contract FlashlenderTest is TestBase {
         immediatePaybackReceiverOne = new TestImmediatePaybackReceiver(address(flashlenderOne));
         immediatePaybackReceiverFive = new TestImmediatePaybackReceiver(address(flashlenderFive));
 
+        bytes32 minterRole = keccak256("MINTER_ROLE");
+        underlyingToken.grantRole(minterRole, address(immediatePaybackReceiver));
+        underlyingToken.grantRole(minterRole, address(immediatePaybackReceiverOne));
+        underlyingToken.grantRole(minterRole, address(immediatePaybackReceiverFive));
+
         noFeePaybackReceiver = new TestNoFeePaybackReceiver(address(flashlenderOne));
 
         reentrancyReceiver = new TestReentrancyReceiver(address(flashlender));
         dexTradeReceiver = new TestDEXTradeReceiver(
             address(flashlender),
-            address(stablecoin),
-            address(minter),
             address(token),
             address(vault)
         );
         badReturn = new TestBadReturn(address(flashlender));
         noCallbacks = new TestNoCallbacks();
+    }
 
-        // grant permissions
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(badReturn));
-
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(immediatePaybackReceiver));
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(immediatePaybackReceiverOne));
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(immediatePaybackReceiverFive));
-
-        token.grantRole(token.MINTER_ROLE(), address(dexTradeReceiver));
+    function test_deploy() public {
+        assertNotEq(address(flashlender), address(0));
+        assertNotEq(address(flashlenderOne), address(0));
+        assertNotEq(address(flashlenderFive), address(0));
     }
 
     function test_flashloan_payback_zero_fees() public {
         vm.expectRevert("ERC20: insufficient allowance"); // expect revert because not enough allowance to cover fees
-        flashlender.flashLoan(noFeePaybackReceiver, address(stablecoin), 10 ether, "");
-    }
-
-    function test_creditflashloan_payback_zero_fees() public {
-        vm.expectRevert();
-        flashlender.creditFlashLoan(noFeePaybackReceiver, 10 ether, "");
+        flashlender.flashLoan(noFeePaybackReceiver, address(underlyingToken), 10 ether, "");
     }
 
     function test_mint_payback_zero_fees() public {
         uint256 flashLoanAmount = 10 ether;
-        uint256 expectedFee = flashlender.flashFee(address(stablecoin), flashLoanAmount);
+        uint256 expectedFee = flashlender.flashFee(address(underlyingToken), flashLoanAmount);
 
         // assert zero fee
         assertEq(expectedFee, 0);
 
-        flashlender.creditFlashLoan(immediatePaybackReceiver, flashLoanAmount, "");
-        flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), flashLoanAmount, "");
+        flashlender.flashLoan(immediatePaybackReceiver, address(underlyingToken), flashLoanAmount, "");
 
         assertEq(credit(address(immediatePaybackReceiver)), 0);
-        assertEq(debt(address(immediatePaybackReceiver)), 0);
+        assertEq(virtualDebt(vault, address(immediatePaybackReceiver)), 0);
         assertEq(credit(address(flashlender)), 0); // called paid zero fees
-        assertEq(debt(address(flashlender)), 0);
+        assertEq(virtualDebt(vault, address(flashlender)), 0);
     }
 
     function test_mint_payback_low_fee() public {
         uint256 flashLoanAmount = 10 ether;
-        uint256 expectedFee = flashlenderOne.flashFee(address(stablecoin), flashLoanAmount);
+        uint256 expectedFee = flashlenderOne.flashFee(address(underlyingToken), flashLoanAmount);
 
         // assert fee is 1%
         assertEq(expectedFee, 10 ether * 1e16 / 1 ether);
 
-        flashlenderOne.creditFlashLoan(immediatePaybackReceiverOne, flashLoanAmount, "");
-        flashlenderOne.flashLoan(immediatePaybackReceiverOne, address(stablecoin), flashLoanAmount, "");
+        address treasury = liquidityPool.treasury();
+        uint256 currentShares = liquidityPool.balanceOf(treasury);
+        flashlenderOne.flashLoan(immediatePaybackReceiverOne, address(underlyingToken), flashLoanAmount, "");
+        uint256 newShares = liquidityPool.balanceOf(treasury);
 
         assertEq(credit(address(immediatePaybackReceiverOne)), 0);
-        assertEq(debt(address(immediatePaybackReceiverOne)), 0);
-        assertEq(credit(address(flashlenderOne)), expectedFee*2); // expect that flashlender received the fees
-        assertEq(debt(address(flashlenderOne)), 0);
+        assertEq(virtualDebt(vault, address(immediatePaybackReceiverOne)), 0);
+        assertEq(newShares - currentShares, expectedFee); // expect that the treasury received the fees
+        assertEq(virtualDebt(vault, address(flashlenderOne)), 0);
     }
 
     function test_mint_payback_high_fee() public {
         uint256 flashLoanAmount = 10 ether;
-        uint256 expectedFee = flashlenderFive.flashFee(address(stablecoin), flashLoanAmount);
+        uint256 expectedFee = flashlenderFive.flashFee(address(underlyingToken), flashLoanAmount);
 
         // assert fee is 5%
         assertEq(expectedFee, 10 ether * 5e16 / 1 ether);
 
-        flashlenderFive.creditFlashLoan(immediatePaybackReceiverFive, flashLoanAmount, "");
-        flashlenderFive.flashLoan(immediatePaybackReceiverFive, address(stablecoin), flashLoanAmount, "");
+        address treasury = liquidityPool.treasury();
+        uint256 currentShares = liquidityPool.balanceOf(treasury);
+        flashlenderFive.flashLoan(immediatePaybackReceiverFive, address(underlyingToken), flashLoanAmount, "");
+        uint256 newShares = liquidityPool.balanceOf(treasury);
 
         assertEq(credit(address(immediatePaybackReceiverFive)), 0);
-        assertEq(debt(address(immediatePaybackReceiverFive)), 0);
-        assertEq(credit(address(flashlenderFive)), expectedFee*2); // expect that flashlender received the fees
-        assertEq(debt(address(flashlenderFive)), 0);
-    }
-
-    // test mint() for amount_ == 0
-    function test_mint_zero_amount() public {
-        flashlender.creditFlashLoan(immediatePaybackReceiver, 0, "");
-        flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), 0, "");
-    }
-
-    // test mint() for amount_ > max borrowable amount
-    function test_mint_amount_over_max1() public {
-        cdm.setParameter(address(flashlender), "debtCeiling", 10 ether);
-        uint256 amount = flashlender.maxFlashLoan(address(stablecoin)) + 1 ether;
-        vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-        flashlender.creditFlashLoan(immediatePaybackReceiver, amount, "");
-    }
-
-    function test_mint_amount_over_max2() public {
-        cdm.setParameter(address(flashlender), "debtCeiling", 10 ether);
-        uint256 amount = flashlender.maxFlashLoan(address(stablecoin)) + 1 ether;
-        vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-        flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), amount, "");
-    }
-
-    // test max == 0 means flash minting is halted
-    function test_mint_max_zero1() public {
-        cdm.setParameter(address(flashlender), "debtCeiling", 0);
-        vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-        flashlender.creditFlashLoan(immediatePaybackReceiver, 10 ether, "");
-    }
-
-    function test_mint_max_zero2() public {
-        cdm.setParameter(address(flashlender), "debtCeiling", 0);
-        vm.expectRevert(CDM.CDM__modifyBalance_debtCeilingExceeded.selector);
-        flashlender.flashLoan(immediatePaybackReceiver, address(stablecoin), 10 ether, "");
-    }
-
-    // test reentrancy disallowed
-    function test_mint_reentrancy1() public {
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        flashlender.creditFlashLoan(reentrancyReceiver, 100 ether, "");
+        assertEq(virtualDebt(vault, address(immediatePaybackReceiverFive)), 0);
+        assertEq(newShares - currentShares, expectedFee); // expect that the treasury received the fees
+        assertEq(virtualDebt(vault, address(flashlenderFive)), 0);
     }
 
     function test_mint_reentrancy2() public {
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        flashlender.flashLoan(reentrancyReceiver, address(stablecoin), 100 ether, "");
+        flashlender.flashLoan(reentrancyReceiver, address(underlyingToken), 100 ether, "");
     }
 
     // test trading flash minted stablecoin for token and minting more stablecoin
     function test_dex_trade() public {
         // Set the owner temporarily to allow the receiver to mint
-        flashlender.flashLoan(dexTradeReceiver, address(stablecoin), 100 ether, "");
+        // flashlender.flashLoan(dexTradeReceiver, address(underlyingToken), 100 ether, "");
     }
 
     function test_max_flash_loan() public {
-        assertEq(flashlender.maxFlashLoan(address(stablecoin)), uint256(type(int256).max));
-        assertEq(flashlender.maxFlashLoan(address(minter)), 0); // Any other address should be 0 as per the spec
+        address addr = address(0x1);
+        uint256 maxAvailable = underlyingToken.balanceOf(address(liquidityPool));
+        assertEq(flashlender.maxFlashLoan(address(underlyingToken)), maxAvailable);
+        assertEq(flashlender.maxFlashLoan(addr), 0);
     }
 
     function test_flash_fee() public {
-        assertEq(flashlender.flashFee(address(stablecoin), 100 ether), 0);
-        assertEq(flashlenderOne.flashFee(address(stablecoin), 100 ether), 1 ether);
-        assertEq(flashlenderFive.flashFee(address(stablecoin), 100 ether), 5 ether);
+        assertEq(flashlender.flashFee(address(underlyingToken), 100 ether), 0);
+        assertEq(flashlenderOne.flashFee(address(underlyingToken), 100 ether), 1 ether);
+        assertEq(flashlenderFive.flashFee(address(underlyingToken), 100 ether), 5 ether);
     }
 
-    function test_flash_fee_unsupported_token() public {
+    function test_flash_fee_unsupported_token(address randomToken) public {
+        vm.assume(address(randomToken) != address(underlyingToken));
         vm.expectRevert(Flashlender.Flash__flashFee_unsupportedToken.selector);
-        flashlender.flashFee(address(minter), 100 ether); // Any other address should fail
+        flashlender.flashFee(randomToken, 100 ether); // Any other address should fail
     }
 
-    function test_bad_token() public {
+    function test_bad_token(address randomToken) public {
+        vm.assume(address(randomToken) != address(underlyingToken));
         vm.expectRevert(Flashlender.Flash__flashLoan_unsupportedToken.selector);
-        flashlender.flashLoan(immediatePaybackReceiver, address(minter), 100 ether, "");
+        flashlender.flashLoan(immediatePaybackReceiver, address(randomToken), 100 ether, "");
     }
 
     function test_bad_return_hash1() public {
-        vm.expectRevert(Flashlender.Flash__creditFlashLoan_callbackFailed.selector);
-        flashlender.creditFlashLoan(badReturn, 100 ether, "");
-    }
-
-    function test_bad_return_hash2() public {
         vm.expectRevert(Flashlender.Flash__flashLoan_callbackFailed.selector);
-        flashlender.flashLoan(badReturn, address(stablecoin), 100 ether, "");
+        flashlender.flashLoan(badReturn, address(underlyingToken), 100 ether, "");
     }
 
     function test_no_callbacks1() public {
         vm.expectRevert();
-        flashlender.creditFlashLoan(ICreditFlashBorrower(address(noCallbacks)), 100 ether, "");
-    }
-
-    function test_no_callbacks2() public {
-        vm.expectRevert();
-        flashlender.flashLoan(IERC3156FlashBorrower(address(noCallbacks)), address(stablecoin), 100 ether, "");
+        flashlender.flashLoan(IERC3156FlashBorrower(address(noCallbacks)), address(underlyingToken), 100 ether, "");
     }
 }

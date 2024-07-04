@@ -13,7 +13,6 @@ contract PausableContract is Pause {
 }
 
 contract PauseTest is Test {
-
     PausableContract public pausableContract;
 
     function setUp() public {

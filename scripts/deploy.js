@@ -199,19 +199,19 @@ async function deployCore() {
   await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
   console.log('Set credit manager debt limit for flashlender to max');
 
-  // await deployContract('PRBProxyRegistry');
+  await deployContract('PRBProxyRegistry');
   storeEnvMetadata({PRBProxyRegistry: CONFIG.Core.PRBProxyRegistry});
 
-  // const swapAction = await deployContract(
-  //  'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
-  // );
-  // const poolAction = await deployContract(
-  //  'PoolAction', 'PoolAction', false, ...Object.values(CONFIG.Core.Actions.PoolAction.constructorArguments)
-  // );
+  const swapAction = await deployContract(
+   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
+  );
+  const poolAction = await deployContract(
+   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG.Core.Actions.PoolAction.constructorArguments)
+  );
 
   await deployContract('ERC165Plugin');
-  // await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address);
-  // await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address);
+  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address);
+  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address);
 
   console.log('------------------------------------');
 
@@ -267,20 +267,6 @@ async function deployGearbox() {
   // Deploy ContractsRegister and set its address in AddressProviderV3
   const ContractsRegister = await deployContract('ContractsRegister', 'ContractsRegister', false, AddressProviderV3.address);
   await AddressProviderV3.setAddress(toBytes32('CONTRACTS_REGISTER'), ContractsRegister.address, false);
-
-  console.log(' AddressProviderV3 ', AddressProviderV3.address );
-  console.log(' ContractsRegister ', ContractsRegister.address );
-  console.log(' ACL ', ACL.address );
-  console.log(' LinearInterestRateModelV3 ', LinearInterestRateModelV3.address );
-  console.log(' MockWETH ', mockWETH.address );
-  console.log(' CONFIG.Core.Gearbox.initialGlobalDebtCeiling ', CONFIG.Core.Gearbox.initialGlobalDebtCeiling);
-
-  const addressTest1 = await AddressProviderV3.getAddressOrRevert(toBytes32('WETH_TOKEN'), 0);
-  console.log(' AddressProviderV3.getAddress(AP_WETH_TOKEN) ', addressTest1 );
-  const addressTest2 = await AddressProviderV3.getAddressOrRevert(toBytes32('TREASURY'), 0);
-  console.log(' AddressProviderV3.getAddress(AP_TREASURY) ', addressTest2 );
-  const addressTest3 = await AddressProviderV3.getAddressOrRevert(toBytes32('CONTRACTS_REGISTER'), 0);
-  console.log(' AddressProviderV3.getAddress(AP_CONTRACTS_REGISTER) ', addressTest3 );
 
   // Deploy PoolV3 contract
   const PoolV3 = await deployContract(
@@ -383,13 +369,23 @@ async function deployVaults() {
     var tokenAddress = config.token;
 
     // initialize the token
-    if (tokenAddress != "") {
-      token = await attachContract('ERC20PresetMinterPauser', tokenAddress);
+    console.log('Token address:', tokenAddress);
+    if (tokenAddress == undefined || tokenAddress == null) {
+      console.log('Deploying token for', key);
+      token = await deployContract(
+        'ERC20PresetMinterPauser',
+        'MockCollateralToken',
+        false, // not a vault
+        "MockCollateralToken", // name
+        "MCT" // symbol
+      );
+      tokenAddress = token.address;
     } else {
       // search for the token in the deployed contracts
       token = contracts[config.tokenName];
       tokenAddress = token.address;
     }
+    console.log('Token address:', tokenAddress);
 
     const tokenScale = new ethers.BigNumber.from(10).pow(await token.decimals());
     const cdpVault = await deployContract(
@@ -728,7 +724,7 @@ async function createPositions() {
 
 ((async () => {
   await deployCore();
-  await deployAuraVaults();
+  // await deployAuraVaults();
   await deployVaults();
   // await deployRadiant();
   // await deployGearbox();

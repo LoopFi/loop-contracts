@@ -419,7 +419,7 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(USDT.balanceOf(address(user)), expectedAmountOut);
     }
 
-    function test_borrow_123() public {
+    function test_borrow() public {
         // deposit to vault
         uint256 initialDeposit = 1_000 ether;
         _deposit(userProxy, address(vault), initialDeposit);
@@ -557,812 +557,197 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(underlyingToken.balanceOf(user), 0);
     }
 
-    // function test_repay_with_interest_with_swap() public {
-    //     uint256 collateral = 1_000*1 ether; // DAI
-    //     uint256 normalDebt = 500*1 ether; // stablecoin
-    //     _depositAndBorrow(userProxy, address(daiVault), collateral, normalDebt);
-
-    //     // get rid of the stablecoin that was borrowed
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), normalDebt);
-
-    //     // accrue interest
-    //     vm.warp(block.timestamp + 365 days);
-    //     uint256 debt = _virtualDebt(daiVault, address(userProxy));
-
-    //     // mint usdc to pay back with
-    //     uint256 swapAmount = debt/1e12 * 101/100;
-    //     deal(address(USDC), address(user), swapAmount);
-
-    //    // build repay params
-    //    uint256 expectedAmountIn;
-    //    CreditParams memory creditParams;
-    //    {
-    //         bytes32[] memory poolIds = new bytes32[](1);
-    //         poolIds[0] = stablePoolId;
-
-    //         address[] memory assets = new address[](2);
-    //         assets[0] = address(stablecoin);
-    //         assets[1] = address(USDC);
-
-    //         creditParams = CreditParams({
-    //             amount: normalDebt,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: debt,
-    //                 limit: swapAmount,
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(poolIds, assets)
-    //             })
-    //         });
-    //         expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-    //    }
-
-    //    vm.startPrank(user);
-    //    USDC.approve(address(userProxy), swapAmount);
-    //    userProxy.execute(
-    //        address(positionAction),
-    //        abi.encodeWithSelector(
-    //            positionAction.repay.selector,
-    //            address(userProxy), // user proxy is the position
-    //            address(daiVault),
-    //            creditParams,
-    //            emptyPermitParams
-    //        )
-    //    );
-    //    vm.stopPrank();
-
-    //    (uint256 vCollateral, uint256 vNormalDebt) = daiVault.positions(address(userProxy));
-    //    uint256 creditAmount = credit(address(userProxy));
-
-    //    assertEq(vCollateral, collateral);
-    //    assertEq(vNormalDebt, 0);
-    //    assertEq(creditAmount, 0);
-    //    assertEq(stablecoin.balanceOf(user), 0);
-    // }
-
-    // function test_repay_from_swap() public {
-    //     uint256 depositAmount = 1_000*1 ether; // DAI
-    //     uint256 borrowAmount = 500*1 ether; // stablecoin
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // mint usdc to pay back with
-    //     uint256 swapAmount = borrowAmount/1e12 * 101/100;
-    //     deal(address(USDC), address(user), swapAmount);
-
-    //     // get rid of the stablecoin that was borrowed
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), borrowAmount);
-
-    //    // build repay params
-    //    uint256 expectedAmountIn;
-    //    CreditParams memory creditParams;
-    //    {
-    //         bytes32[] memory poolIds = new bytes32[](1);
-    //         poolIds[0] = stablePoolId;
-
-    //         address[] memory assets = new address[](2);
-    //         assets[0] = address(stablecoin);
-    //         assets[1] = address(USDC);
-
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: borrowAmount,
-    //                 limit: swapAmount,
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(poolIds, assets)
-    //             })
-    //         });
-    //         expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-    //    }
-
-    //    vm.startPrank(user);
-    //    USDC.approve(address(userProxy), swapAmount);
-    //    userProxy.execute(
-    //        address(positionAction),
-    //        abi.encodeWithSelector(
-    //            positionAction.repay.selector,
-    //            address(userProxy), // user proxy is the position
-    //            address(daiVault),
-    //            creditParams,
-    //            emptyPermitParams
-    //        )
-    //    );
-    //    vm.stopPrank();
-
-    //    (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-    //    uint256 creditAmount = credit(address(userProxy));
-
-    //    assertEq(collateral, depositAmount);
-    //    assertEq(normalDebt, 0);
-    //    assertEq(creditAmount, 0);
-    //    assertEq(stablecoin.balanceOf(user), 0);
-    // }
-
-    // function test_repay_from_swap_EXACT_IN() public {
-    //     uint256 depositAmount = 1_000*1 ether; // DAI
-    //     uint256 borrowAmount = 500*1 ether; // stablecoin
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // mint usdc to pay back with
-    //     uint256 swapAmount = ((borrowAmount/2) * 101)/100e12; // repay half debt, mint extra to ensure our minimum is the exact amount
-    //     deal(address(USDC), address(user), swapAmount);
-
-    //     // get rid of the stablecoin that was borrowed
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), borrowAmount);
-
-    //    // build repay params
-    //    uint256 expectedAmountOut;
-    //    CreditParams memory creditParams;
-    //    {
-    //         bytes32[] memory poolIds = new bytes32[](1);
-    //         poolIds[0] = stablePoolId;
-
-    //         address[] memory assets = new address[](2);
-    //         assets[0] = address(USDC);
-    //         assets[1] = address(stablecoin);
-
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount/2,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_IN,
-    //                 assetIn: address(USDC),
-    //                 amount: swapAmount,
-    //                 limit: borrowAmount/2,
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(poolIds, assets)
-    //             })
-    //         });
-    //         expectedAmountOut = _simulateBalancerSwap(creditParams.auxSwap);
-    //    }
-
-    //    vm.startPrank(user);
-    //    USDC.approve(address(userProxy), swapAmount);
-    //    userProxy.execute(
-    //        address(positionAction),
-    //        abi.encodeWithSelector(
-    //            positionAction.repay.selector,
-    //            address(userProxy), // user proxy is the position
-    //            address(daiVault),
-    //            creditParams,
-    //            emptyPermitParams
-    //        )
-    //    );
-    //    vm.stopPrank();
-
-    //    (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-    //    uint256 creditAmount = credit(address(userProxy));
-
-    //    assertEq(collateral, depositAmount);
-    //    assertEq(normalDebt, borrowAmount/2);
-    //    assertEq(creditAmount, expectedAmountOut - borrowAmount/2); // ensure that any extra credit is stored as credit for the user
-    //    assertEq(stablecoin.balanceOf(user), 0);
-    // }
-
-    // function test_repay_InvalidAuxSwap() public {
-    //     uint256 depositAmount = 1_000*1 ether; // DAI
-    //     uint256 borrowAmount = 500*1 ether; // stablecoin
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // mint usdc to pay back with
-    //     uint256 swapAmount = borrowAmount/1e12 * 101/100;
-    //     deal(address(USDC), address(user), swapAmount);
-
-    //     // get rid of the stablecoin that was borrowed
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), borrowAmount);
-
-    //    // build repay params
-    //    uint256 expectedAmountIn;
-    //    CreditParams memory creditParams;
-    //    {
-    //         bytes32[] memory poolIds = new bytes32[](1);
-    //         poolIds[0] = stablePoolId;
-
-    //         address[] memory assets = new address[](2);
-    //         assets[0] = address(stablecoin);
-    //         assets[1] = address(USDC);
-
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: borrowAmount,
-    //                 limit: swapAmount,
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(poolIds, assets)
-    //             })
-    //         });
-    //         expectedAmountIn = _simulateBalancerSwap(creditParams.auxSwap);
-    //    }
-
-    //    vm.prank(user);
-    //    USDC.approve(address(userProxy), swapAmount);
-
-    //    // trigger PositionAction__repay_InvalidAuxSwap
-    //    creditParams.auxSwap.recipient = user;
-    //    vm.prank(user);
-    //    vm.expectRevert(PositionAction.PositionAction__repay_InvalidAuxSwap.selector);
-    //    userProxy.execute(
-    //        address(positionAction),
-    //        abi.encodeWithSelector(
-    //            positionAction.repay.selector,
-    //            address(userProxy), // user proxy is the position
-    //            address(daiVault),
-    //            creditParams,
-    //            emptyPermitParams
-    //        )
-    //    );
-    // }
-
-    // function test_withdrawAndRepay() public {
-    //     uint256 depositAmount = 5_000*1 ether;
-    //     uint256 borrowAmount = 2_500*1 ether;
-
-    //     // deposit and borrow
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // build withdraw and repay params
-    //     CollateralParams memory collateralParams;
-    //     CreditParams memory creditParams;
-    //     {
-    //         collateralParams = CollateralParams({
-    //             targetToken: address(DAI),
-    //             amount: depositAmount,
-    //             collateralizer: user,
-    //             auxSwap: emptySwap
-    //         });
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: emptySwap
-    //         });
-    //     }
-
-    //     vm.startPrank(user);
-    //     stablecoin.approve(address(userProxy), borrowAmount);
-
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.withdrawAndRepay.selector,
-    //             address(userProxy), // user proxy is the position
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-    //     vm.stopPrank();
-
-
-    //     (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
-    //     uint256 creditAmount = credit(address(userProxy));
-
-    //     assertEq(collateral, 0);
-    //     assertEq(debt, 0);
-    //     assertEq(creditAmount, 0);
-    //     assertEq(stablecoin.balanceOf(user), 0);
-    //     assertEq(DAI.balanceOf(user), depositAmount);
-    // }
-
-    // function test_withdrawAndRepay_with_swaps() public {
-    //     uint256 depositAmount = 5_000*1 ether;
-    //     uint256 borrowAmount = 2_500*1 ether;
-
-    //     // deposit and borrow
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // spend users stablecoin
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), borrowAmount);
-
-    //     // build withdraw and repay params
-    //     CollateralParams memory collateralParams;
-    //     CreditParams memory creditParams;
-    //     uint256 debtSwapMaxAmountIn = borrowAmount * 101 /100e12;
-    //     uint256 debtSwapAmountIn;
-    //     uint256 expectedCollateralOut;
-    //     {
-    //         address[] memory collateralAssets = new address[](2);
-    //         collateralAssets[0] = address(DAI);
-    //         collateralAssets[1] = address(USDC);
-
-    //         address[] memory debtAssets = new address[](2);
-    //         debtAssets[0] = address(stablecoin);
-    //         debtAssets[1] = address(USDC);
-
-    //         collateralParams = CollateralParams({
-    //             targetToken: address(USDC),
-    //             amount: depositAmount,
-    //             collateralizer: user,
-    //             auxSwap: SwapParams({ // swap DAI for USDC
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_IN,
-    //                 assetIn: address(DAI),
-    //                 amount: depositAmount,
-    //                 limit: depositAmount * 99/100e12,
-    //                 recipient: address(user), // sent directly to the user
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, collateralAssets)
-    //             })
-    //         });
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: borrowAmount,
-    //                 limit: debtSwapMaxAmountIn,
-    //                 recipient: address(userProxy), // must be sent to proxy
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, debtAssets)
-    //             })
-    //         });
-    //         (debtSwapAmountIn, expectedCollateralOut) = _simulateBalancerSwapMulti(creditParams.auxSwap, collateralParams.auxSwap);
-    //     }
-
-    //     vm.startPrank(user);
-    //     deal(address(USDC), address(user), debtSwapMaxAmountIn);
-    //     USDC.approve(address(userProxy), debtSwapMaxAmountIn);
-
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.withdrawAndRepay.selector,
-    //             address(userProxy), // user proxy is the position
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-    //     vm.stopPrank();
-
-
-    //     // ensure that users position is cleared out
-    //     (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
-    //     uint256 creditAmount = credit(address(userProxy));
-    //     assertEq(collateral, 0);
-    //     assertEq(debt, 0);
-    //     assertEq(creditAmount, 0);
-
-    //     // ensure that ERC20 balances are as expected
-    //     assertEq(stablecoin.balanceOf(address(userProxy)), 0); // ensure no stablecoin has been left on proxy
-    //     assertEq(stablecoin.balanceOf(user), 0); // ensure no stablecoin has been left on user eoa
-
-    //     // ensure that left over USDC from debt swap is kept on proxy and USDC from collateral swap is sent to user
-    //     assertEq(USDC.balanceOf(user), expectedCollateralOut + debtSwapMaxAmountIn - debtSwapAmountIn);
-    // }
-
-    // // withdraw dai and swap to usdc, then repay usdc debt by swapping to stablecoin
-    // function test_withdrawAndRepay_with_EXACT_OUT_swaps() public {
-    //     uint256 depositAmount = 5_000*1 ether;
-    //     uint256 borrowAmount = 2_500*1 ether;
-
-    //     // deposit and borrow
-    //     _depositAndBorrow(userProxy, address(daiVault), depositAmount, borrowAmount);
-
-    //     // spend users stablecoin
-    //     vm.prank(user);
-    //     stablecoin.transfer(address(0x1), borrowAmount);
-
-    //     // build withdraw and repay params
-    //     CollateralParams memory collateralParams;
-    //     CreditParams memory creditParams;
-    //     uint256 debtSwapMaxAmountIn = borrowAmount * 101 /100e12;
-    //     uint256 collateralSwapOut = depositAmount * 99/100e12;
-    //     uint256 debtSwapAmountIn; // usdc spent swapping debt to stablecoin
-    //     uint256 expectedCollateralIn; // dai spent swapping collateral to usdc
-    //     {
-    //         address[] memory collateralAssets = new address[](2);
-    //         collateralAssets[0] = address(USDC);
-    //         collateralAssets[1] = address(DAI);
-
-    //         address[] memory debtAssets = new address[](2);
-    //         debtAssets[0] = address(stablecoin);
-    //         debtAssets[1] = address(USDC);
-
-    //         collateralParams = CollateralParams({
-    //             targetToken: address(USDC),
-    //             amount: depositAmount,
-    //             collateralizer: user,
-    //             auxSwap: SwapParams({ // swap DAI for USDC
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(DAI),
-    //                 amount: collateralSwapOut,
-    //                 limit: depositAmount,
-    //                 recipient: address(user), // sent directly to the user
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, collateralAssets)
-    //             })
-    //         });
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({ // swap USDC for stablecoin
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: borrowAmount,
-    //                 limit: debtSwapMaxAmountIn,
-    //                 recipient: address(userProxy), // must be sent to proxy
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, debtAssets)
-    //             })
-    //         });
-    //         (debtSwapAmountIn, expectedCollateralIn) = _simulateBalancerSwapMulti(creditParams.auxSwap, collateralParams.auxSwap);
-    //     }
-
-    //     vm.startPrank(user);
-    //     deal(address(USDC), address(user), debtSwapMaxAmountIn);
-    //     USDC.approve(address(userProxy), debtSwapMaxAmountIn);
-
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.withdrawAndRepay.selector,
-    //             address(userProxy), // user proxy is the position
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-    //     vm.stopPrank();
-
-
-    //     // ensure that users position is cleared out
-    //     (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
-    //     uint256 creditAmount = credit(address(userProxy));
-    //     assertEq(collateral, 0);
-    //     assertEq(debt, 0);
-    //     assertEq(creditAmount, 0);
-
-    //     // ensure that ERC20 balances are as expected
-    //     assertEq(stablecoin.balanceOf(address(userProxy)), 0); // ensure no stablecoin has been left on proxy
-    //     assertEq(stablecoin.balanceOf(user), 0); // ensure no stablecoin has been left on user eoa
-
-    //     // ensure that left over USDC from debt swap and amount of from collateral swap is sent to user
-    //     assertEq(USDC.balanceOf(user), collateralSwapOut + debtSwapMaxAmountIn - debtSwapAmountIn);
-    //     assertEq(DAI.balanceOf(user), depositAmount - expectedCollateralIn); // ensure user got left over dai from collateral exact_out swap
-    // }
-
-    // function test_depositAndBorrow() public {
-    //     uint256 upFrontUnderliers = 10_000*1 ether;
-    //     uint256 borrowAmount = 5_000*1 ether;
-
-    //     deal(address(DAI), user, upFrontUnderliers);
-
-    //     CollateralParams memory collateralParams = CollateralParams({
-    //         targetToken: address(DAI),
-    //         amount: upFrontUnderliers,
-    //         collateralizer: address(user),
-    //         auxSwap: emptySwap // no entry swap
-    //     });
-    //     CreditParams memory creditParams = CreditParams({
-    //         amount: borrowAmount,
-    //         creditor: user,
-    //         auxSwap: emptySwap // no exit swap
-    //     });
-
-    //     vm.prank(user);
-    //     DAI.approve(address(userProxy), upFrontUnderliers);
-
-    //     vm.prank(user);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.depositAndBorrow.selector,
-    //             address(userProxy),
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-
-    //     (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-    //     assertEq(collateral, upFrontUnderliers);
-    //     assertEq(normalDebt, borrowAmount);
-
-    //     assertEq(stablecoin.balanceOf(user), borrowAmount);
-    // }
-
-    // // enter a DAI vault with USDC and exit with USDT
-    // function test_depositAndBorrow_with_entry_and_exit_swaps() public {
-    //     uint256 upFrontUnderliers = 10_000*1e6; // in USDC
-    //     uint256 borrowAmount = 5_000*1 ether; // in stablecoin
-
-    //     deal(address(USDC), user, upFrontUnderliers);
-
-    //     CollateralParams memory collateralParams;
-    //     CreditParams memory creditParams;
-    //     uint256 expectedCollateral;
-    //     uint256 expectedExitAmount;
-    //     {
-
-    //         address[] memory entryAssets = new address[](2);
-    //         entryAssets[0] = address(USDC);
-    //         entryAssets[1] = address(DAI);
-
-    //         address[] memory exitAssets = new address[](2);
-    //         exitAssets[0] = address(stablecoin);
-    //         exitAssets[1] = address(USDT);
-
-    //         collateralParams = CollateralParams({
-    //             targetToken: address(USDC),
-    //             amount: 0,
-    //             collateralizer: address(user),
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_IN,
-    //                 assetIn: address(USDC),
-    //                 amount: upFrontUnderliers,
-    //                 limit: upFrontUnderliers * 1e12 * 98 / 100, // amountOutMin in DAI 
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, entryAssets)
-    //             })            
-    //         });
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_IN,
-    //                 assetIn: address(stablecoin),
-    //                 amount: borrowAmount,
-    //                 limit: borrowAmount * 98 / 100e12, // amountOutMin in USDT
-    //                 recipient: user,
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(stablePoolIdArray, exitAssets)
-    //             })
-    //         });
-
-    //         (expectedCollateral, expectedExitAmount) = _simulateBalancerSwapMulti(collateralParams.auxSwap, creditParams.auxSwap);
-    //     }
-
-    //     vm.prank(user);
-    //     USDC.approve(address(userProxy), upFrontUnderliers);
-
-    //     vm.prank(user);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.depositAndBorrow.selector,
-    //             address(userProxy),
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-
-    //     (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-    //     assertEq(collateral, expectedCollateral);
-    //     assertEq(normalDebt, borrowAmount);
-
-    //     assertEq(USDT.balanceOf(user), expectedExitAmount);
-    // }
-
-    // // enter a DAI vault with USDC and exit with USDT using EXACT_OUT swaps
-    // function test_depositAndBorrow_with_EXACT_OUT_entry_and_exit_swaps() public {
-    //     uint256 depositAmount = 10_100*1e6; // in USDC
-    //     uint256 borrowAmount = 5_100*1 ether; // in stablecoin
-
-    //     deal(address(USDC), user, depositAmount);
-
-    //     CollateralParams memory collateralParams;
-    //     CreditParams memory creditParams;
-    //     uint256 expectedEntryIn;
-    //     uint256 expectedExitIn;
-    //     uint256 expectedCollateral = depositAmount * 99e12 / 100;
-    //     uint256 expectedExit = borrowAmount * 99/100e12;
-    //     {
-    //         bytes32[] memory entryPoolIds = new bytes32[](1);
-    //         entryPoolIds[0] = stablePoolId;
-
-    //         address[] memory entryAssets = new address[](2);
-    //         entryAssets[0] = address(DAI);
-    //         entryAssets[1] = address(USDC);
-
-    //         bytes32[] memory exitPoolIds = new bytes32[](1);
-    //         exitPoolIds[0] = stablePoolId;
-
-    //         address[] memory exitAssets = new address[](2);
-    //         exitAssets[0] = address(USDT);
-    //         exitAssets[1] = address(stablecoin);
-
-    //         collateralParams = CollateralParams({
-    //             targetToken: address(USDC),
-    //             amount: 0,
-    //             collateralizer: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(USDC),
-    //                 amount: expectedCollateral,
-    //                 limit: depositAmount, // amountInMax in USDC
-    //                 recipient: address(userProxy),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(entryPoolIds, entryAssets)
-    //             })
-    //         });
-    //         creditParams = CreditParams({
-    //             amount: borrowAmount,
-    //             creditor: user,
-    //             auxSwap: SwapParams({
-    //                 swapProtocol: SwapProtocol.BALANCER,
-    //                 swapType: SwapType.EXACT_OUT,
-    //                 assetIn: address(stablecoin),
-    //                 amount: expectedExit,
-    //                 limit: borrowAmount, // amountInMax in stablecoin
-    //                 recipient: address(user),
-    //                 deadline: block.timestamp + 100,
-    //                 args: abi.encode(exitPoolIds, exitAssets)
-    //             })
-    //         });
-
-    //         (expectedEntryIn, expectedExitIn) = _simulateBalancerSwapMulti(collateralParams.auxSwap, creditParams.auxSwap);
-    //     }
-
-    //     vm.prank(user);
-    //     USDC.approve(address(userProxy), depositAmount);
-
-    //     vm.prank(user);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.depositAndBorrow.selector,
-    //             address(userProxy),
-    //             address(daiVault),
-    //             collateralParams,
-    //             creditParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-
-    //     (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-    //     assertEq(collateral, expectedCollateral);
-    //     assertEq(normalDebt, borrowAmount);
-
-    //     // validate that the swap amounts are as expected w/ residual amounts being sent to msg.sender
-    //     assertEq(USDT.balanceOf(user), expectedExit);
-    //     assertEq(stablecoin.balanceOf(user), borrowAmount - expectedExitIn);
-
-    //     // validate resiudal amounts from entry swap
-    //     assertEq(USDC.balanceOf(address(user)), depositAmount - expectedEntryIn);
-
-    //     // validate that there is no dust
-    //     assertEq(USDT.balanceOf(address(userProxy)), 0);
-    //     assertEq(stablecoin.balanceOf(address(userProxy)), 0);
-    //     assertEq(DAI.balanceOf(address(userProxy)), 0);
-    // }
-
-    // // MULTISEND
-
-    // // send a direct call to multisend and expect revert
-    // function test_multisend_no_direct_call() public {
-    //     address[] memory targets = new address[](1);
-    //     targets[0] = address(DAI);
-
-    //     bytes[] memory data = new bytes[](1);
-    //     data[0] = abi.encodeWithSelector(DAI.balanceOf.selector, user);
-
-    //     bool[] memory delegateCall = new bool[](1);
-    //     delegateCall[0] = false;
-
-    //     vm.expectRevert(PositionAction.PositionAction__onlyDelegatecall.selector);
-    //     positionAction.multisend(targets, data, delegateCall);
-    // }
-
-    // function test_multisend_revert_on_inner_revert() public {
-    //     address[] memory targets = new address[](1);
-    //     targets[0] = address(DAI);
-
-    //     bytes[] memory data = new bytes[](1);
-    //     data[0] = abi.encodeWithSelector(PositionAction.multisend.selector); // random selector
-
-    //     bool[] memory delegateCall = new bool[](1);
-    //     delegateCall[0] = false;
-
-    //     vm.expectRevert(BaseAction.Action__revertBytes_emptyRevertBytes.selector);
-    //     vm.prank(user);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.multisend.selector,
-    //             targets,
-    //             data,
-    //             delegateCall
-    //         )
-    //     );
-    // }
-
-    // function test_multisend_simple_delegatecall() public {
-    //     uint256 depositAmount = 1_000 ether;
-    //     uint256 borrowAmount = 500 ether;
-
-    //     deal(address(DAI), address(userProxy), depositAmount);
-
-    //     CollateralParams memory collateralParams = CollateralParams({
-    //         targetToken: address(DAI),
-    //         amount: depositAmount,
-    //         collateralizer: address(userProxy),
-    //         auxSwap: emptySwap
-    //     });
-
-    //     CreditParams memory creditParams = CreditParams({
-    //         amount: borrowAmount,
-    //         creditor: address(userProxy),
-    //         auxSwap: emptySwap
-    //     });
-
-    //     address[] memory targets = new address[](2);
-    //     targets[0] = address(positionAction);
-    //     targets[1] = address(daiVault);
-
-    //     bytes[] memory data = new bytes[](2);
-    //     data[0] = abi.encodeWithSelector(
-    //         positionAction.depositAndBorrow.selector,
-    //         address(userProxy),
-    //         address(daiVault),
-    //         collateralParams,
-    //         creditParams,
-    //         emptyPermitParams
-    //     );
-    //     data[1] = abi.encodeWithSelector(CDPVault.modifyCollateralAndDebt.selector,
-    //         address(userProxy),
-    //         address(userProxy),
-    //         address(userProxy),
-    //         0,
-    //         0
-    //     );
-
-    //     bool[] memory delegateCall = new bool[](2);
-    //     delegateCall[0] = true;
-    //     delegateCall[1] = false;
-
-    //     vm.prank(user);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.multisend.selector,
-    //             targets,
-    //             data,
-    //             delegateCall
-    //         )
-    //     );
-
-    //     (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
-    //     assertEq(collateral, depositAmount);
-    //     assertEq(debt, borrowAmount);
-    // }
+    function test_withdrawAndRepay() public {
+        uint256 depositAmount = 5_000*1 ether;
+        uint256 borrowAmount = 2_500*1 ether;
+
+        // deposit and borrow
+        _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
+
+        // build withdraw and repay params
+        CollateralParams memory collateralParams;
+        CreditParams memory creditParams;
+        {
+            collateralParams = CollateralParams({
+                targetToken: address(token),
+                amount: depositAmount,
+                collateralizer: user,
+                auxSwap: emptySwap
+            });
+            creditParams = CreditParams({
+                amount: borrowAmount,
+                creditor: user,
+                auxSwap: emptySwap
+            });
+        }
+
+        vm.startPrank(user);
+        underlyingToken.approve(address(userProxy), borrowAmount);
+
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.withdrawAndRepay.selector,
+                address(userProxy), // user proxy is the position
+                address(vault),
+                collateralParams,
+                creditParams,
+                emptyPermitParams
+            )
+        );
+        vm.stopPrank();
+
+        (uint256 collateral, uint256 debt, , ) = vault.positions(address(userProxy));
+        uint256 creditAmount = credit(address(userProxy));
+
+        assertEq(collateral, 0);
+        assertEq(debt, 0);
+        assertEq(creditAmount, 0);
+        assertEq(underlyingToken.balanceOf(user), 0);
+        assertEq(token.balanceOf(user), depositAmount);
+    }
+
+    function test_depositAndBorrow() public {
+        uint256 upFrontUnderliers = 10_000*1 ether;
+        uint256 borrowAmount = 5_000*1 ether;
+
+        deal(address(token), user, upFrontUnderliers);
+
+        CollateralParams memory collateralParams = CollateralParams({
+            targetToken: address(token),
+            amount: upFrontUnderliers,
+            collateralizer: address(user),
+            auxSwap: emptySwap // no entry swap
+        });
+        CreditParams memory creditParams = CreditParams({
+            amount: borrowAmount,
+            creditor: user,
+            auxSwap: emptySwap // no exit swap
+        });
+
+        vm.prank(user);
+        token.approve(address(userProxy), upFrontUnderliers);
+
+        vm.prank(user);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.depositAndBorrow.selector,
+                address(userProxy),
+                address(vault),
+                collateralParams,
+                creditParams,
+                emptyPermitParams
+            )
+        );
+
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+
+        assertEq(collateral, upFrontUnderliers);
+        assertEq(debt, borrowAmount);
+
+        assertEq(underlyingToken.balanceOf(user), borrowAmount);
+    }
+
+    // MULTISEND
+
+    // send a direct call to multisend and expect revert
+    function test_multisend_no_direct_call() public {
+        address[] memory targets = new address[](1);
+        targets[0] = address(token);
+
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeWithSelector(token.balanceOf.selector, user);
+
+        bool[] memory delegateCall = new bool[](1);
+        delegateCall[0] = false;
+
+        vm.expectRevert(PositionAction.PositionAction__onlyDelegatecall.selector);
+        positionAction.multisend(targets, data, delegateCall);
+    }
+
+    function test_multisend_revert_on_inner_revert() public {
+        address[] memory targets = new address[](1);
+        targets[0] = address(token);
+
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeWithSelector(PositionAction.multisend.selector); // random selector
+
+        bool[] memory delegateCall = new bool[](1);
+        delegateCall[0] = false;
+
+        vm.expectRevert(BaseAction.Action__revertBytes_emptyRevertBytes.selector);
+        vm.prank(user);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.multisend.selector,
+                targets,
+                data,
+                delegateCall
+            )
+        );
+    }
+
+    function test_multisend_simple_delegatecall() public {
+        uint256 depositAmount = 1_000 ether;
+        uint256 borrowAmount = 500 ether;
+
+        deal(address(token), address(userProxy), depositAmount);
+
+        CollateralParams memory collateralParams = CollateralParams({
+            targetToken: address(token),
+            amount: depositAmount,
+            collateralizer: address(userProxy),
+            auxSwap: emptySwap
+        });
+
+        CreditParams memory creditParams = CreditParams({
+            amount: borrowAmount,
+            creditor: address(userProxy),
+            auxSwap: emptySwap
+        });
+
+        address[] memory targets = new address[](2);
+        targets[0] = address(positionAction);
+        targets[1] = address(vault);
+
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(
+            positionAction.depositAndBorrow.selector,
+            address(userProxy),
+            address(vault),
+            collateralParams,
+            creditParams,
+            emptyPermitParams
+        );
+        data[1] = abi.encodeWithSelector(CDPVault.modifyCollateralAndDebt.selector,
+            address(userProxy),
+            address(userProxy),
+            address(userProxy),
+            0,
+            0
+        );
+
+        bool[] memory delegateCall = new bool[](2);
+        delegateCall[0] = true;
+        delegateCall[1] = false;
+
+        vm.prank(user);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.multisend.selector,
+                targets,
+                data,
+                delegateCall
+            )
+        );
+
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        assertEq(collateral, depositAmount);
+        assertEq(debt, borrowAmount);
+    }
 
     // function test_multisend_deposit() public {
     //     uint256 depositAmount = 10_000 ether;
@@ -1444,27 +829,6 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
     }
-
-    // function _borrow(PRBProxy proxy, address vault, uint256 borrowAmount) internal {
-    //     // build borrow params
-    //     SwapParams memory auxSwap;
-    //     CreditParams memory creditParams = CreditParams({
-    //         amount: borrowAmount,
-    //         creditor: address(proxy),
-    //         auxSwap: auxSwap // no entry swap
-    //     });
-
-    //     vm.prank(proxy.owner());
-    //     proxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.borrow.selector,
-    //             address(proxy), // user proxy is the position
-    //             vault,
-    //             creditParams
-    //         )
-    //     );
-    // }
 
     function _depositAndBorrow(PRBProxy proxy, address vault_, uint256 depositAmount, uint256 borrowAmount) internal {
         CDPVault cdpVault = CDPVault(vault_);

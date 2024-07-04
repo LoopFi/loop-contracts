@@ -12,7 +12,7 @@ import {CDPVaultConstants, CDPVaultConfig} from "../../interfaces/ICDPVault.sol"
 import {IPermission} from "../../interfaces/IPermission.sol";
 
 import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
-import {CDPVault, calculateDebt, calculateNormalDebt, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
+import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 
 contract CDPVaultWrapper is CDPVault {
     constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) CDPVault(constants, config) {}

@@ -29,29 +29,6 @@ interface IPoolV3Loop is IPoolV3 {
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
 bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");
 
-/// @notice Calculates the actual debt from a normalized debt amount
-/// @param normalDebt Normalized debt (either of a position or the total normalized debt)
-/// @param rateAccumulator Rate accumulator
-/// @return debt Actual debt [wad]
-function calculateDebt(uint256 normalDebt, uint64 rateAccumulator) pure returns (uint256 debt) {
-    debt = wmul(normalDebt, rateAccumulator);
-}
-
-/// @notice Calculates the normalized debt from an actual debt amount
-/// @param debt Actual debt (either of a position or the total debt)
-/// @param rateAccumulator Rate accumulator
-/// @return normalDebt Normalized debt [wad]
-function calculateNormalDebt(uint256 debt, uint64 rateAccumulator) pure returns (uint256 normalDebt) {
-    normalDebt = wdiv(debt, rateAccumulator);
-
-    // account for rounding errors due to division
-    if (calculateDebt(normalDebt, rateAccumulator) < debt) {
-        unchecked {
-            ++normalDebt;
-        }
-    }
-}
-
 /// @title CDPVault
 /// @notice Base logic of a borrow vault for depositing collateral and drawing credit against it
 contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {

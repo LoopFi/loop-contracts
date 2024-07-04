@@ -178,7 +178,18 @@ contract CDPVaultTest is TestBase {
     function test_modifyCollateralAndDebt_emptyCall() public {
         CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
         address position = address(new PositionOwner(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+
+        vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
+
+        (uint256 collateral, uint256 debt, , ) = vault.positions(position);
         vault.modifyCollateralAndDebt(position, address(this), address(this), 0, 0);
+        (uint256 collateralAfter, uint256 debtAfter, , ) = vault.positions(position);
+
+        assertEq(collateral, collateralAfter);
+        assertEq(debt, debtAfter);
     }
 
     function test_modifyCollateralAndDebt_repayPositionAndWithdraw() public {

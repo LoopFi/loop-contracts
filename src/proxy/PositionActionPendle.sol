@@ -32,18 +32,18 @@ contract PositionActionPendle is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address /*src*/, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(address vault, address position, address /*src*/, uint256 amount) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(address(this), amount);
+        return ICDPVault(vault).deposit(position, amount);
     }
 
     /// @notice Withdraw collateral from the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address /*dst*/, uint256 amount) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(address(this), amount);
+    function _onWithdraw(address vault, address position, address /*dst*/, uint256 amount) internal override returns (uint256) {
+        return ICDPVault(vault).withdraw(address(position), amount);
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault
@@ -64,7 +64,7 @@ contract PositionActionPendle is PositionAction {
         }
         addCollateralAmount = ICDPVault(leverParams.vault).token().balanceOf(address(this));
         // deposit into the CDP Vault
-        return _onDeposit(leverParams.vault, address(0), addCollateralAmount);
+        return _onDeposit(leverParams.vault, address(this) ,address(0), addCollateralAmount);
     }
 
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault
@@ -75,7 +75,7 @@ contract PositionActionPendle is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        uint collateralAmount = _onWithdraw(leverParams.vault, address(0), subCollateral);
+        uint collateralAmount = _onWithdraw(leverParams.vault, address(this), address(0), subCollateral);
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(

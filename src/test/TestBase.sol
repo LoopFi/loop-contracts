@@ -72,8 +72,9 @@ contract TestBase is Test {
         vm.warp(currentTimestamp);
         _;
     }
-
+    
     function setUp() public virtual {
+        dealManager = new PatchedDeal();
         setCurrentTimestamp(block.timestamp);
 
         createAccounts();
@@ -246,16 +247,6 @@ contract TestBase is Test {
             });
     }
 
-    function setUp() public virtual {
-        dealManager = new PatchedDeal();
-        setCurrentTimestamp(block.timestamp);
-
-        createAccounts();
-        createAssets();
-        createOracles();
-        createCore();
-        labelContracts();
-    }
 
     function getContracts() public view returns (address[] memory contracts) {
         contracts = new address[](5);
@@ -264,17 +255,6 @@ contract TestBase is Test {
         contracts[2] = address(liquidityPool);
         contracts[3] = address(acl);
         contracts[4] = address(mockWETH);
-    }
-
-    function deal(address token_, address to, uint256 amount) virtual override internal {
-        if (usePatchedDeal) {
-            uint256 chainId = block.chainid;
-            vm.chainId(1);
-            dealManager.deal2(token_, to, amount);
-            vm.chainId(chainId);
-        } else {
-            super.deal(token_, to, amount);
-        }
     }
 
     function deal(address token_, address to, uint256 amount) virtual override internal {

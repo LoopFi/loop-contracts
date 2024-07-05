@@ -628,6 +628,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
         if (block.timestamp != lastBaseInterestUpdate_) {
             _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[LP-18]
+            lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
         if (block.timestamp != lastQuotaRevenueUpdate) {

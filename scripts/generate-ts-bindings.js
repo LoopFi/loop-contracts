@@ -33,6 +33,8 @@ async function main() {
     { name: 'PriceProvider', path: '../out/Tokenomics.t.sol/MockPriceProvider.json'},
     { name: 'BalancerPool', path: '../out/IBalancerVault.sol/IVault.json'},
     { name: 'PoolV3', path: '../out/PoolV3.sol/PoolV3.json'},
+    { name: 'PositionActionPendle', path: '../out/PositionActionPendle.sol/PositionActionPendle.json'},
+    { name: 'PendleLPOracle', path: '../out/PendleLPOracle.sol/PendleLPOracle.json'},
   ];
 
   const abis = {};

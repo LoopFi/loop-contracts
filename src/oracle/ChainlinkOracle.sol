@@ -23,7 +23,7 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     uint256 public immutable stalePeriod;
     /// @notice Aggregator decimal to WAD conversion scale
     uint256 public immutable aggregatorScale;
-    /// @notice
+
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/

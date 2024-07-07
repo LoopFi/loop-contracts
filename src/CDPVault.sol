@@ -18,7 +18,6 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
-import {console} from "forge-std/console.sol";
 
 interface IPoolV3Loop is IPoolV3 {
     function mintProfit(uint256 profit) external;
@@ -384,6 +383,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 newCumulativeIndex;
 
         uint256 profit;
+        int256 quotaRevenueChange;
         if (deltaDebt > 0) {
             (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease(
                 uint256(deltaDebt), // delta debt
@@ -391,7 +391,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             ); // U:[CM-10]
-
+            position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
+            quotaRevenueChange = _calcQuotaRevenueChange(deltaDebt);
             pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
         } else if (deltaDebt < 0) {
             uint256 maxRepayment = calcTotalDebt(debtData);
@@ -417,7 +418,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                     debtData.cumulativeQuotaInterest
                 );
             }
-
+            quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt - newDebt));
             pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
 
             position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
@@ -443,7 +444,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             !_isCollateralized(newDebt, collateralValue, config.liquidationRatio)
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
+        if (quotaRevenueChange != 0) {
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+        }
         emit ModifyCollateralAndDebt(owner, collateralizer, creditor, deltaCollateral, deltaDebt);
+    }
+
+    function _calcQuotaRevenueChange(int256 deltaDebt) internal view returns (int256 quotaRevenueChange) {
+        uint16 rate = IPoolQuotaKeeperV3(poolQuotaKeeper()).getQuotaRate(address(token));
+        return QuotasLogic.calcQuotaRevenueChange(rate, deltaDebt);
     }
 
     function _calcDebt(Position memory position) internal view returns (DebtData memory cdd) {

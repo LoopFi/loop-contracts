@@ -237,17 +237,19 @@ contract CDPVaultTest is TestBase {
         assertEq(credit(address(this)), 150 ether);
 
         (, uint256 accruedInterest, uint256 cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
-
+        vm.prank(address(gauge));
+        quotaKeeper.updateRates();
         assertEq(accruedInterest, 0, "accruedInterest before");
         assertEq(cumulativeQuotaInterest, 0, "cumulativeQuotaInterest before");
         assertEq(virtualDebt(vault, address(this)), 150 ether + accruedInterest, "Not correct");
         console.log(vault.quotasInterest(address(this)));
-        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue before");
+        assertEq(liquidityPool.quotaRevenue(), liquidityPool.totalBorrowed() / 1000, "quotaRevenue before");
+
         vm.warp(block.timestamp + 95 days);
         (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
         assertGt(accruedInterest, 0, "accruedInterest after 100 days");
         assertGt(cumulativeQuotaInterest, 0, "cumulativeQuotaInterest after 100 days");
-        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue after 100 days");
+        assertEq(liquidityPool.quotaRevenue(), liquidityPool.totalBorrowed() / 1000, "quotaRevenue after 100 days");
         vm.prank(address(gauge));
         quotaKeeper.updateRates();
         assertEq(
@@ -292,6 +294,7 @@ contract CDPVaultTest is TestBase {
         (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(this));
         assertEq(collateral, 0);
         assertEq(debt, 0);
+        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue after repaying");
         console.log(liquidityPool.quotaRevenue(), "quotaRevenue after repaying");
     }
 
@@ -309,7 +312,7 @@ contract CDPVaultTest is TestBase {
         token.approve(address(vault), 200 ether);
         vault.modifyCollateralAndDebt(address(this), address(this), address(this), 200 ether, 150 ether);
         assertEq(credit(address(this)), 150 ether);
-        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue before updating rates after a borrow");
+        assertEq(liquidityPool.quotaRevenue(), liquidityPool.totalBorrowed() / 1000, "quotaRevenue before updating rates after a borrow");
         assertEq(
             liquidityPool.calcAccruedQuotaInterest(),
             0,
@@ -410,7 +413,7 @@ contract CDPVaultTest is TestBase {
         (collateral, debt, , , , ) = vault.positions(address(this));
         assertEq(collateral, 0);
         assertEq(debt, 0);
-        console.log(liquidityPool.quotaRevenue(), "quotaRevenue after repaying");
+        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue after repaying");
     }
 
     function test_closePosition_Quotas_2Users() public {
@@ -425,7 +428,7 @@ contract CDPVaultTest is TestBase {
         token.approve(address(vault), 200 ether);
         vault.modifyCollateralAndDebt(address(this), address(this), address(this), 200 ether, 150 ether);
         assertEq(credit(address(this)), 150 ether);
-        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue before updating rates after a borrow");
+        assertEq(liquidityPool.quotaRevenue(), liquidityPool.totalBorrowed() / 1000, "quotaRevenue before updating rates after a borrow");
         assertEq(
             liquidityPool.calcAccruedQuotaInterest(),
             0,
@@ -441,7 +444,7 @@ contract CDPVaultTest is TestBase {
         vault.modifyCollateralAndDebt(user2, user2, user2, 200 ether, 150 ether);
         vm.stopPrank();
         assertEq(credit(user2), 150 ether);
-        assertEq(liquidityPool.quotaRevenue(), 0, "quotaRevenue before updating rates after a borrow");
+        assertEq(liquidityPool.quotaRevenue(), liquidityPool.totalBorrowed() / 1000, "quotaRevenue before updating rates after a borrow");
         assertEq(
             liquidityPool.calcAccruedQuotaInterest(),
             0,

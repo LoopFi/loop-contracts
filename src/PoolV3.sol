@@ -111,6 +111,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _;
     }
 
+    /// @dev Ensures that function caller is an allowed credit manager
+    modifier creditManagerOnly() {
+        _revertIfCallerNotCreditManager();
+        _;
+    }
+
     modifier whenNotLocked() {
         if (_allowed[msg.sender]) {
             _;
@@ -123,6 +129,13 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
         if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
+    }
+
+    /// @dev Reverts if `msg.sender` is not an allowed credit manager
+    function _revertIfCallerNotCreditManager() internal view {
+        if (!_creditManagerSet.contains(msg.sender)) {
+            revert CallerNotCreditManagerException(); // U:[PQK-4]
+        }
     }
 
     function _revertIfLocked() internal view {
@@ -471,6 +484,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     )
         external
         override
+        creditManagerOnly // U:[LP-2C]
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
     {
@@ -516,6 +530,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     )
         external
         override
+        creditManagerOnly // U:[LP-2C]
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
     {
@@ -632,7 +647,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
         if (block.timestamp != lastBaseInterestUpdate_) {
             _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[LP-18]
-            lastBaseInterestUpdate = uint40(block.timestamp); 
+            lastBaseInterestUpdate = uint40(block.timestamp);
         }
 
         if (block.timestamp != lastQuotaRevenueUpdate) {
@@ -676,9 +691,16 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         external
         override
         nonReentrant // U:[LP-2B]
-        poolQuotaKeeperOnly // U:[LP-2C]
+        //poolQuotaKeeperOnly // U:[LP-2C]
+        creditManagerOnly
     {
-        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[LP-19]
+        console.log(quotaRevenue(), "quota revenue");
+        int256 quotaRevenue = quotaRevenue().toInt256() + quotaRevenueDelta;
+        console.logInt(quotaRevenue);
+        console.logInt(quotaRevenueDelta);
+        console.log(quotaRevenue.toUint256());
+        uint256 quotaRevenue_ = quotaRevenue.toUint256();
+        _setQuotaRevenue(quotaRevenue_); // U:[LP-19]
     }
 
     /// @notice Sets new quota revenue value

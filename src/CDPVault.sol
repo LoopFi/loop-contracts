@@ -486,9 +486,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         DebtData memory debtData = _calcDebt(position);
 
         // load price and calculate discounted price
-        uint256 spotPrice_ = spotPrice();
-        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
-        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+       // uint256 spotPrice_ = spotPrice();
+        uint256 discountedPrice = wmul(spotPrice(), liqConfig_.liquidationDiscount);
+        if (spotPrice() == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
@@ -498,11 +498,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
        
 
         // verify that the position is indeed unsafe
-        if (_isCollateralized(debtData.debt, wmul(position.collateral, spotPrice_), config.liquidationRatio))
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice()), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
         // TODO: review this
+        uint256 loss;
         if (takeCollateral > position.collateral) {
             takeCollateral = position.collateral;
             repayAmount = wmul(takeCollateral, discountedPrice);
@@ -510,6 +511,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             // debt >= repayAmount if takeCollateral > position.collateral
             //deltaDebt = currentDebt;
             deltaDebt = debtData.debt;
+            loss = calcTotalDebt(debtData) - deltaDebt;
         }
 
         // update vault state
@@ -528,18 +530,25 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 newCumulativeIndex = debtData.cumulativeIndexNow;
                 profit = debtData.accruedFees;
             } else {
-                (newDebt, newCumulativeIndex, profit) = calcDecrease(
+                if(loss != 0) {
+                profit = 0;
+                newDebt = 0;
+                newCumulativeIndex = debtData.cumulativeIndexNow;
+                } else {
+                    (newDebt, newCumulativeIndex, profit) = calcDecrease(
                     deltaDebt, // delta debt
                     debtData.debt,
                     debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                     debtData.cumulativeIndexLastUpdate
                 );
+                }
             }
+           
             // update liquidated position
             position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
         }
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);

@@ -21,6 +21,7 @@ import {Flashlender} from "../Flashlender.sol";
 import {MockOracle} from "./MockOracle.sol";
 import {WAD, wdiv} from "../utils/Math.sol";
 import {PoolV3} from "../PoolV3.sol";
+import {VaultRegistry} from "../VaultRegistry.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AddressProviderV3} from "@gearbox-protocol/core-v3/contracts/core/AddressProviderV3.sol";
@@ -43,6 +44,8 @@ contract TestBase is Test {
     ERC20PresetMinterPauser internal mockWETH;
 
     Flashlender internal flashlender;
+
+    VaultRegistry internal vaultRegistry;
 
     ERC20PresetMinterPauser internal token;
     ERC20PresetMinterPauser internal underlyingToken;
@@ -131,6 +134,7 @@ contract TestBase is Test {
 
         flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
         liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
+        vaultRegistry = new VaultRegistry();
     }
 
     function createCDPVault(
@@ -173,6 +177,7 @@ contract TestBase is Test {
             constants.pool.setCreditManagerDebtLimit(address(vault), debtCeiling);
         }
 
+        vaultRegistry.addVault(ICDPVault(address(vault)));
         vm.label({account: address(vault), newLabel: "CDPVault"});
     }
 

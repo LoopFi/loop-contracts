@@ -64,7 +64,7 @@ contract PositionAction20Test is IntegrationTestBase {
         mockWETH.approve(address(user), type(uint256).max);
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction), address(vaultRegistry));
 
         vm.label(user, "user");
         vm.label(address(userProxy), "userProxy");
@@ -419,9 +419,10 @@ contract PositionAction20Test is IntegrationTestBase {
         assertEq(USDT.balanceOf(address(user)), expectedAmountOut);
     }
 
-    function test_borrow() public {
+    function test_borrow_1() public {
         // deposit to vault
         uint256 initialDeposit = 1_000 ether;
+        
         _deposit(userProxy, address(vault), initialDeposit);
 
         // borrow against deposit

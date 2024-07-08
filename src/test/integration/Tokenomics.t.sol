@@ -180,7 +180,6 @@ contract TokenomicsTest is IntegrationTestBase {
     ChefIncentivesController public incentivesController;
     EligibilityDataProvider public eligibilityDataProvider;
     MultiFeeDistribution public multiFeeDistribution;
-    VaultRegistry public vaultRegistry;
     MockPriceProvider public priceProvider;
     
     ERC20Mock public loopToken;
@@ -226,9 +225,7 @@ contract TokenomicsTest is IntegrationTestBase {
         lpToken = ERC20(address(govWeightedPool));
 
         // setup the vault registry
-        vaultRegistry = new VaultRegistry();
         vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
-        vaultRegistry.addVault(ICDPVault(address(vault)));
 
         multiFeeDistribution = MultiFeeDistribution(address(new ERC1967Proxy(
             address(new MultiFeeDistribution()),

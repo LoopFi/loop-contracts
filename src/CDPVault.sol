@@ -240,8 +240,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     /// @notice Withdraws collateral tokens from this contract and decreases a users collateral balance
     /// @param to Address of the user to withdraw tokens to
-    /// @param amount Amount of tokens to withdraw [wad]
-    /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
+    /// @param amount Amount of tokens to withdraw [tokenScale]
+    /// @return tokenAmount Amount of tokens withdrawn [wad]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
         tokenAmount = wmul(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
@@ -254,6 +254,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+
+    /// @notice Borrows credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to generate [wad]
+    /// @dev The borrower will receive the amount of credit in the underlying token
     function borrow(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = toInt256(amount);
         modifyCollateralAndDebt({
@@ -265,6 +271,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+    /// @notice Repays credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to repay [wad]
+    /// @dev The borrower will repay the amount of credit in the underlying token
     function repay(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = -toInt256(amount);
         modifyCollateralAndDebt({
@@ -292,6 +303,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     /// @notice Updates a position's collateral and debt balances
     /// @dev This is the only method which is allowed to modify a position's collateral and debt balances
+    /// @param owner Address of the owner of the position
+    /// @param position Position state
+    /// @param newDebt New debt balance [wad]
+    /// @param newCumulativeIndex New cumulative index
+    /// @param deltaCollateral Amount of collateral to put up (+) or to remove (-) from the position [wad]
+    /// @param totalDebt_ Total debt of the vault [wad]
     function _modifyPosition(
         address owner,
         Position memory position,
@@ -432,6 +449,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         emit ModifyCollateralAndDebt(owner, collateralizer, creditor, deltaCollateral, deltaDebt);
     }
 
+    /// @notice Returns the total debt and the accrued interest of a position
     function _calcDebt(Position memory position) internal view returns (DebtData memory cdd) {
         uint256 index = pool.baseInterestIndex();
         cdd.debt = position.debt;
@@ -547,8 +565,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // Mint the penalty from the vault to the treasury
         // cdm.modifyBalance(address(this), address(buffer), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
-
-        
     }
 
     /// @dev Computes new debt principal and interest index after increasing debt
@@ -572,16 +588,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         newDebt = debt + amount; // U:[CL-2]
         newCumulativeIndex = ((cumulativeIndexNow * newDebt * INDEX_PRECISION) /
             ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)); // U:[CL-2]
-    }
-
-    /// @dev Computes interest accrued since the last update
-    function calcAccruedInterest(
-        uint256 amount,
-        uint256 cumulativeIndexLastUpdate,
-        uint256 cumulativeIndexNow
-    ) internal pure returns (uint256) {
-        if (amount == 0) return 0;
-        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt
@@ -647,6 +653,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         newDebt = debt - amountToRepay; // U:[CL-3]
     }
 
+    /// @dev Computes interest accrued since the last update
+    function calcAccruedInterest(
+        uint256 amount,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeIndexNow
+    ) internal pure returns (uint256) {
+        if (amount == 0) return 0;
+        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
+    }
 
     /// @notice Returns the total debt of a position
     /// @param position Address of the position

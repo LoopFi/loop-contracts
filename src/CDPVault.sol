@@ -413,6 +413,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             uint256 amount = abs(deltaDebt);
             if (amount >= maxRepayment) {
                 amount = maxRepayment; // U:[CM-11]
+                deltaDebt = -toInt256(maxRepayment);
             }
 
             poolUnderlying.safeTransferFrom(creditor, address(pool), amount);

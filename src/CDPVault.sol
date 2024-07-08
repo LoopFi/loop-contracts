@@ -411,10 +411,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         if (deltaCollateral > 0) {
-            uint256 amount = deltaCollateral.toUint256();
+            uint256 amount = wmul(deltaCollateral.toUint256(), tokenScale);
             token.safeTransferFrom(collateralizer, address(this), amount);
         } else if (deltaCollateral < 0) {
-            uint256 amount = abs(deltaCollateral);
+            uint256 amount = wmul(abs(deltaCollateral), tokenScale);
             token.safeTransfer(collateralizer, amount);
         }
 

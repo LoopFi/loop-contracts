@@ -243,7 +243,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param amount Amount of tokens to withdraw [wad]
     /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
-        tokenAmount = wmul(amount, tokenScale);
+        tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: msg.sender,

@@ -446,24 +446,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         cdd.accruedFees = (cdd.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
     }
 
-    function _updatePosition(address position) internal view returns (Position memory updatedPos) {
-        Position memory pos = positions[position];
-        // pos.cumulativeIndexLastUpdate =
-        uint256 accruedInterest = calcAccruedInterest(
-            pos.debt,
-            pos.cumulativeIndexLastUpdate,
-            pool.baseInterestIndex()
-        );
-        uint256 currentDebt = pos.debt + accruedInterest;
-        uint256 spotPrice_ = spotPrice();
-        uint256 collateralValue = wmul(pos.collateral, spotPrice_);
-
-        if (spotPrice_ == 0 || _isCollateralized(currentDebt, collateralValue, vaultConfig.liquidationRatio))
-            revert CDPVault__modifyCollateralAndDebt_notSafe();
-
-        return pos;
-    }
-
     /*//////////////////////////////////////////////////////////////
                               LIQUIDATION
     //////////////////////////////////////////////////////////////*/

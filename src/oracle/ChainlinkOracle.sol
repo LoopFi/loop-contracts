@@ -17,13 +17,21 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Chainlink aggregator address
-    AggregatorV3Interface public immutable aggregator;
-    /// @notice Stable period in seconds
-    uint256 public immutable stalePeriod;
-    /// @notice Aggregator decimal to WAD conversion scale
-    uint256 public immutable aggregatorScale;
+    // /// @notice Chainlink aggregator address
+    // AggregatorV3Interface public immutable aggregator;
+    // /// @notice Stable period in seconds
+    // uint256 public immutable stalePeriod;
+    // /// @notice Aggregator decimal to WAD conversion scale
+    // uint256 public immutable aggregatorScale;
 
+    struct Oracle {
+        AggregatorV3Interface aggregator;
+        uint256 stalePeriod;
+        uint256 aggregatorScale;
+    }
+
+    /// @notice Mapping token to Chainlink oracle address
+    mapping(address => Oracle) public oracles;
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -41,13 +49,10 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    /// @param aggregator_ Chainlink aggregator address
-    /// @param stalePeriod_ Stable period in seconds
-    constructor(AggregatorV3Interface aggregator_, uint256 stalePeriod_) initializer {
-        aggregator = aggregator_;
-        stalePeriod = stalePeriod_;
-        aggregatorScale = 10 ** uint256(aggregator.decimals());
+    function setOracles(address[] calldata _tokens, Oracle[] calldata _oracles) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            oracles[_tokens[i]] = _oracles[i];
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -69,44 +74,43 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
-        if (_getStatus()) revert ChainlinkOracle__authorizeUpgrade_validStatus();
-    }
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 PRICING
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the status of the oracle
-    /// @param /*token*/ Token address, ignored for this oracle
+    /// @param token Token address
     /// @dev The status is valid if the price is validated and not stale
-    function getStatus(address /*token*/) public view virtual override returns (bool status) {
-        return _getStatus();
+    function getStatus(address token) public view virtual override returns (bool status) {
+        return _getStatus(token);
     }
 
     /// @notice Returns the latest price for the asset from Chainlink [WAD]
-    /// @param /*token*/ Token address
+    /// @param token Token address
     /// @return price Asset price [WAD]
     /// @dev reverts if the price is invalid
-    function spot(address /* token */) external view virtual override returns (uint256 price) {
+    function spot(address token) external view virtual override returns (uint256 price) {
         bool isValid;
-        (isValid, price) = _fetchAndValidate();
+        (isValid, price) = _fetchAndValidate(token);
         if (!isValid) revert ChainlinkOracle__spot_invalidValue();
     }
 
     /// @notice Fetches and validates the latest price from Chainlink
     /// @return isValid Whether the price is valid based on the value range and staleness
     /// @return price Asset price [WAD]
-    function _fetchAndValidate() internal view returns (bool isValid, uint256 price) {
-        try AggregatorV3Interface(aggregator).latestRoundData() returns (
+    function _fetchAndValidate(address token) internal view returns (bool isValid, uint256 price) {
+        Oracle memory oracle = oracles[token];
+        try AggregatorV3Interface(oracle.aggregator).latestRoundData() returns (
             uint80 /*roundId*/,
             int256 answer,
             uint256 /*startedAt*/,
             uint256 updatedAt,
             uint80 /*answeredInRound*/
         ) {
-            isValid = (answer > 0 && block.timestamp - updatedAt <= stalePeriod);
-            return (isValid, wdiv(uint256(answer), aggregatorScale));
+            isValid = (answer > 0 && block.timestamp - updatedAt <= oracle.stalePeriod);
+            return (isValid, wdiv(uint256(answer), oracle.aggregatorScale));
         } catch {
             // return the default values (false, 0) on failure
         }
@@ -115,7 +119,7 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @return status Whether the oracle is valid
     /// @dev The status is valid if the price is validated and not stale
-    function _getStatus() private view returns (bool status) {
-        (status, ) = _fetchAndValidate();
+    function _getStatus(address token) private view returns (bool status) {
+        (status, ) = _fetchAndValidate(token);
     }
 }

@@ -99,13 +99,13 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @return price Asset price [WAD]
     function _fetchAndValidate() internal view returns (bool isValid, uint256 price) {
         try AggregatorV3Interface(aggregator).latestRoundData() returns (
-            uint80 roundId,
+            uint80 /*roundId*/,
             int256 answer,
             uint256 /*startedAt*/,
             uint256 updatedAt,
-            uint80 answeredInRound
+            uint80 /*answeredInRound*/
         ) {
-            isValid = (answer > 0 && answeredInRound >= roundId && block.timestamp - updatedAt <= stalePeriod);
+            isValid = (answer > 0 && block.timestamp - updatedAt <= stalePeriod);
             return (isValid, wdiv(uint256(answer), aggregatorScale));
         } catch {
             // return the default values (false, 0) on failure

@@ -84,11 +84,21 @@ contract ChainlinkOracleTest is TestBase {
         chainlinkOracle = ChainlinkOracle(
             address(
                 new ERC1967Proxy(
-                    address(new ChainlinkOracle(aggregator, staleTime)),
+                    address(new ChainlinkOracle()),
                     abi.encodeWithSelector(ChainlinkOracle.initialize.selector, address(this), address(this))
                 )
             )
         );
+        ChainlinkOracle.Oracle[] memory oracles = new ChainlinkOracle.Oracle[](1);
+        ChainlinkOracle.Oracle memory oracle = ChainlinkOracle.Oracle({
+            aggregator: aggregator,
+            stalePeriod: staleTime,
+            aggregatorScale: aggregatorScale
+        });
+        oracles[0] = oracle;
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(0x1);
+        chainlinkOracle.setOracles(tokens, oracles);
     }
 
     function test_deployOracle() public {
@@ -99,7 +109,7 @@ contract ChainlinkOracleTest is TestBase {
         chainlinkOracle = ChainlinkOracle(
             address(
                 new ERC1967Proxy(
-                    address(new ChainlinkOracle(aggregator, staleTime)),
+                    address(new ChainlinkOracle()),
                     abi.encodeWithSelector(ChainlinkOracle.initialize.selector, admin, manager)
                 )
             )
@@ -124,12 +134,6 @@ contract ChainlinkOracleTest is TestBase {
 
     function test_spot_revertsOnInvalidValue() public {
         aggregator.setRoundValue(0);
-        vm.expectRevert(ChainlinkOracle.ChainlinkOracle__spot_invalidValue.selector);
-        chainlinkOracle.spot(address(0x1));
-    }
-
-    function test_spot_revertsOnInvalidRound() public {
-        aggregator.setRoundId(1, 0);
         vm.expectRevert(ChainlinkOracle.ChainlinkOracle__spot_invalidValue.selector);
         chainlinkOracle.spot(address(0x1));
     }

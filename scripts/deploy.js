@@ -114,6 +114,7 @@ async function attachContract(name, address) {
 async function deployContract(name, artifactName, isVault, ...args) {
   console.log(`Deploying ${artifactName || name}... {${args.map((v) => v.toString()).join(', ')}}}`);
   const Contract = await ethers.getContractFactory(name);
+  console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
   const contract = await Contract.deploy(...args);
   await contract.deployed();
   console.log(`${artifactName || name} deployed to: ${contract.address}`);
@@ -175,22 +176,30 @@ async function deployCore() {
     await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
   }
 
-  const cdm = await deployContract('CDM', 'CDM', false, signer, signer, signer);
-  await cdm["setParameter(bytes32,uint256)"](toBytes32("globalDebtCeiling"), CONFIG.Core.CDM.initialGlobalDebtCeiling);
+  // const cdm = await deployContract('CDM', 'CDM', false, signer, signer, signer);
+  // await cdm["setParameter(bytes32,uint256)"](toBytes32("globalDebtCeiling"), CONFIG.Core.CDM.initialGlobalDebtCeiling);
 
-  const stablecoin = await deployContract('Stablecoin');
-  const minter = await deployContract('Minter', 'Minter', false, cdm.address, stablecoin.address, signer, signer);
-  const flashlender = await deployContract('Flashlender', 'Flashlender', false, minter.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
-  await deployProxy('Buffer', [cdm.address], [signer, signer]);
+  // const stablecoin = await deployContract('Stablecoin');
+  // const minter = await deployContract('Minter', 'Minter', false, cdm.address, stablecoin.address, signer, signer);
+  // await deployProxy('Buffer', [cdm.address], [signer, signer]);
   await deployContract('MockOracle');
 
-  for (const [key, config] of Object.entries(CONFIG.Core.PSM)) {
-    const psm = await deployContract('PSM', key, false, minter.address, cdm.address, config.collateral,  stablecoin.address, signer, signer, signer);
-    await cdm["setParameter(address,bytes32,uint256)"](psm.address, toBytes32("debtCeiling"), config.debtCeiling);
-    console.log('Set debtCeiling for PSM', psm.address, 'to', fromWad(config.debtCeiling), 'Credit');
-  }
 
-  // await deployContract('PRBProxyRegistry');
+  // for (const [key, config] of Object.entries(CONFIG.Core.PSM)) {
+  //   const psm = await deployContract('PSM', key, false, minter.address, cdm.address, config.collateral,  stablecoin.address, signer, signer, signer);
+  //   await cdm["setParameter(address,bytes32,uint256)"](psm.address, toBytes32("debtCeiling"), config.debtCeiling);
+  //   console.log('Set debtCeiling for PSM', psm.address, 'to', fromWad(config.debtCeiling), 'Credit');
+  // }
+
+  const pool = await deployGearbox();
+
+  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
+
+  const UINT256_MAX = ethers.constants.MaxUint256;
+  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
+  console.log('Set credit manager debt limit for flashlender to max');
+
+  await deployContract('PRBProxyRegistry');
   storeEnvMetadata({PRBProxyRegistry: CONFIG.Core.PRBProxyRegistry});
 
   const swapAction = await deployContract(
@@ -206,14 +215,102 @@ async function deployCore() {
 
   console.log('------------------------------------');
 
-  await stablecoin.grantRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_AND_BURNER_ROLE")), minter.address);
-  console.log('Granted MINTER_AND_BURNER_ROLE to Minter');
+  // await stablecoin.grantRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_AND_BURNER_ROLE")), minter.address);
+  // console.log('Granted MINTER_AND_BURNER_ROLE to Minter');
 
-  await cdm["setParameter(address,bytes32,uint256)"](flashlender.address, toBytes32("debtCeiling"), CONFIG.Core.Flashlender.initialDebtCeiling);
-  console.log('Set debtCeiling to', fromWad(CONFIG.Core.Flashlender.initialDebtCeiling), 'Credit for Flashlender');
+  // await cdm["setParameter(address,bytes32,uint256)"](flashlender.address, toBytes32("debtCeiling"), CONFIG.Core.Flashlender.initialDebtCeiling);
+  // console.log('Set debtCeiling to', fromWad(CONFIG.Core.Flashlender.initialDebtCeiling), 'Credit for Flashlender');
 
-  console.log('------------------------------------');
+  // console.log('------------------------------------');
 }
+
+async function deployGearbox() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        DEPLOYING GEARBOX
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  const signer = await getSignerAddress();
+
+  // Deploy Mock WETH contract
+  const mockWETH = await deployContract(
+    'ERC20PresetMinterPauser',
+    'MockWETH',
+    false, // not a vault
+    "Pool Underlying WETH", // name
+    "WETH" // symbol
+  );
+
+  // Deploy LinearInterestRateModelV3 contract
+  const LinearInterestRateModelV3 = await deployContract(
+    'LinearInterestRateModelV3',
+    'LinearInterestRateModelV3',
+    false, // not a vault
+    8500, // U_1
+    9500, // U_2
+    1000, // R_base
+    2000, // R_slope1
+    3000, // R_slope2
+    4000, // R_slope3
+    false // _isBorrowingMoreU2Forbidden
+  );
+
+  // Deploy ACL contract
+  const ACL = await deployContract('ACL', 'ACL', false);
+
+  // Deploy AddressProviderV3 contract and set addresses
+  const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
+  await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), mockWETH.address, false);
+  await AddressProviderV3.setAddress(toBytes32('TREASURY'), CONFIG.Core.Gearbox.treasury, false);
+
+  // Deploy ContractsRegister and set its address in AddressProviderV3
+  const ContractsRegister = await deployContract('ContractsRegister', 'ContractsRegister', false, AddressProviderV3.address);
+  await AddressProviderV3.setAddress(toBytes32('CONTRACTS_REGISTER'), ContractsRegister.address, false);
+
+  // Deploy PoolV3 contract
+  const PoolV3 = await deployContract(
+    'PoolV3',
+    'PoolV3',
+    false, // not a vault
+    AddressProviderV3.address, // addressProvider_
+    mockWETH.address, // underlyingToken_
+    LinearInterestRateModelV3.address, // interestRateModel_
+    CONFIG.Core.Gearbox.initialGlobalDebtCeiling, // Debt ceiling
+    "Loop Liquidity Pool", // name_
+    "lpETH " // symbol_
+  );
+
+  // Mint and deposit WETH to the PoolV3 contract
+  const availableLiquidity = ethers.utils.parseEther('1000000'); // 1,000,000 WETH
+
+  await mockWETH.mint(signer, availableLiquidity);
+  await mockWETH.approve(PoolV3.address, availableLiquidity);
+  await PoolV3.deposit(availableLiquidity, signer);
+
+  console.log('Gearbox Contracts Deployed');
+
+  await verifyOnTenderly('ERC20PresetMinterPauser', mockWETH.address);
+  await storeContractDeployment(false, 'MockWETH', mockWETH.address, 'ERC20PresetMinterPauser');
+  
+  await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
+  await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
+  
+  await verifyOnTenderly('ACL', ACL.address);
+  await storeContractDeployment(false, 'ACL', ACL.address, 'ACL');
+  
+  await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
+  await storeContractDeployment(false, 'AddressProviderV3', AddressProviderV3.address, 'AddressProviderV3');
+  
+  await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
+  await storeContractDeployment(false, 'ContractsRegister', ContractsRegister.address, 'ContractsRegister');
+  
+  await verifyOnTenderly('PoolV3', PoolV3.address);
+  await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
+
+  return PoolV3;
+}
+
 
 async function deployAuraVaults() {
   console.log(`
@@ -259,9 +356,8 @@ async function deployVaults() {
 
   const signer = await getSignerAddress();
   const {
-    CDM: cdm,
     MockOracle: oracle,
-    Buffer: buffer,
+    PoolV3: pool,
     ...contracts
   } = await loadDeployedContracts();
   
@@ -273,13 +369,23 @@ async function deployVaults() {
     var tokenAddress = config.token;
 
     // initialize the token
-    if (tokenAddress != "") {
-      token = await attachContract('ERC20PresetMinterPauser', tokenAddress);
+    console.log('Token address:', tokenAddress);
+    if (tokenAddress == undefined || tokenAddress == null) {
+      console.log('Deploying token for', key);
+      token = await deployContract(
+        'ERC20PresetMinterPauser',
+        'MockCollateralToken',
+        false, // not a vault
+        "MockCollateralToken", // name
+        "MCT" // symbol
+      );
+      tokenAddress = token.address;
     } else {
       // search for the token in the deployed contracts
       token = contracts[config.tokenName];
       tokenAddress = token.address;
     }
+    console.log('Token address:', tokenAddress);
 
     const tokenScale = new ethers.BigNumber.from(10).pow(await token.decimals());
     const cdpVault = await deployContract(
@@ -287,9 +393,8 @@ async function deployVaults() {
       vaultName,
       true,
       [
-        cdm.address,
+        pool.address,
         oracle.address,
-        buffer.address,
         tokenAddress,
         tokenScale
       ],
@@ -297,7 +402,8 @@ async function deployVaults() {
     );
 
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
-    await cdm["setParameter(address,bytes32,uint256)"](cdpVault.address, toBytes32("debtCeiling"), config.deploymentArguments.debtCeiling);
+    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    // await cdm["setParameter(address,bytes32,uint256)"](cdpVault.address, toBytes32("debtCeiling"), config.deploymentArguments.debtCeiling);
     
     console.log('------------------------------------');
 
@@ -317,9 +423,8 @@ async function deployVaults() {
         description: config.description,
         artifactName: 'CDPVault',
         collateralType: config.collateralType,
-        cdm: cdm.address,
+        pool: pool.address,
         oracle: oracle.address,
-        buffer: buffer.address,
         token: tokenAddress,
         tokenScale: tokenScale,
         tokenSymbol: await token.symbol(),
@@ -619,9 +724,10 @@ async function createPositions() {
 
 ((async () => {
   await deployCore();
-  await deployAuraVaults();
+  // await deployAuraVaults();
   await deployVaults();
-  await deployRadiant();
+  // await deployRadiant();
+  // await deployGearbox();
   // await logVaults();
   // await createPositions();
   //await verifyAllDeployedContracts();

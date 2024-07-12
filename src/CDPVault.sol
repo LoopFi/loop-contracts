@@ -408,6 +408,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             }
 
             pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        } else {
+            newDebt = position.debt;
+            newCumulativeIndex = debtData.cumulativeIndexNow;
         }
 
         if (deltaCollateral > 0) {

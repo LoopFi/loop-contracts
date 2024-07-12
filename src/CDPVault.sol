@@ -243,7 +243,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param amount Amount of tokens to withdraw [wad]
     /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
-        tokenAmount = wmul(amount, tokenScale);
+        tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: msg.sender,
@@ -414,10 +414,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         if (deltaCollateral > 0) {
-            uint256 amount = deltaCollateral.toUint256();
+            uint256 amount = wmul(deltaCollateral.toUint256(), tokenScale);
             token.safeTransferFrom(collateralizer, address(this), amount);
         } else if (deltaCollateral < 0) {
-            uint256 amount = abs(deltaCollateral);
+            uint256 amount = wmul(abs(deltaCollateral), tokenScale);
             token.safeTransfer(collateralizer, amount);
         }
 

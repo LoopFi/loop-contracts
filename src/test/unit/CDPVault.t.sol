@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
-import {TestBase} from "../TestBase.sol";
+import {TestBase, ERC20PresetMinterPauser} from "../TestBase.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -15,6 +15,19 @@ import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
 import {CDPVault, calculateDebt, calculateNormalDebt, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 import {console} from "forge-std/console.sol";
 
+contract MockTokenScaled is ERC20PresetMinterPauser {
+    uint8 private _decimals;
+
+    constructor(string memory name, string memory symbol, uint8 decimals_) ERC20PresetMinterPauser(name, symbol) {
+        _decimals = decimals_;
+    }
+
+    function decimals() public view override returns (uint8) {
+        return _decimals;
+    }
+
+}
+
 contract CDPVaultWrapper is CDPVault {
     constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) CDPVault(constants, config) {}
 }
@@ -27,9 +40,6 @@ contract PositionOwner {
 }
 
 contract CDPVaultTest is TestBase {
-    function setUp() public override {
-        super.setUp();
-    }
 
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
@@ -437,6 +447,56 @@ contract CDPVaultTest is TestBase {
         (uint256 collateral, uint256 debtAfter, , ) = vault.positions(position);
         assertEq(collateral, 100 ether - collateralReceived);
         assertEq(debtAfter, 40 ether);
+    }
+
+    function test_deposit_collateral_decimals() public {
+        uint8 digits = 9;
+        MockTokenScaled tokenScaled = new MockTokenScaled("TestToken", "TST", digits);
+        CDPVault mockVault = createCDPVault(
+            tokenScaled,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            0.95 ether
+        );
+
+        uint256 amount = 200 * 10**digits;
+        tokenScaled.mint(address(this), amount);
+        (uint256 collateralBefore, , , ) = mockVault.positions(address(this));
+        tokenScaled.approve(address(mockVault), amount);
+        mockVault.deposit(address(this), amount);
+        (uint256 collateralAfter, , , ) = mockVault.positions(address(this));
+
+        uint256 scaledAmount = wdiv(amount, mockVault.tokenScale());
+        assertEq(collateralAfter, collateralBefore + scaledAmount);
+    }
+
+    function test_withdraw_collateral_decimals() public {
+        uint8 digits = 9;
+        MockTokenScaled tokenScaled = new MockTokenScaled("TestToken", "TST", digits);
+        CDPVault mockVault = createCDPVault(
+            tokenScaled,
+            150 ether,
+            0,
+            1.25 ether,
+            1 ether,
+            0.95 ether
+        );
+
+        uint256 amount = 200 * 10**digits;
+        tokenScaled.mint(address(this), amount);
+        (uint256 collateral1, , , ) = mockVault.positions(address(this));
+        tokenScaled.approve(address(mockVault), amount);
+        mockVault.deposit(address(this), amount);
+        (uint256 collateral2, , , ) = mockVault.positions(address(this));
+
+        uint256 scaledAmount = wdiv(amount, mockVault.tokenScale());
+        assertEq(collateral2, collateral1 + scaledAmount);
+
+        mockVault.withdraw(address(this), amount);
+        (uint256 collateral3, , , ) = mockVault.positions(address(this));
+        assertEq(collateral3, 0);
     }
 
     // /*//////////////////////////////////////////////////////////////

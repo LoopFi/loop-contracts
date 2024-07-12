@@ -13,7 +13,7 @@ import {Permission} from "./utils/Permission.sol";
 import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
 
 import {IChefIncentivesController} from "./reward/interfaces/IChefIncentivesController.sol";
-import {IPoolV3} from "lib/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
@@ -28,32 +28,10 @@ interface IPoolV3Loop is IPoolV3 {
 
     function addAvailable(address user, int256 amount) external;
 }
+
 // Authenticated Roles
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
 bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");
-
-/// @notice Calculates the actual debt from a normalized debt amount
-/// @param normalDebt Normalized debt (either of a position or the total normalized debt)
-/// @param rateAccumulator Rate accumulator
-/// @return debt Actual debt [wad]
-function calculateDebt(uint256 normalDebt, uint64 rateAccumulator) pure returns (uint256 debt) {
-    debt = wmul(normalDebt, rateAccumulator);
-}
-
-/// @notice Calculates the normalized debt from an actual debt amount
-/// @param debt Actual debt (either of a position or the total debt)
-/// @param rateAccumulator Rate accumulator
-/// @return normalDebt Normalized debt [wad]
-function calculateNormalDebt(uint256 debt, uint64 rateAccumulator) pure returns (uint256 normalDebt) {
-    normalDebt = wdiv(debt, rateAccumulator);
-
-    // account for rounding errors due to division
-    if (calculateDebt(normalDebt, rateAccumulator) < debt) {
-        unchecked {
-            ++normalDebt;
-        }
-    }
-}
 
 /// @title CDPVault
 /// @notice Base logic of a borrow vault for depositing collateral and drawing credit against it
@@ -65,6 +43,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     using SafeERC20 for IERC20;
     using SafeCast for int256;
+
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -83,6 +62,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     IPoolV3 public immutable pool;
     IERC20 public immutable poolUnderlying;
+
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -93,6 +73,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         /// @notice Collateralization ratio below which a position can be liquidated [wad]
         uint64 liquidationRatio;
     }
+
     /// @notice CDPVault configuration
     VaultConfig public vaultConfig;
 
@@ -120,17 +101,17 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint192 cumulativeQuotaIndexLU;
         uint128 cumulativeQuotaInterest;
     }
+
     /// @notice Map of user positions
-    mapping(address owner => Position) public positions;
+    mapping(address => Position) public positions;
 
     struct LiquidationConfig {
-        // is subtracted from the `repayAmount` to avoid profitable self liquidations [wad]
-        // defined as: 1 - penalty (e.g. `liquidationPenalty` = 0.95 is a 5% penalty)
+        /// @notice Penalty applied during liquidation [wad]
         uint64 liquidationPenalty;
-        // is subtracted from the `spotPrice` of the collateral to provide incentive to liquidate unsafe positions [wad]
-        // defined as: 1 - discount (e.g. `liquidationDiscount` = 0.95 is a 5% discount)
+        /// @notice Discount on collateral during liquidation [wad]
         uint64 liquidationDiscount;
     }
+
     /// @notice Liquidation configuration
     LiquidationConfig public liquidationConfig;
 
@@ -195,7 +176,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         _grantRole(DEFAULT_ADMIN_ROLE, config.roleAdmin);
         _grantRole(VAULT_CONFIG_ROLE, config.vaultAdmin);
         _grantRole(PAUSER_ROLE, config.pauseAdmin);
-        // _grantRole(VAULT_UNWINDER_ROLE, config.vaultUnwinder);
 
         emit VaultCreated(address(this), address(token), config.roleAdmin);
     }
@@ -217,6 +197,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         emit SetParameter(parameter, data);
     }
 
+    /// @notice Sets various address parameters for this contract
+    /// @dev Sender has to be allowed to call this method
+    /// @param parameter Name of the variable to set
+    /// @param data New address to set for the variable
     function setParameter(bytes32 parameter, address data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
         if (parameter == "rewardController") rewardController = IChefIncentivesController(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
@@ -227,7 +211,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                       COLLATERAL BALANCE ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposits collateral tokens into this contract and increases a users collateral balance
+    /// @notice Deposits collateral tokens into this contract and increases a user's collateral balance
     /// @dev The caller needs to approve this contract to transfer tokens on their behalf
     /// @param to Address of the user to attribute the collateral to
     /// @param amount Amount of tokens to deposit [tokenScale]
@@ -244,12 +228,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
-    /// @notice Withdraws collateral tokens from this contract and decreases a users collateral balance
+    /// @notice Withdraws collateral tokens from this contract and decreases a user's collateral balance
     /// @param to Address of the user to withdraw tokens to
-    /// @param amount Amount of tokens to withdraw [wad]
-    /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
+    /// @param amount Amount of tokens to withdraw [tokenScale]
+    /// @return tokenAmount Amount of tokens withdrawn [wad]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
-        tokenAmount = wmul(amount, tokenScale);
+        tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: msg.sender,
@@ -260,6 +244,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+    /// @notice Borrows credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to generate [wad]
+    /// @dev The borrower will receive the amount of credit in the underlying token
     function borrow(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = toInt256(amount);
         modifyCollateralAndDebt({
@@ -271,6 +260,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+    /// @notice Repays credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to repay [wad]
+    /// @dev The borrower will repay the amount of credit in the underlying token
     function repay(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = -toInt256(amount);
         modifyCollateralAndDebt({
@@ -298,6 +292,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     /// @notice Updates a position's collateral and debt balances
     /// @dev This is the only method which is allowed to modify a position's collateral and debt balances
+    /// @param owner Address of the owner of the position
+    /// @param position Position state
+    /// @param newDebt New debt balance [wad]
+    /// @param newCumulativeIndex New cumulative index
+    /// @param deltaCollateral Amount of collateral to put up (+) or to remove (-) from the position [wad]
+    /// @param totalDebt_ Total debt of the vault [wad]
     function _modifyPosition(
         address owner,
         Position memory position,
@@ -399,6 +399,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             uint256 amount = abs(deltaDebt);
             if (amount >= maxRepayment) {
                 amount = maxRepayment; // U:[CM-11]
+                deltaDebt = -toInt256(maxRepayment);
             }
 
             poolUnderlying.safeTransferFrom(creditor, address(pool), amount);
@@ -426,10 +427,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         if (deltaCollateral > 0) {
-            uint256 amount = deltaCollateral.toUint256();
+            uint256 amount = wmul(deltaCollateral.toUint256(), tokenScale);
             token.safeTransferFrom(collateralizer, address(this), amount);
         } else if (deltaCollateral < 0) {
-            uint256 amount = abs(deltaCollateral);
+            uint256 amount = wmul(abs(deltaCollateral), tokenScale);
             token.safeTransfer(collateralizer, amount);
         }
 
@@ -507,7 +508,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                               LIQUIDATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Liquidates a single unsafe positions by selling collateral at a discounted (`liquidationDiscount`)
+    /// @notice Liquidates a single unsafe position by selling collateral at a discounted (`liquidationDiscount`)
     /// oracle price. The liquidator has to provide the amount he wants to repay or sell (`repayAmounts`) for
     /// the position. From that repay amount a penalty (`liquidationPenalty`) is subtracted to mitigate against
     /// profitable self liquidations. If the available collateral of a position is not sufficient to cover the debt
@@ -528,9 +529,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         DebtData memory debtData = _calcDebt(position);
 
         // load price and calculate discounted price
-        uint256 spotPrice_ = spotPrice();
-        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
-        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        uint256 discountedPrice = wmul(spotPrice(), liqConfig_.liquidationDiscount);
+        if (spotPrice() == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
@@ -538,25 +538,22 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
 
         // verify that the position is indeed unsafe
-        if (_isCollateralized(debtData.debt, wmul(position.collateral, spotPrice_), config.liquidationRatio))
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice()), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
         // TODO: review this
+        uint256 loss;
         if (takeCollateral > position.collateral) {
             takeCollateral = position.collateral;
             repayAmount = wmul(takeCollateral, discountedPrice);
             penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
-            // debt >= repayAmount if takeCollateral > position.collateral
-            //deltaDebt = currentDebt;
             deltaDebt = debtData.debt;
+            loss = calcTotalDebt(debtData) - deltaDebt;
         }
 
-        // update vault state
-        totalDebt -= deltaDebt;
-
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), deltaDebt);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
 
         uint256 newDebt;
         uint256 profit;
@@ -586,13 +583,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // update liquidated position
         position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
 
         // Mint the penalty from the vault to the treasury
-        // cdm.modifyBalance(address(this), address(buffer), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
     }
 
@@ -609,9 +605,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param debt Debt principal before repayment
     /// @param cumulativeIndexNow The current interest index
     /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
-    // @param cumulativeQuotaInterest Credit account's quota interest before repayment
-    // @param quotaFees Accrued quota fees
-    // @param feeInterest Fee on accrued interest (both base and quota) charged by the DAO
     /// @return newDebt Debt principal after repayment
     /// @return newCumulativeIndex Credit account's quota interest after repayment
     /// @return profit Amount of underlying tokens received as fees by the DAO
@@ -671,9 +664,19 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 newCumulativeIndex = cumulativeIndexNow;
             }
         } else {
-            newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3]
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
-        newDebt = debt - amountToRepay; // U:[CL-3]
+        newDebt = debt - amountToRepay;
+    }
+
+    /// @dev Computes interest accrued since the last update
+    function calcAccruedInterest(
+        uint256 amount,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeIndexNow
+    ) internal pure returns (uint256) {
+        if (amount == 0) return 0;
+        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount;
     }
 
     /// @notice Returns the total debt of a position

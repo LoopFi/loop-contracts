@@ -24,8 +24,9 @@ contract PositionAction20 is PositionAction {
     constructor(
         address flashlender_,
         address swapAction_,
-        address PoolAction_
-    ) PositionAction(flashlender_, swapAction_, PoolAction_) {}
+        address poolAction_, 
+        address vaultRegistry_
+    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION
@@ -35,18 +36,19 @@ contract PositionAction20 is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address /*src*/, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(address vault, address position, address /*src*/, uint256 amount) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(address(this), amount);
+        return ICDPVault(vault).deposit(position, amount);
     }
 
     /// @notice Withdraw collateral from the vault
     /// @param vault Address of the vault
+    /// @param position Address of the position
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address /*dst*/, uint256 amount) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(address(this), amount);
+    function _onWithdraw(address vault, address position, address /*dst*/, uint256 amount) internal override returns (uint256) {
+        return ICDPVault(vault).withdraw(position, amount);
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault
@@ -76,6 +78,6 @@ contract PositionAction20 is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256) {
-        return _onWithdraw(leverParams.vault, address(0), subCollateral);
+        return _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral);
     }
 }

@@ -81,7 +81,7 @@ contract VaultRegistry is AccessControl, IVaultRegistry {
         uint256 vaultLen = vaultList.length;
         for (uint256 i = 0; i < vaultLen; ) {
             if (vaultList[i] == vault) {
-                vaultList[i] = vaultList[vaultList.length - 1];
+                vaultList[i] = vaultList[vaultLen - 1];
                 vaultList.pop();
                 break;
             }

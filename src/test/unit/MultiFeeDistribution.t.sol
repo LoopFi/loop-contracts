@@ -189,8 +189,8 @@ contract MultiFeeDistributionTest is TestBase {
         multiFeeDistribution.setLPToken(lpToken);
     }
 
-    function test_addReward(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+    function test_addReward() public {
+        address rewardToken = address(0x123);
 
         // we are not a minter
         vm.expectRevert(MultiFeeDistribution.InsufficientPermission.selector);
@@ -210,8 +210,8 @@ contract MultiFeeDistributionTest is TestBase {
         multiFeeDistribution.addReward(address(0));
     }
 
-    function test_addReward_updatesRewardData(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+    function test_addReward_updatesRewardData() public {
+        address rewardToken = address(0x123);
         address[] memory minters = new address[](1);
         minters[0] = address(this);
         multiFeeDistribution.setMinters(minters);
@@ -222,8 +222,8 @@ contract MultiFeeDistributionTest is TestBase {
         assertEq(periodFinish, block.timestamp);
     }
 
-    function test_removeReward(address rewardToken) public {
-        vm.assume(rewardToken != address(0));
+    function test_removeReward() public {
+        address rewardToken = address(0x123);
 
         vm.expectRevert(MultiFeeDistribution.InsufficientPermission.selector);
         multiFeeDistribution.removeReward(rewardToken);

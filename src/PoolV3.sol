@@ -117,12 +117,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _;
     }
 
-    /// @dev Ensures that function caller is an allowed credit manager
-    modifier creditManagerOnly() {
-        _revertIfCallerNotCreditManager();
-        _;
-    }
-
     modifier whenNotLocked() {
         if (_allowed[msg.sender]) {
             _;
@@ -135,13 +129,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
         if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
-    }
-
-    /// @dev Reverts if `msg.sender` is not an allowed credit manager
-    function _revertIfCallerNotCreditManager() internal view {
-        if (!_creditManagerSet.contains(msg.sender)) {
-            revert CallerNotCreditManagerException(); // U:[PQK-4]
-        }
     }
 
     /// @dev Reverts if `msg.sender` is not an allowed credit manager

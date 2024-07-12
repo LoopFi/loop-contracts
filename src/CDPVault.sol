@@ -424,6 +424,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
             position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
+        } else {
+            newDebt = position.debt;
+            newCumulativeIndex = debtData.cumulativeIndexNow;
         }
 
         if (deltaCollateral > 0) {
@@ -569,13 +572,19 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             profit = debtData.accruedInterest;
             position.cumulativeQuotaInterest = 0;
         } else {
-            (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
-                deltaDebt, // delta debt
-                debtData.debt,
-                debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                debtData.cumulativeIndexLastUpdate,
-                debtData.cumulativeQuotaInterest
-            );
+            if (loss != 0) {
+                profit = 0;
+                newDebt = 0;
+                newCumulativeIndex = debtData.cumulativeIndexNow;
+            } else {
+                (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
+                    deltaDebt, // delta debt
+                    debtData.debt,
+                    debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                    debtData.cumulativeIndexLastUpdate,
+                    debtData.cumulativeQuotaInterest
+                );
+            }
         }
         // position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
         //position.quotaFees = quotaFees;

@@ -64,7 +64,12 @@ contract PositionAction20Test is IntegrationTestBase {
         mockWETH.approve(address(user), type(uint256).max);
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction), address(vaultRegistry));
+        positionAction = new PositionAction20(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction),
+            address(vaultRegistry)
+        );
 
         vm.label(user, "user");
         vm.label(address(userProxy), "userProxy");
@@ -99,7 +104,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, , ) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(debt, 0);
@@ -107,7 +112,7 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_vault_with_entry_swap_from_USDC() public {
         uint256 depositAmount = 10_000 * 1e6;
-        uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; // convert 6 decimals to 18 and add 1% slippage
+        uint256 amountOutMin = (depositAmount * 1e12 * 98) / 100; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, depositAmount);
 
@@ -140,7 +145,6 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.prank(user);
         USDC.approve(address(userProxy), depositAmount);
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -153,7 +157,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, expectedCollateral);
         assertEq(debt, 0);
@@ -171,7 +175,6 @@ contract PositionAction20Test is IntegrationTestBase {
             auxSwap: emptySwap
         });
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -184,14 +187,13 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(debt, 0);
     }
 
     function test_deposit_to_an_unrelated_position() public {
-
         // create 2nd position
         address alice = vm.addr(0x45674567);
         PRBProxy aliceProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(alice))));
@@ -222,7 +224,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, , ) = vault.positions(address(aliceProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(aliceProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(debt, 0);
@@ -230,8 +232,8 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_EXACT_OUT() public {
         uint256 depositAmount = 10_000 ether;
-        //uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; 
-        uint256 amountInMax = depositAmount * 101 / 100e12; // convert 6 decimals to 18 and add 1% slippage
+        //uint256 amountOutMin = depositAmount * 1e12 * 98 / 100;
+        uint256 amountInMax = (depositAmount * 101) / 100e12; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, amountInMax);
 
@@ -264,7 +266,6 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.startPrank(user);
         USDC.approve(address(userProxy), amountInMax);
 
-
         userProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
@@ -277,7 +278,7 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(debt, 0);
@@ -286,7 +287,7 @@ contract PositionAction20Test is IntegrationTestBase {
 
     function test_deposit_InvalidAuxSwap() public {
         uint256 depositAmount = 10_000 * 1e6;
-        uint256 amountOutMin = depositAmount * 1e12 * 98 / 100; // convert 6 decimals to 18 and add 1% slippage
+        uint256 amountOutMin = (depositAmount * 1e12 * 98) / 100; // convert 6 decimals to 18 and add 1% slippage
 
         deal(address(USDC), user, depositAmount);
 
@@ -358,7 +359,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, 0);
         assertEq(debt, 0);
 
@@ -390,7 +391,7 @@ contract PositionAction20Test is IntegrationTestBase {
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(token),
                     amount: initialDeposit,
-                    limit: initialDeposit/1e12 * 99/100,
+                    limit: ((initialDeposit / 1e12) * 99) / 100,
                     recipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
@@ -410,10 +411,10 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, 0);
         assertEq(debt, 0);
-        
+
         // (int256 balance,) = cdm.accounts(address(userProxy));
         // assertEq(balance, 0);
         assertEq(USDT.balanceOf(address(user)), expectedAmountOut);
@@ -422,11 +423,11 @@ contract PositionAction20Test is IntegrationTestBase {
     function test_borrow_1() public {
         // deposit to vault
         uint256 initialDeposit = 1_000 ether;
-        
+
         _deposit(userProxy, address(vault), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether;
+        uint256 borrowAmount = 500 * 1 ether;
         deal(address(token), user, borrowAmount);
 
         // build borrow params
@@ -447,7 +448,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, initialDeposit);
         assertEq(debt, borrowAmount);
 
@@ -464,7 +465,7 @@ contract PositionAction20Test is IntegrationTestBase {
         uint256 borrowAmount = 5_000 ether;
         _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
         assertEq(collateral, depositAmount);
@@ -479,8 +480,8 @@ contract PositionAction20Test is IntegrationTestBase {
     // REPAY TESTS
 
     function test_repay() public {
-        uint256 depositAmount = 1_000*1 ether;
-        uint256 borrowAmount = 500*1 ether;
+        uint256 depositAmount = 1_000 * 1 ether;
+        uint256 borrowAmount = 500 * 1 ether;
         _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
 
         // build repay params
@@ -494,7 +495,7 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.startPrank(user);
         underlyingToken.approve(address(userProxy), borrowAmount);
         underlyingToken.approve(address(liquidityPool), borrowAmount);
-        
+
         userProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
@@ -507,7 +508,7 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, depositAmount);
@@ -517,8 +518,8 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     function test_repay_with_interest() public {
-        uint256 depositAmount = 1_000*1 ether;
-        uint256 borrowAmount = 500*1 ether;
+        uint256 depositAmount = 1_000 * 1 ether;
+        uint256 borrowAmount = 500 * 1 ether;
         _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
 
         // accrue interest
@@ -549,7 +550,7 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, depositAmount);
@@ -559,8 +560,8 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     function test_withdrawAndRepay() public {
-        uint256 depositAmount = 5_000*1 ether;
-        uint256 borrowAmount = 2_500*1 ether;
+        uint256 depositAmount = 5_000 * 1 ether;
+        uint256 borrowAmount = 2_500 * 1 ether;
 
         // deposit and borrow
         _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
@@ -575,11 +576,7 @@ contract PositionAction20Test is IntegrationTestBase {
                 collateralizer: user,
                 auxSwap: emptySwap
             });
-            creditParams = CreditParams({
-                amount: borrowAmount,
-                creditor: user,
-                auxSwap: emptySwap
-            });
+            creditParams = CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap});
         }
 
         vm.startPrank(user);
@@ -598,7 +595,7 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, , ) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, 0);
@@ -609,8 +606,8 @@ contract PositionAction20Test is IntegrationTestBase {
     }
 
     function test_depositAndBorrow() public {
-        uint256 upFrontUnderliers = 10_000*1 ether;
-        uint256 borrowAmount = 5_000*1 ether;
+        uint256 upFrontUnderliers = 10_000 * 1 ether;
+        uint256 borrowAmount = 5_000 * 1 ether;
 
         deal(address(token), user, upFrontUnderliers);
 
@@ -642,7 +639,7 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, upFrontUnderliers);
         assertEq(debt, borrowAmount);
@@ -681,12 +678,7 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.multisend.selector,
-                targets,
-                data,
-                delegateCall
-            )
+            abi.encodeWithSelector(positionAction.multisend.selector, targets, data, delegateCall)
         );
     }
 
@@ -722,7 +714,8 @@ contract PositionAction20Test is IntegrationTestBase {
             creditParams,
             emptyPermitParams
         );
-        data[1] = abi.encodeWithSelector(CDPVault.modifyCollateralAndDebt.selector,
+        data[1] = abi.encodeWithSelector(
+            CDPVault.modifyCollateralAndDebt.selector,
             address(userProxy),
             address(userProxy),
             address(userProxy),
@@ -737,15 +730,10 @@ contract PositionAction20Test is IntegrationTestBase {
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.multisend.selector,
-                targets,
-                data,
-                delegateCall
-            )
+            abi.encodeWithSelector(positionAction.multisend.selector, targets, data, delegateCall)
         );
 
-        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, depositAmount);
         assertEq(debt, borrowAmount);
     }

@@ -489,23 +489,21 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         DebtData memory debtData = _calcDebt(position);
 
         // load price and calculate discounted price
-        uint256 spotPrice_ = spotPrice();
-        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
-        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        uint256 discountedPrice = wmul(spotPrice(), liqConfig_.liquidationDiscount);
+        if (spotPrice() == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
         uint256 deltaDebt = wmul(repayAmount, liqConfig_.liquidationPenalty);
         uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
 
-       
-
         // verify that the position is indeed unsafe
-        if (_isCollateralized(debtData.debt, wmul(position.collateral, spotPrice_), config.liquidationRatio))
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice()), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
         // TODO: review this
+        uint256 loss;
         if (takeCollateral > position.collateral) {
             takeCollateral = position.collateral;
             repayAmount = wmul(takeCollateral, discountedPrice);
@@ -513,13 +511,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             // debt >= repayAmount if takeCollateral > position.collateral
             //deltaDebt = currentDebt;
             deltaDebt = debtData.debt;
+            loss = calcTotalDebt(debtData) - deltaDebt;
         }
 
-        // update vault state
-        totalDebt -= deltaDebt;
-
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), deltaDebt);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
 
         uint256 newDebt;
         uint256 profit;
@@ -531,18 +527,31 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 newCumulativeIndex = debtData.cumulativeIndexNow;
                 profit = debtData.accruedFees;
             } else {
-                (newDebt, newCumulativeIndex, profit) = calcDecrease(
-                    deltaDebt, // delta debt
-                    debtData.debt,
-                    debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                    debtData.cumulativeIndexLastUpdate
-                );
+                if (loss != 0) {
+                    profit = 0;
+                    newDebt = 0;
+                    newCumulativeIndex = debtData.cumulativeIndexNow;
+                } else {
+                    (newDebt, newCumulativeIndex, profit) = calcDecrease(
+                        deltaDebt, // delta debt
+                        debtData.debt,
+                        debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                        debtData.cumulativeIndexLastUpdate
+                    );
+                }
             }
             // update liquidated position
-            position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
+            position = _modifyPosition(
+                owner,
+                position,
+                newDebt,
+                newCumulativeIndex,
+                -toInt256(takeCollateral),
+                totalDebt
+            );
         }
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
@@ -550,8 +559,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // Mint the penalty from the vault to the treasury
         // cdm.modifyBalance(address(this), address(buffer), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
-
-        
     }
 
     /// @dev Computes new debt principal and interest index after increasing debt
@@ -649,7 +656,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
         newDebt = debt - amountToRepay; // U:[CL-3]
     }
-
 
     /// @notice Returns the total debt of a position
     /// @param position Address of the position

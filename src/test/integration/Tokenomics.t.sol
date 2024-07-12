@@ -89,6 +89,9 @@ contract RadiantDeployHelper {
     address public loopToken;
     IWETH public weth = IWETH(address(WETH));
 
+    uint256 public loopIndex = 0;
+    uint256 public wethIndex = 1;
+
     function deployLoopToken(uint256 mintAmount) external returns (ERC20Mock loopToken_) {
         loopToken_ = new ERC20Mock();
         loopToken_.mint(address(this), mintAmount);
@@ -143,6 +146,9 @@ contract RadiantDeployHelper {
             maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
             ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
         }
+
+        loopIndex = assets[0] == address(loopToken) ? 0 : 1;
+        wethIndex = loopIndex == 0 ? 1 : 0;
 
         // create the pool
         pool_ = weightedPoolFactory.create(
@@ -330,12 +336,12 @@ contract TokenomicsTest is IntegrationTestBase {
         deal(address(WETH), user, wethLiquidityAmt);
         address[] memory assets = new address[](2);
 
-        assets[0] = address(loopToken);
-        assets[1] = address(WETH);
+        assets[radiantDeployHelper.wethIndex()] = address(WETH);
+        assets[radiantDeployHelper.loopIndex()] = address(loopToken);
 
         uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = amount;
-        maxAmountsIn[1] = wethLiquidityAmt;
+        maxAmountsIn[radiantDeployHelper.wethIndex()] = wethLiquidityAmt;
+        maxAmountsIn[radiantDeployHelper.loopIndex()] = amount;
         
         vm.startPrank(user);
         loopToken.approve(address(balancerVault), amount);

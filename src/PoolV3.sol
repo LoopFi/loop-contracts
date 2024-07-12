@@ -484,6 +484,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     )
         external
         override
+        creditManagerOnly // U:[LP-2C]
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
     {
@@ -529,6 +530,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     )
         external
         override
+        creditManagerOnly // U:[LP-2C]
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
     {
@@ -624,6 +626,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         return _calcBaseInterestAccrued(timestampLU); // U:[LP-17]
     }
 
+    function calcAccruedQuotaInterest() external view returns (uint256) {
+        return _calcQuotaRevenueAccrued();
+    }
+
     /// @dev Updates base interest rate based on expected and available liquidity deltas
     ///      - Adds expected liquidity delta to stored expected liquidity
     ///      - If time has passed since the last base interest update, adds accrued interest
@@ -641,7 +647,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
         if (block.timestamp != lastBaseInterestUpdate_) {
             _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[LP-18]
-            lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
+            lastBaseInterestUpdate = uint40(block.timestamp);
         }
 
         if (block.timestamp != lastQuotaRevenueUpdate) {
@@ -685,9 +691,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         external
         override
         nonReentrant // U:[LP-2B]
-        poolQuotaKeeperOnly // U:[LP-2C]
+        //poolQuotaKeeperOnly // U:[LP-2C]
+        creditManagerOnly
     {
-        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[LP-19]
+        _setQuotaRevenue(uint256(quotaRevenue().toInt256() + quotaRevenueDelta)); // U:[LP-19]
     }
 
     /// @notice Sets new quota revenue value
@@ -842,7 +849,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Sets new total debt limit
-        function _setTotalDebtLimit(uint256 limit) internal {
+    function _setTotalDebtLimit(uint256 limit) internal {
         uint128 newLimit = _convertToU128(limit);
         if (newLimit == _totalDebt.limit) return;
 

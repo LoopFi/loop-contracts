@@ -27,6 +27,10 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AddressProviderV3} from "@gearbox-protocol/core-v3/contracts/core/AddressProviderV3.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
+import {PoolQuotaKeeperMock} from "src/test/PoolQuotaKeeperMock.sol";
+import {GaugeV3} from "src/quotas/GaugeV3.sol";
+import {PoolQuotaKeeperV3} from "src/quotas/PoolQuotaKeeperV3.sol";
+import {MockVoter} from "src/test/MockVoter.sol";
 
 contract CreditCreator {
     constructor(ICDM cdm) {
@@ -50,6 +54,9 @@ contract TestBase is Test {
     ERC20PresetMinterPauser internal token;
     ERC20PresetMinterPauser internal underlyingToken;
     MockOracle internal oracle;
+    PoolQuotaKeeperV3 internal quotaKeeper;
+    GaugeV3 internal gauge;
+    MockVoter internal voter;
 
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
@@ -78,6 +85,8 @@ contract TestBase is Test {
         createAssets();
         createOracles();
         createCore();
+        createAndSetPoolQuotaKeeper();
+        createGaugeAndSetGauge();
         labelContracts();
     }
 
@@ -102,6 +111,23 @@ contract TestBase is Test {
     function createOracles() internal virtual {
         oracle = new MockOracle();
         setOraclePrice(WAD);
+    }
+
+    function createAndSetPoolQuotaKeeper() internal virtual {
+        quotaKeeper = new PoolQuotaKeeperV3(address(liquidityPool));
+        liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
+    }
+
+    function createGaugeAndSetGauge() internal virtual {
+        voter = new MockVoter();
+        voter.setFirstEpochTimestamp(block.timestamp);
+        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
+        quotaKeeper.setGauge(address(gauge));
+        gauge.addQuotaToken(address(token), 10, 100);
+        gauge.setFrozenEpoch(false);
+        vm.warp(block.timestamp + 1 weeks);
+        vm.prank(address(gauge));
+        quotaKeeper.updateRates();
     }
 
     function createCore() internal virtual {

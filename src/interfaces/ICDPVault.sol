@@ -50,7 +50,14 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
     )
         external
         view
-        returns (uint256 collateral, uint256 debt, uint256 lastDebtUpdate, uint256 cumulativeIndexLastUpdate);
+        returns (
+            uint256 collateral,
+            uint256 debt,
+            uint256 lastDebtUpdate,
+            uint256 cumulativeIndexLastUpdate,
+            uint192 cumulativeQuotaIndexLU,
+            uint128 cumulativeQuotaInterest
+        );
 
     function deposit(address to, uint256 amount) external returns (uint256);
 

@@ -99,10 +99,10 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , ) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , ) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
     }
 
     function test_deposit_vault_with_entry_swap_from_USDC() public {
@@ -153,10 +153,10 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
 
         assertEq(collateral, expectedCollateral);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
     }
 
     function test_deposit_from_proxy_collateralizer() public {
@@ -184,10 +184,10 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
     }
 
     function test_deposit_to_an_unrelated_position() public {
@@ -222,10 +222,10 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , ) = vault.positions(address(aliceProxy));
+        (uint256 collateral, uint256 debt, , ) = vault.positions(address(aliceProxy));
 
         assertEq(collateral, depositAmount);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
     }
 
     function test_deposit_EXACT_OUT() public {
@@ -277,10 +277,10 @@ contract PositionAction20Test is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
         assertEq(USDC.balanceOf(user), amountInMax - expectedAmountIn); // assert residual is sent to user
     }
 
@@ -358,9 +358,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
         assertEq(collateral, 0);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
 
         // (int256 balance,) = cdm.accounts(address(userProxy));
         // assertEq(balance, 0);
@@ -410,9 +410,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
         assertEq(collateral, 0);
-        assertEq(normalDebt, 0);
+        assertEq(debt, 0);
         
         // (int256 balance,) = cdm.accounts(address(userProxy));
         // assertEq(balance, 0);
@@ -447,9 +447,9 @@ contract PositionAction20Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
         assertEq(collateral, initialDeposit);
-        assertEq(normalDebt, borrowAmount);
+        assertEq(debt, borrowAmount);
 
         // (int256 balance,) = cdm.accounts(address(userProxy));
         // assertEq(balance, 0);
@@ -464,13 +464,13 @@ contract PositionAction20Test is IntegrationTestBase {
         uint256 borrowAmount = 5_000 ether;
         _depositAndBorrow(userProxy, address(vault), depositAmount, borrowAmount);
 
-        (uint256 collateral, uint256 normalDebt, ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, ,) = vault.positions(address(userProxy));
 
         // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
         assertEq(collateral, depositAmount);
 
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertLt(normalDebt, _virtualDebt(vault, address(userProxy)));
+        // assert debt is the same as the amount of stablecoin borrowed
+        assertEq(debt, _virtualDebt(vault, address(userProxy)));
 
         // assert that debt is minted to the user
         assertEq(underlyingToken.balanceOf(user), borrowAmount);
@@ -795,10 +795,10 @@ contract PositionAction20Test is IntegrationTestBase {
     //         )
     //     );
 
-    //     (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+    //     (uint256 collateral, uint256 debt) = daiVault.positions(address(userProxy));
 
     //     assertEq(collateral, depositAmount);
-    //     assertEq(normalDebt, 100 ether);
+    //     assertEq(debt, 100 ether);
     // }
 
     // HELPER FUNCTIONS

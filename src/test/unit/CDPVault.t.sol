@@ -569,7 +569,6 @@ contract CDPVaultTest is TestBase {
         vm.warp(block.timestamp + 365 days);
         console.log(vault.totalDebt(), "totalDebt");
         uint256 creditBefore = credit(address(this));
-        uint256 virtualDebtBefore = virtualDebt(vault, position);
         uint256 sharesBefore = liquidityPool.totalSupply();
         assertGt(sharesBefore, 0);
 
@@ -598,7 +597,6 @@ contract CDPVaultTest is TestBase {
         vm.warp(block.timestamp + 365 days);
         console.log(vault.totalDebt(), "totalDebt");
         uint256 creditBefore = credit(address(this));
-        uint256 virtualDebtBefore = virtualDebt(vault, position);
         uint256 sharesBefore = liquidityPool.totalSupply();
         assertGt(sharesBefore, 0);
         // Transfer some shares to treasury to allow burning

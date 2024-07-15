@@ -3,42 +3,7 @@ pragma solidity ^0.8.19;
 
 import {TestBase, ERC20PresetMinterPauser} from "../TestBase.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
-import {IOracle} from "../../interfaces/IOracle.sol";
-import {ICDPVaultBase} from "../../interfaces/ICDPVault.sol";
-import {CDPVaultConstants, CDPVaultConfig} from "../../interfaces/ICDPVault.sol";
-import {IPermission} from "../../interfaces/IPermission.sol";
-
-import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
-import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 import {console} from "forge-std/console.sol";
-
-contract MockTokenScaled is ERC20PresetMinterPauser {
-    uint8 private _decimals;
-
-    constructor(string memory name, string memory symbol, uint8 decimals_) ERC20PresetMinterPauser(name, symbol) {
-        _decimals = decimals_;
-    }
-
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-}
-import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
-import {console} from "forge-std/console.sol";
-
-contract CDPVaultWrapper is CDPVault {
-    constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) CDPVault(constants, config) {}
-}
-
-contract PositionOwner {
-    constructor(IPermission vault) {
-        // Allow deployer to modify Position
-        vault.modifyPermission(msg.sender, true);
-    }
-}
 
 contract StakingLPEthTest is TestBase {
     address user1 = address(0x23);

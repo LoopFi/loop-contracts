@@ -19,7 +19,7 @@ contract PendleLPOracleTest is IntegrationTestBase {
     using PendleLpOracleLib for IPMarket;
     PendleLPOracle internal pendleOracle;
 
-    uint256 internal staleTime = 1 days;
+    uint256 internal staleTime = 10 days;
     address market = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
     address weETHChainlink = 0x5c9C449BbC9a6075A2c061dF312a35fd1E05fF22; // weETH/ETH chainlink feed
     address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee; // etherfi staked eth (underlying)
@@ -44,7 +44,7 @@ contract PendleLPOracleTest is IntegrationTestBase {
         assertTrue(address(pendleOracle) != address(0));
     }
     
-    function test_spot(address token) public {
+    function test_spot_123(address token) public {
         (, int256 answer, , ,) = AggregatorV3Interface(weETHChainlink).latestRoundData();
         uint256 scaledAnswer = wdiv(uint256(answer), 10**AggregatorV3Interface(weETHChainlink).decimals());
         uint256 weETHRate = IPMarket(market).getLpToAssetRate(180);

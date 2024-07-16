@@ -80,7 +80,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction), address(vaultRegistry));
 
         vm.label(user, "user");
         vm.label(address(userProxy), "userProxy");
@@ -89,6 +89,9 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.label(address(positionAction), "positionAction");
     }
 
+    function test_deploy_pendle_position_action() public {
+        assertTrue(address(positionAction) != address(0));
+    }
 
     // function test_deposit_Pendle_LP_stETH() public {
     //     uint256 depositAmount = 100 ether;

@@ -193,6 +193,10 @@ async function deployCore() {
 
   const pool = await deployGearbox();
 
+  // Deploy Vault Registry
+  const vaultRegistry = await deployContract('VaultRegistry');
+  console.log('Vault Registry deployed to:', vaultRegistry.address);
+
   const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
 
   const UINT256_MAX = ethers.constants.MaxUint256;
@@ -210,8 +214,9 @@ async function deployCore() {
   );
 
   await deployContract('ERC165Plugin');
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address);
+  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
+  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
+  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
 
   console.log('------------------------------------');
 
@@ -365,8 +370,25 @@ async function deployVaults() {
     const vaultName = `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
+    // Deploy oracle for the vault if defined in the config
+    let oracleAddress = oracle.address;
+    if (config.oracle) {
+      console.log('Deploying oracle for', key);
+      const oracleConfig = config.oracle.deploymentArguments;
+      const deployedOracle = await deployContract(
+        config.oracle.type,
+        config.oracle.type,
+        false,
+        ...Object.values(oracleConfig)
+      );
+      oracleAddress = deployedOracle.address;
+      console.log(`Oracle deployed for ${key} at ${oracleAddress}`);
+    }
+
     var token;
     var tokenAddress = config.token;
+    let tokenScale = config.tokenScale;
+    let tokenSymbol = config.tokenSymbol;
 
     // initialize the token
     console.log('Token address:', tokenAddress);
@@ -380,21 +402,19 @@ async function deployVaults() {
         "MCT" // symbol
       );
       tokenAddress = token.address;
-    } else {
-      // search for the token in the deployed contracts
-      token = contracts[config.tokenName];
-      tokenAddress = token.address;
+      tokenScale = new ethers.BigNumber.from(10).pow(await token.decimals());
+      tokenSymbol = "MCT";
     }
+    
     console.log('Token address:', tokenAddress);
-
-    const tokenScale = new ethers.BigNumber.from(10).pow(await token.decimals());
+    
     const cdpVault = await deployContract(
       'CDPVault',
       vaultName,
       true,
       [
         pool.address,
-        oracle.address,
+        oracleAddress,
         tokenAddress,
         tokenScale
       ],
@@ -409,11 +429,9 @@ async function deployVaults() {
 
     console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
 
-    await oracle.updateSpot(tokenAddress, config.oracle.defaultPrice);
-    console.log('Updated default price for', key, 'to', fromWad(config.oracle.defaultPrice), 'USD');
-
-    const underlier = (config.collateralType === "ERC4626")
-      ? await attachContract('ERC20PresetMinterPauser', config.underlier) : null;
+    // if (config.oracle)
+    // await oracle.updateSpot(tokenAddress, config.oracle.defaultPrice);
+    // console.log('Updated default price for', key, 'to', fromWad(config.oracle.defaultPrice), 'USD');
 
     await storeVaultMetadata(
       cdpVault.address,
@@ -427,19 +445,9 @@ async function deployVaults() {
         oracle: oracle.address,
         token: tokenAddress,
         tokenScale: tokenScale,
-        tokenSymbol: await token.symbol(),
+        tokenSymbol: tokenSymbol,
         tokenName: config.tokenName,
-        tokenIcon: config.tokenIcon,
-        underlier: (config.collateralType === "ERC4626")
-          ? config.underlier : null,
-        underlierScale: (config.collateralType === "ERC4626")
-          ? new ethers.BigNumber.from(10).pow(await underlier.decimals()) : null,
-        underlierSymbol: (config.collateralType === "ERC4626")
-          ? await underlier.symbol() : null,
-        underlierName: (config.collateralType === "ERC4626") ? config.underlierName : null,
-        underlierIcon: (config.collateralType === "ERC4626") ? config.underlierIcon : null,
-        protocolName: (config.collateralType === "ERC4626") ? config.protocolName : null,
-        protocolIcon: (config.collateralType === "ERC4626") ? config.protocolIcon : null
+        tokenIcon: config.tokenIcon
       }
     );
 
@@ -600,9 +608,7 @@ async function deployRadiant() {
     lpTokenAddress
   ] = await deployRadiantDeployHelper();
 
-  // Deploy Vault Registry
-  const vaultRegistry = await deployContract('VaultRegistry');
-  console.log('Vault Registry deployed to:', vaultRegistry.address);
+  
   const multiFeeDistribution = await deployProxy('MultiFeeDistribution', [], [
     loopToken,
     CONFIG.Tokenomics.MultiFeeDistribution.lockZap,

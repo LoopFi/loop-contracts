@@ -22,7 +22,7 @@ contract PositionActionPendle is PositionAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapAction_, address PoolAction_ ) PositionAction(flashlender_, swapAction_, PoolAction_) {}
+    constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_ ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION

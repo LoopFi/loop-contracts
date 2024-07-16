@@ -89,6 +89,9 @@ contract RadiantDeployHelper {
     address public loopToken;
     IWETH public weth = IWETH(address(WETH));
 
+    uint256 public loopIndex = 0;
+    uint256 public wethIndex = 1;
+
     function deployLoopToken(uint256 mintAmount) external returns (ERC20Mock loopToken_) {
         loopToken_ = new ERC20Mock();
         loopToken_.mint(address(this), mintAmount);
@@ -144,6 +147,9 @@ contract RadiantDeployHelper {
             ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
         }
 
+        loopIndex = assets[0] == address(loopToken) ? 0 : 1;
+        wethIndex = loopIndex == 0 ? 1 : 0;
+
         // create the pool
         pool_ = weightedPoolFactory.create(
             "50WETH-50LOOP",
@@ -180,7 +186,6 @@ contract TokenomicsTest is IntegrationTestBase {
     ChefIncentivesController public incentivesController;
     EligibilityDataProvider public eligibilityDataProvider;
     MultiFeeDistribution public multiFeeDistribution;
-    VaultRegistry public vaultRegistry;
     MockPriceProvider public priceProvider;
     
     ERC20Mock public loopToken;
@@ -226,9 +231,7 @@ contract TokenomicsTest is IntegrationTestBase {
         lpToken = ERC20(address(govWeightedPool));
 
         // setup the vault registry
-        vaultRegistry = new VaultRegistry();
         vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
-        vaultRegistry.addVault(ICDPVault(address(vault)));
 
         multiFeeDistribution = MultiFeeDistribution(address(new ERC1967Proxy(
             address(new MultiFeeDistribution()),
@@ -333,12 +336,12 @@ contract TokenomicsTest is IntegrationTestBase {
         deal(address(WETH), user, wethLiquidityAmt);
         address[] memory assets = new address[](2);
 
-        assets[0] = address(loopToken);
-        assets[1] = address(WETH);
+        assets[radiantDeployHelper.wethIndex()] = address(WETH);
+        assets[radiantDeployHelper.loopIndex()] = address(loopToken);
 
         uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = amount;
-        maxAmountsIn[1] = wethLiquidityAmt;
+        maxAmountsIn[radiantDeployHelper.wethIndex()] = wethLiquidityAmt;
+        maxAmountsIn[radiantDeployHelper.loopIndex()] = amount;
         
         vm.startPrank(user);
         loopToken.approve(address(balancerVault), amount);

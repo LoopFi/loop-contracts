@@ -690,7 +690,7 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
     function _updateRegisteredBalance(address _user) internal {
         uint256 length = poolLength();
         for (uint256 i; i < length; ) {
-            (, uint256 newBal, , ) = ICDPVault(registeredTokens[i]).positions(_user);
+            (, uint256 newBal, , , , ) = ICDPVault(registeredTokens[i]).positions(_user);
             uint256 registeredBal = userInfo[registeredTokens[i]][_user].amount;
             if (newBal != 0 && newBal != registeredBal) {
                 _handleActionAfterForToken(

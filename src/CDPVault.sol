@@ -15,6 +15,9 @@ import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
 import {IChefIncentivesController} from "./reward/interfaces/IChefIncentivesController.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
+import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
+import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
 
 interface IPoolV3Loop is IPoolV3 {
     function mintProfit(uint256 profit) external;
@@ -25,12 +28,14 @@ interface IPoolV3Loop is IPoolV3 {
 
     function addAvailable(address user, int256 amount) external;
 }
+
 // Authenticated Roles
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
 bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");
 
 /// @title CDPVault
 /// @notice Base logic of a borrow vault for depositing collateral and drawing credit against it
+/// @dev All accrued interests is taken by the protocol as profit to be distributed to LP stakers, dLP stakers and the DAO
 contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
@@ -38,6 +43,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     using SafeERC20 for IERC20;
     using SafeCast for int256;
+
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -52,13 +58,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     uint256 constant INDEX_PRECISION = 10 ** 9;
 
-    /// @dev Percentage of accrued interest in bps taken by the protocol as profit
-    uint16 internal feeInterest;
-
-    uint16 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
+    //uint16 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
 
     IPoolV3 public immutable pool;
     IERC20 public immutable poolUnderlying;
+
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -69,6 +73,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         /// @notice Collateralization ratio below which a position can be liquidated [wad]
         uint64 liquidationRatio;
     }
+
     /// @notice CDPVault configuration
     VaultConfig public vaultConfig;
 
@@ -80,8 +85,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 debt;
         uint256 cumulativeIndexNow;
         uint256 cumulativeIndexLastUpdate;
+        uint128 cumulativeQuotaInterest;
+        uint192 cumulativeQuotaIndexNow;
+        uint192 cumulativeQuotaIndexLU;
         uint256 accruedInterest;
-        uint256 accruedFees;
+        //   uint256 accruedFees;
     }
 
     // Position Accounting
@@ -90,18 +98,20 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 debt; // [wad]
         uint256 lastDebtUpdate; // [timestamp]
         uint256 cumulativeIndexLastUpdate;
+        uint192 cumulativeQuotaIndexLU;
+        uint128 cumulativeQuotaInterest;
     }
+
     /// @notice Map of user positions
-    mapping(address owner => Position) public positions;
+    mapping(address => Position) public positions;
 
     struct LiquidationConfig {
-        // is subtracted from the `repayAmount` to avoid profitable self liquidations [wad]
-        // defined as: 1 - penalty (e.g. `liquidationPenalty` = 0.95 is a 5% penalty)
+        /// @notice Penalty applied during liquidation [wad]
         uint64 liquidationPenalty;
-        // is subtracted from the `spotPrice` of the collateral to provide incentive to liquidate unsafe positions [wad]
-        // defined as: 1 - discount (e.g. `liquidationDiscount` = 0.95 is a 5% discount)
+        /// @notice Discount on collateral during liquidation [wad]
         uint64 liquidationDiscount;
     }
+
     /// @notice Liquidation configuration
     LiquidationConfig public liquidationConfig;
 
@@ -166,7 +176,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         _grantRole(DEFAULT_ADMIN_ROLE, config.roleAdmin);
         _grantRole(VAULT_CONFIG_ROLE, config.vaultAdmin);
         _grantRole(PAUSER_ROLE, config.pauseAdmin);
-        // _grantRole(VAULT_UNWINDER_ROLE, config.vaultUnwinder);
 
         emit VaultCreated(address(this), address(token), config.roleAdmin);
     }
@@ -188,6 +197,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         emit SetParameter(parameter, data);
     }
 
+    /// @notice Sets various address parameters for this contract
+    /// @dev Sender has to be allowed to call this method
+    /// @param parameter Name of the variable to set
+    /// @param data New address to set for the variable
     function setParameter(bytes32 parameter, address data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
         if (parameter == "rewardController") rewardController = IChefIncentivesController(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
@@ -198,7 +211,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                       COLLATERAL BALANCE ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposits collateral tokens into this contract and increases a users collateral balance
+    /// @notice Deposits collateral tokens into this contract and increases a user's collateral balance
     /// @dev The caller needs to approve this contract to transfer tokens on their behalf
     /// @param to Address of the user to attribute the collateral to
     /// @param amount Amount of tokens to deposit [tokenScale]
@@ -215,12 +228,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
-    /// @notice Withdraws collateral tokens from this contract and decreases a users collateral balance
+    /// @notice Withdraws collateral tokens from this contract and decreases a user's collateral balance
     /// @param to Address of the user to withdraw tokens to
-    /// @param amount Amount of tokens to withdraw [wad]
-    /// @return tokenAmount Amount of tokens withdrawn [tokenScale]
+    /// @param amount Amount of tokens to withdraw [tokenScale]
+    /// @return tokenAmount Amount of tokens withdrawn [wad]
     function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
-        tokenAmount = wmul(amount, tokenScale);
+        tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
             owner: msg.sender,
@@ -231,6 +244,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+    /// @notice Borrows credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to generate [wad]
+    /// @dev The borrower will receive the amount of credit in the underlying token
     function borrow(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = toInt256(amount);
         modifyCollateralAndDebt({
@@ -242,6 +260,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
+    /// @notice Repays credit against collateral
+    /// @param borrower Address of the borrower
+    /// @param position Address of the position
+    /// @param amount Amount of debt to repay [wad]
+    /// @dev The borrower will repay the amount of credit in the underlying token
     function repay(address borrower, address position, uint256 amount) external {
         int256 deltaDebt = -toInt256(amount);
         modifyCollateralAndDebt({
@@ -269,6 +292,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     /// @notice Updates a position's collateral and debt balances
     /// @dev This is the only method which is allowed to modify a position's collateral and debt balances
+    /// @param owner Address of the owner of the position
+    /// @param position Position state
+    /// @param newDebt New debt balance [wad]
+    /// @param newCumulativeIndex New cumulative index
+    /// @param deltaCollateral Amount of collateral to put up (+) or to remove (-) from the position [wad]
+    /// @param totalDebt_ Total debt of the vault [wad]
     function _modifyPosition(
         address owner,
         Position memory position,
@@ -352,49 +381,59 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
         uint256 newDebt;
         uint256 newCumulativeIndex;
+
         uint256 profit;
+        int256 quotaRevenueChange;
         if (deltaDebt > 0) {
-            (newDebt, newCumulativeIndex) = calcIncrease(
+            (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease(
                 uint256(deltaDebt), // delta debt
                 position.debt,
                 debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             ); // U:[CM-10]
-
+            position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
+            quotaRevenueChange = _calcQuotaRevenueChange(deltaDebt);
             pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
         } else if (deltaDebt < 0) {
             uint256 maxRepayment = calcTotalDebt(debtData);
             uint256 amount = abs(deltaDebt);
             if (amount >= maxRepayment) {
                 amount = maxRepayment; // U:[CM-11]
+                deltaDebt = -toInt256(maxRepayment);
             }
 
             poolUnderlying.safeTransferFrom(creditor, address(pool), amount);
 
+            uint128 newCumulativeQuotaInterest;
             if (amount == maxRepayment) {
                 newDebt = 0;
                 newCumulativeIndex = debtData.cumulativeIndexNow;
-                profit = debtData.accruedFees;
+                profit = debtData.accruedInterest;
+                newCumulativeQuotaInterest = 0;
             } else {
-                (newDebt, newCumulativeIndex, profit) = calcDecrease(
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = calcDecrease(
                     amount, // delta debt
                     position.debt,
                     debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                    position.cumulativeIndexLastUpdate
+                    position.cumulativeIndexLastUpdate,
+                    debtData.cumulativeQuotaInterest
                 );
             }
-
+            quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt - newDebt));
             pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+
+            position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
+            position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
         } else {
             newDebt = position.debt;
             newCumulativeIndex = debtData.cumulativeIndexNow;
         }
 
         if (deltaCollateral > 0) {
-            uint256 amount = deltaCollateral.toUint256();
+            uint256 amount = wmul(deltaCollateral.toUint256(), tokenScale);
             token.safeTransferFrom(collateralizer, address(this), amount);
         } else if (deltaCollateral < 0) {
-            uint256 amount = abs(deltaCollateral);
+            uint256 amount = wmul(abs(deltaCollateral), tokenScale);
             token.safeTransfer(collateralizer, amount);
         }
 
@@ -409,7 +448,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             !_isCollateralized(newDebt, collateralValue, config.liquidationRatio)
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
+        if (quotaRevenueChange != 0) {
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+        }
         emit ModifyCollateralAndDebt(owner, collateralizer, creditor, deltaCollateral, deltaDebt);
+    }
+
+    function _calcQuotaRevenueChange(int256 deltaDebt) internal view returns (int256 quotaRevenueChange) {
+        uint16 rate = IPoolQuotaKeeperV3(poolQuotaKeeper()).getQuotaRate(address(token));
+        return QuotasLogic.calcQuotaRevenueChange(rate, deltaDebt);
     }
 
     function _calcDebt(Position memory position) internal view returns (DebtData memory cdd) {
@@ -417,16 +464,35 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         cdd.debt = position.debt;
         cdd.cumulativeIndexNow = index;
         cdd.cumulativeIndexLastUpdate = position.cumulativeIndexLastUpdate;
+        cdd.cumulativeQuotaIndexLU = position.cumulativeQuotaIndexLU;
+        // Get cumulative quota interest
+        (cdd.cumulativeQuotaInterest, cdd.cumulativeQuotaIndexNow) = _getQuotedTokensData(cdd);
 
-        cdd.accruedInterest = calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
+        cdd.cumulativeQuotaInterest += position.cumulativeQuotaInterest;
 
-        cdd.accruedFees = (cdd.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        cdd.accruedInterest = CreditLogic.calcAccruedInterest(cdd.debt, cdd.cumulativeIndexLastUpdate, index);
+
+        cdd.accruedInterest += cdd.cumulativeQuotaInterest;
+    }
+
+    /// @dev Returns quotas data for credit manager and credit account
+    function _getQuotedTokensData(
+        DebtData memory cdd
+    ) internal view returns (uint128 outstandingQuotaInterest, uint192 cumulativeQuotaIndexNow) {
+        cumulativeQuotaIndexNow = IPoolQuotaKeeperV3(poolQuotaKeeper()).cumulativeIndex(address(token));
+        uint128 outstandingInterestDelta = QuotasLogic.calcAccruedQuotaInterest(
+            uint96(cdd.debt),
+            cumulativeQuotaIndexNow,
+            cdd.cumulativeQuotaIndexLU
+        );
+
+        outstandingQuotaInterest = outstandingInterestDelta; // U:[CM-24]
     }
 
     function _updatePosition(address position) internal view returns (Position memory updatedPos) {
         Position memory pos = positions[position];
         // pos.cumulativeIndexLastUpdate =
-        uint256 accruedInterest = calcAccruedInterest(
+        uint256 accruedInterest = CreditLogic.calcAccruedInterest(
             pos.debt,
             pos.cumulativeIndexLastUpdate,
             pool.baseInterestIndex()
@@ -445,7 +511,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                               LIQUIDATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Liquidates a single unsafe positions by selling collateral at a discounted (`liquidationDiscount`)
+    /// @notice Liquidates a single unsafe position by selling collateral at a discounted (`liquidationDiscount`)
     /// oracle price. The liquidator has to provide the amount he wants to repay or sell (`repayAmounts`) for
     /// the position. From that repay amount a penalty (`liquidationPenalty`) is subtracted to mitigate against
     /// profitable self liquidations. If the available collateral of a position is not sufficient to cover the debt
@@ -466,9 +532,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         DebtData memory debtData = _calcDebt(position);
 
         // load price and calculate discounted price
-        uint256 spotPrice_ = spotPrice();
-        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
-        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        uint256 discountedPrice = wmul(spotPrice(), liqConfig_.liquidationDiscount);
+        if (spotPrice() == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
@@ -476,98 +541,64 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
 
         // verify that the position is indeed unsafe
-        if (_isCollateralized(debtData.debt, wmul(position.collateral, spotPrice_), config.liquidationRatio))
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice()), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
         // TODO: review this
+        uint256 loss;
         if (takeCollateral > position.collateral) {
             takeCollateral = position.collateral;
             repayAmount = wmul(takeCollateral, discountedPrice);
             penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
-            // debt >= repayAmount if takeCollateral > position.collateral
-            //deltaDebt = currentDebt;
             deltaDebt = debtData.debt;
+            loss = calcTotalDebt(debtData) - deltaDebt;
         }
 
-        // update vault state
-        totalDebt -= deltaDebt;
-
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), deltaDebt);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
 
         uint256 newDebt;
         uint256 profit;
         uint256 maxRepayment = calcTotalDebt(debtData);
-        {
-            uint256 newCumulativeIndex;
-            if (deltaDebt == maxRepayment) {
+
+        uint256 newCumulativeIndex;
+        //uint128 newCumulativeQuotaInterest;
+        // uint128 quotaFees;
+
+        if (deltaDebt == maxRepayment) {
+            newDebt = 0;
+            newCumulativeIndex = debtData.cumulativeIndexNow;
+            profit = debtData.accruedInterest;
+            position.cumulativeQuotaInterest = 0;
+        } else {
+            if (loss != 0) {
+                profit = 0;
                 newDebt = 0;
                 newCumulativeIndex = debtData.cumulativeIndexNow;
-                profit = debtData.accruedFees;
             } else {
-                (newDebt, newCumulativeIndex, profit) = calcDecrease(
+                (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
                     deltaDebt, // delta debt
                     debtData.debt,
                     debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                    debtData.cumulativeIndexLastUpdate
+                    debtData.cumulativeIndexLastUpdate,
+                    debtData.cumulativeQuotaInterest
                 );
             }
-            // update liquidated position
-            position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
         }
+        // position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
+        //position.quotaFees = quotaFees;
+        position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
+        // update liquidated position
+        position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
 
         // Mint the penalty from the vault to the treasury
-        // cdm.modifyBalance(address(this), address(buffer), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
-    }
-
-    /// @dev Computes new debt principal and interest index after increasing debt
-    ///      - The new debt principal is simply `debt + amount`
-    ///      - The new credit account's interest index is a solution to the equation
-    ///        `debt * (indexNow / indexLastUpdate - 1) = (debt + amount) * (indexNow / indexNew - 1)`,
-    ///        which essentially writes that interest accrued since last update remains the same
-    /// @param amount Amount to increase debt by
-    /// @param debt Debt principal before increase
-    /// @param cumulativeIndexNow The current interest index
-    /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
-    /// @return newDebt Debt principal after increase
-    /// @return newCumulativeIndex New credit account's interest index
-    function calcIncrease(
-        uint256 amount,
-        uint256 debt,
-        uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexLastUpdate
-    ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex) {
-        if (debt == 0) return (amount, cumulativeIndexNow);
-        newDebt = debt + amount; // U:[CL-2]
-        newCumulativeIndex = ((cumulativeIndexNow * newDebt * INDEX_PRECISION) /
-            ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)); // U:[CL-2]
-    }
-
-    /// @dev Computes interest accrued since the last update
-    function calcAccruedInterest(
-        uint256 amount,
-        uint256 cumulativeIndexLastUpdate,
-        uint256 cumulativeIndexNow
-    ) internal pure returns (uint256) {
-        if (amount == 0) return 0;
-        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
-    }
-
-    /// @dev Calculates the accrued interest for a position
-    function getAccruedInterest(address position) public view returns (uint256) {
-        Position memory pos = positions[position];
-        return calcAccruedInterest(
-            pos.debt,
-            pos.cumulativeIndexLastUpdate,
-            pool.baseInterestIndex()
-        );
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt
@@ -583,56 +614,79 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param debt Debt principal before repayment
     /// @param cumulativeIndexNow The current interest index
     /// @param cumulativeIndexLastUpdate Credit account's interest index as of last update
-    // @param cumulativeQuotaInterest Credit account's quota interest before repayment
-    // @param quotaFees Accrued quota fees
-    // @param feeInterest Fee on accrued interest (both base and quota) charged by the DAO
     /// @return newDebt Debt principal after repayment
     /// @return newCumulativeIndex Credit account's quota interest after repayment
     /// @return profit Amount of underlying tokens received as fees by the DAO
-    // @return newCumulativeQuotaInterest Credit account's accrued quota interest after repayment
+    /// @return newCumulativeQuotaInterest Credit account's accrued quota interest after repayment
     // @return newQuotaFees Amount of unpaid quota fees left after repayment
     function calcDecrease(
         uint256 amount,
         uint256 debt,
         uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexLastUpdate
-    ) internal view returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit) {
+        uint256 cumulativeIndexLastUpdate,
+        uint128 cumulativeQuotaInterest
+    )
+        internal
+        view
+        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint128 newCumulativeQuotaInterest)
+    {
         uint256 amountToRepay = amount;
 
+        if (cumulativeQuotaInterest != 0 && amountToRepay != 0) {
+            // All interest accrued on the quota interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
+
+            if (amountToRepay >= cumulativeQuotaInterest) {
+                amountToRepay -= cumulativeQuotaInterest; // U:[CL-3]
+                profit += cumulativeQuotaInterest; // U:[CL-3]
+
+                newCumulativeQuotaInterest = 0; // U:[CL-3]
+            } else {
+                // If amount is not enough to repay quota interest + DAO fee, then send all to the stakers
+                uint256 quotaInterestPaid = amountToRepay; // U:[CL-3]
+                profit += amountToRepay; // U:[CL-3]
+                amountToRepay = 0; // U:[CL-3]
+
+                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - quotaInterestPaid); // U:[CL-3]
+            }
+        } else {
+            newCumulativeQuotaInterest = cumulativeQuotaInterest;
+        }
+
         if (amountToRepay != 0) {
-            uint256 interestAccrued = calcAccruedInterest({
+            uint256 interestAccrued = CreditLogic.calcAccruedInterest({
                 amount: debt,
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
             }); // U:[CL-3]
-            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3]
+            // All interest accrued on the base interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
+            if (amountToRepay >= interestAccrued) {
+                amountToRepay -= interestAccrued;
 
-            if (amountToRepay >= interestAccrued + profitFromInterest) {
-                amountToRepay -= interestAccrued + profitFromInterest;
-
-                profit += profitFromInterest; // U:[CL-3]
+                profit += interestAccrued; // U:[CL-3]
 
                 newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
             } else {
-                // If amount is not enough to repay base interest + DAO fee, then it is split pro-rata between them
-                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
-
-                profit += amountToRepay - amountToPool; // U:[CL-3]
+                // If amount is not enough to repay quota interest + DAO fee, then send all to the stakers
+                profit += interestAccrued; // U:[CL-3]
                 amountToRepay = 0; // U:[CL-3]
 
-                newCumulativeIndex =
-                    (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
-                    (INDEX_PRECISION *
-                        cumulativeIndexNow -
-                        (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) /
-                        debt); // U:[CL-3]
+                newCumulativeIndex = cumulativeIndexNow;
             }
         } else {
-            newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3]
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
-        newDebt = debt - amountToRepay; // U:[CL-3]
+        newDebt = debt - amountToRepay;
     }
 
+    /// @dev Computes interest accrued since the last update
+    function calcAccruedInterest(
+        uint256 amount,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeIndexNow
+    ) internal pure returns (uint256) {
+        if (amount == 0) return 0;
+        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount;
+    }
 
     /// @notice Returns the total debt of a position
     /// @param position Address of the position
@@ -644,6 +698,28 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @dev Computes total debt, given raw debt data
     /// @param debtData See `DebtData` (must have debt data filled)
     function calcTotalDebt(DebtData memory debtData) internal pure returns (uint256) {
-        return debtData.debt + debtData.accruedInterest + debtData.accruedFees;
+        return debtData.debt + debtData.accruedInterest; //+ debtData.accruedFees;
+    }
+
+    /// @notice Returns address of the quota keeper connected to the pool
+    function poolQuotaKeeper() public view returns (address) {
+        return IPoolV3(pool).poolQuotaKeeper(); // U:[CM-47]
+    }
+
+    /// @notice Returns quotas interest
+    function quotasInterest(address position) external view returns (uint256) {
+        DebtData memory debtData = _calcDebt(positions[position]);
+        return debtData.cumulativeQuotaInterest;
+    }
+
+    function getDebtData(address position) external view returns (DebtData memory) {
+        return _calcDebt(positions[position]);
+    }
+
+    function getDebtInfo(
+        address position
+    ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {
+        DebtData memory debtData = _calcDebt(positions[position]);
+        return (debtData.debt, debtData.accruedInterest, debtData.cumulativeQuotaInterest);
     }
 }

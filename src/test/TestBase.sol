@@ -32,6 +32,7 @@ import {GaugeV3} from "src/quotas/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "src/quotas/PoolQuotaKeeperV3.sol";
 import {MockVoter} from "src/test/MockVoter.sol";
 import {StakingLPEth} from "src/StakingLPEth.sol";
+import {Silo} from "src/Silo.sol";
 
 contract CreditCreator {
     constructor(ICDM cdm) {
@@ -59,7 +60,7 @@ contract TestBase is Test {
     GaugeV3 internal gauge;
     MockVoter internal voter;
     StakingLPEth internal stakingLpEth;
-
+    Silo internal silo;
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
 
@@ -124,6 +125,8 @@ contract TestBase is Test {
     function createStakingLpEth() internal virtual {
         stakingLpEth = new StakingLPEth(address(liquidityPool), "StakingLPEth", "sLP-ETH");
         vm.label({account: address(stakingLpEth), newLabel: "StakingLPEth"});
+        silo = stakingLpEth.silo();
+        vm.label({account: address(silo), newLabel: "Silo"});
     }
 
     function createGaugeAndSetGauge() internal virtual {

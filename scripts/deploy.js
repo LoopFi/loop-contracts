@@ -596,6 +596,16 @@ async function registerRewards(loopTokenAddress, incentivesController, rewardAmo
   console.log('Registered reward deposit in incentivesController.');
 }
 
+
+async function registerVaults() {
+  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
+  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+    console.log(`${name}: ${vault.address}`);
+    await vaultRegistry.addVault(vault.address);
+    console.log('Added', name, 'to vault registry');
+  }
+}
+
 async function deployRadiant() {
   console.log('Deploying Radiant Contracts...');
   const signer = await getSignerAddress();
@@ -729,9 +739,10 @@ async function createPositions() {
 }
 
 ((async () => {
-  await deployCore();
+  // await deployCore();
   // await deployAuraVaults();
-  await deployVaults();
+  // await deployVaults();
+  // await registerVaults();
   // await deployRadiant();
   // await deployGearbox();
   // await logVaults();

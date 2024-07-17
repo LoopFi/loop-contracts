@@ -152,6 +152,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     error CDPVault__liquidatePosition_notUnsafe();
     error CDPVault__liquidatePosition_invalidSpotPrice();
     error CDPVault__liquidatePosition_invalidParameters();
+    error CDPVault__noBadDebt();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -545,9 +546,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
-        // TODO: review this
         uint256 loss;
         if (takeCollateral > position.collateral) {
+            if (calcTotalDebt(debtData) <= wmul(position.collateral, spotPrice())) revert CDPVault__noBadDebt();
             takeCollateral = position.collateral;
             repayAmount = wmul(takeCollateral, discountedPrice);
             penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);

@@ -426,7 +426,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
         } else {
             newDebt = position.debt;
-            newCumulativeIndex = debtData.cumulativeIndexNow;
+            newCumulativeIndex = debtData.cumulativeIndexLastUpdate;
         }
 
         if (deltaCollateral > 0) {
@@ -552,7 +552,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             repayAmount = wmul(takeCollateral, discountedPrice);
             penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
             deltaDebt = debtData.debt;
-            loss = calcTotalDebt(debtData) - deltaDebt;
+            loss = calcTotalDebt(debtData) - (repayAmount - penalty);
         }
 
         // transfer the repay amount from the liquidator to the vault

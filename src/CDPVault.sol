@@ -445,7 +445,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
         if (
             (deltaDebt > 0 || deltaCollateral < 0) &&
-            !_isCollateralized(newDebt, collateralValue, config.liquidationRatio)
+            !_isCollateralized(calcTotalDebt(_calcDebt(position)), collateralValue, config.liquidationRatio)
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
         if (quotaRevenueChange != 0) {

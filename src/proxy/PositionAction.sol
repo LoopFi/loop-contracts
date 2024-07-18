@@ -102,6 +102,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     error PositionAction__decreaseLever_invalidAuxSwap();
     error PositionAction__decreaseLever_invalidResidualRecipient();
     error PositionAction__onFlashLoan__invalidSender();
+    error PositionAction__onFlashLoan__invalidInitiator();
     error PositionAction__onlyDelegatecall();
     error PositionAction__unregisteredVault();
 
@@ -376,13 +377,15 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @notice Callback function for the flash loan taken out in increaseLever
     /// @param data The encoded bytes that were passed into the flash loan
     function onFlashLoan(
-        address /*initiator*/,
+        address initiator,
         address /*token*/,
         uint256 /*amount*/,
         uint256 /*fee*/,
         bytes calldata data
     ) external returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onFlashLoan__invalidSender();
+        if (initiator != address(this)) revert PositionAction__onFlashLoan__invalidInitiator();
+
         (LeverParams memory leverParams, address upFrontToken, uint256 upFrontAmount) = abi.decode(
             data,
             (LeverParams, address, uint256)

@@ -56,6 +56,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     error CallerNotManagerException();
     error PoolV3LockedException();
+    error IncompatibleDecimalsException();
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -178,6 +179,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
         interestRateModel = interestRateModel_; // U:[LP-1B]
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
+
+        if (ERC20(underlyingToken_).decimals() != 18) {
+            revert IncompatibleDecimalsException();
+        }
 
         locked = true;
 

@@ -124,7 +124,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             _revertIfLocked();
             _;
         }
-        _;
     }
 
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {

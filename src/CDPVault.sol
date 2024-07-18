@@ -489,24 +489,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         outstandingQuotaInterest = outstandingInterestDelta; // U:[CM-24]
     }
 
-    function _updatePosition(address position) internal view returns (Position memory updatedPos) {
-        Position memory pos = positions[position];
-        // pos.cumulativeIndexLastUpdate =
-        uint256 accruedInterest = CreditLogic.calcAccruedInterest(
-            pos.debt,
-            pos.cumulativeIndexLastUpdate,
-            pool.baseInterestIndex()
-        );
-        uint256 currentDebt = pos.debt + accruedInterest;
-        uint256 spotPrice_ = spotPrice();
-        uint256 collateralValue = wmul(pos.collateral, spotPrice_);
-
-        if (spotPrice_ == 0 || _isCollateralized(currentDebt, collateralValue, vaultConfig.liquidationRatio))
-            revert CDPVault__modifyCollateralAndDebt_notSafe();
-
-        return pos;
-    }
-
     /*//////////////////////////////////////////////////////////////
                               LIQUIDATION
     //////////////////////////////////////////////////////////////*/
@@ -545,7 +527,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             revert CDPVault__liquidatePosition_notUnsafe();
 
         // account for bad debt
-        // TODO: review this
         uint256 loss;
         if (takeCollateral > position.collateral) {
             takeCollateral = position.collateral;
@@ -563,8 +544,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 maxRepayment = calcTotalDebt(debtData);
 
         uint256 newCumulativeIndex;
-        //uint128 newCumulativeQuotaInterest;
-        // uint128 quotaFees;
 
         if (deltaDebt == maxRepayment) {
             newDebt = 0;
@@ -586,15 +565,14 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 );
             }
         }
-        // position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
-        //position.quotaFees = quotaFees;
+
         position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
         // update liquidated position
         position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss);
+
         // transfer the collateral amount from the vault to the liquidator
-        // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
 
         // Mint the penalty from the vault to the treasury
@@ -627,7 +605,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint128 cumulativeQuotaInterest
     )
         internal
-        view
+        pure
         returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint128 newCumulativeQuotaInterest)
     {
         uint256 amountToRepay = amount;
@@ -657,18 +635,18 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 amount: debt,
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
-            }); // U:[CL-3]
+            });
             // All interest accrued on the base interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
             if (amountToRepay >= interestAccrued) {
                 amountToRepay -= interestAccrued;
 
-                profit += interestAccrued; // U:[CL-3]
+                profit += interestAccrued;
 
-                newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
+                newCumulativeIndex = cumulativeIndexNow;
             } else {
                 // If amount is not enough to repay quota interest + DAO fee, then send all to the stakers
-                profit += interestAccrued; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
+                profit += interestAccrued;
+                amountToRepay = 0;
 
                 newCumulativeIndex = cumulativeIndexNow;
             }
@@ -712,10 +690,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         return debtData.cumulativeQuotaInterest;
     }
 
+    /// @notice Returns debt data for a position
     function getDebtData(address position) external view returns (DebtData memory) {
         return _calcDebt(positions[position]);
     }
 
+    /// @notice Returns debt data for a position
     function getDebtInfo(
         address position
     ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {

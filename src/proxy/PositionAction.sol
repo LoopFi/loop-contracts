@@ -419,6 +419,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             toInt256(addDebt)
         );
 
+        underlyingToken.approve(address(flashlender), addDebt);
+
         return CALLBACK_SUCCESS;
     }
 

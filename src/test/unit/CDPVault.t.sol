@@ -14,6 +14,7 @@ import {IPermission} from "../../interfaces/IPermission.sol";
 import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
 import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 import {console} from "forge-std/console.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 
 contract MockTokenScaled is ERC20PresetMinterPauser {
     uint8 private _decimals;
@@ -858,7 +859,7 @@ contract CDPVaultTest is TestBase {
     // //////////////////////////////////////////////////////////////*/
 
     // // Case 1: Entire debt is repaid and no bad debt has accrued (no fee - self liquidation)
-    function test_liquidate_full_1() public {
+    function test_liquidate_full_1_No_Bad_Debt() public {
         CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
 
         // create position
@@ -867,7 +868,8 @@ contract CDPVaultTest is TestBase {
         // liquidate position
         address position = address(this);
         uint256 repayAmount = 80 ether;
-        _updateSpot(0.80 ether);
+        mockWETH.mint(address(this), repayAmount);
+        _updateSpot(0.8 ether);
         mockWETH.approve(address(vault), repayAmount);
         console.log(vault.totalDebt(), "totalDebt");
         uint256 creditBefore = credit(address(this));
@@ -879,6 +881,32 @@ contract CDPVaultTest is TestBase {
 
         assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
         assertEq(creditBefore - creditAfter, 80 ether);
+        assertEq(collateral, 0, "collateral");
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(vault.totalDebt(), 0, "totalDebt");
+    }
+
+    function test_liquidate_full_1_Bad_Debt() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
+
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+
+        // liquidate position
+        address position = address(this);
+        uint256 repayAmount = 80 ether;
+        _updateSpot(0.7 ether);
+        mockWETH.approve(address(vault), repayAmount);
+        console.log(vault.totalDebt(), "totalDebt");
+        uint256 creditBefore = credit(address(this));
+        uint256 virtualDebtBefore = virtualDebt(vault, position);
+        vault.liquidatePositionBadDebt(position, repayAmount);
+        uint256 creditAfter = credit(address(this));
+
+        (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
+
+        assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
+        assertEq(creditBefore - creditAfter, 70 ether);
         assertEq(collateral, 0);
         assertEq(token.balanceOf(address(vault)), 0);
         assertEq(vault.totalDebt(), 0, "totalDebt");
@@ -894,7 +922,7 @@ contract CDPVaultTest is TestBase {
         // liquidate position
         address position = address(this);
         uint256 repayAmount = 80 ether;
-        _updateSpot(0.1 ether);
+        _updateSpot(0.8 ether);
         mockWETH.approve(address(vault), repayAmount);
         console.log(vault.totalDebt(), "totalDebt");
         uint256 creditBefore = credit(address(this));
@@ -904,7 +932,7 @@ contract CDPVaultTest is TestBase {
         (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
 
         assertEq(debtAfter, virtualDebtBefore - repayAmount); // debt - repayAmount
-        assertEq(creditBefore - creditAfter, 10 ether);
+        assertEq(creditBefore - creditAfter, 80 ether);
         assertEq(collateral, 0);
         assertEq(token.balanceOf(address(vault)), 0);
         assertEq(vault.totalDebt(), 0, "totalDebt");
@@ -928,7 +956,7 @@ contract CDPVaultTest is TestBase {
         uint256 sharesBefore = liquidityPool.totalSupply();
         assertGt(sharesBefore, 0);
 
-        vault.liquidatePosition(position, repayAmount);
+        vault.liquidatePositionBadDebt(position, repayAmount);
         uint256 creditAfter = credit(address(this));
         (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
         assertEq(liquidityPool.totalSupply(), sharesBefore, "pool shares");
@@ -958,7 +986,7 @@ contract CDPVaultTest is TestBase {
         // Transfer some shares to treasury to allow burning
         liquidityPool.transfer(liquidityPool.treasury(), sharesBefore);
 
-        vault.liquidatePosition(position, repayAmount);
+        vault.liquidatePositionBadDebt(position, repayAmount);
         uint256 creditAfter = credit(address(this));
         (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
         assertGt(sharesBefore, liquidityPool.totalSupply(), "pool shares");

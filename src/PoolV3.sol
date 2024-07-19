@@ -182,7 +182,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         locked = true;
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
-        _creditManagerSet.add(msg.sender);
     }
 
     /// @notice Pool shares decimals, matches underlying token decimals

@@ -59,6 +59,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Timestamp of the last quota rates update
     uint40 public override lastQuotaRateUpdate;
+    /// @notice token => vault (credit manager) mapping
+    mapping(address => address) public creditManagers;
 
     /// @dev Ensures that function caller is gauge
     modifier gaugeOnly() {
@@ -157,7 +159,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Adds a new quota token
     /// @param token Address of the token
     function addQuotaToken(
-        address token
+        address token,
+        address vault
     )
         external
         override
@@ -170,7 +173,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         // The rate will be set during a general epoch update in the gauge
         quotaTokensSet.add(token); // U:[PQK-5]
         totalQuotaParams[token].cumulativeIndexLU = 1; // U:[PQK-5]
-
+        creditManagers[token] = vault; // U:[PQK-5]
         emit AddQuotaToken(token); // U:[PQK-5]
     }
 
@@ -205,7 +208,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             tokenQuotaParams.rate = rate; // U:[PQK-7]
 
-            quotaRevenue += (IPoolV3(pool).totalBorrowed() * rate) / PERCENTAGE_FACTOR; // U:[PQK-7]
+            quotaRevenue += (IPoolV3(pool).creditManagerBorrowed(creditManagers[token]) * rate) / PERCENTAGE_FACTOR; // U:[PQK-7]
 
             emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 

@@ -5,11 +5,11 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 // INTERFACES
-import {IGaugeV3, QuotaRateParams, UserVotes} from "@gearbox-protocol/core-v3/contracts/interfaces/IGaugeV3.sol";
+import {QuotaRateParams, UserVotes} from "@gearbox-protocol/core-v3/contracts/interfaces/IGaugeV3.sol";
 import {IGearStakingV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
-import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolQuotaKeeperV3} from "src/interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
-
+import {IGaugeV3} from "src/interfaces/IGaugeV3.sol";
 // TRAITS
 import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts/traits/ACLNonReentrantTrait.sol";
 
@@ -232,7 +232,8 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function addQuotaToken(
         address token,
         uint16 minRate,
-        uint16 maxRate
+        uint16 maxRate,
+        address vault
     )
         external
         override
@@ -253,7 +254,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
         IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
         if (!quotaKeeper.isQuotedToken(token)) {
-            quotaKeeper.addQuotaToken({token: token}); // U:[GA-05]
+            quotaKeeper.addQuotaToken({token: token, vault: vault}); // U:[GA-05]
         }
 
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]

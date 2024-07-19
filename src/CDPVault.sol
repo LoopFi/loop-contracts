@@ -392,6 +392,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             ); // U:[CM-10]
+            position.cumulativeQuotaInterest = debtData.cumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
             quotaRevenueChange = _calcQuotaRevenueChange(deltaDebt);
             pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
@@ -557,7 +558,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount - penalty);
 
         uint256 newDebt;
         uint256 profit;
@@ -599,6 +600,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         token.safeTransfer(msg.sender, takeCollateral);
 
         // Mint the penalty from the vault to the treasury
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
     }
 

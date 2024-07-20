@@ -238,15 +238,6 @@ async function deployGearbox() {
 
   const signer = await getSignerAddress();
 
-  // Deploy Mock WETH contract
-  const mockWETH = await deployContract(
-    'ERC20PresetMinterPauser',
-    'MockWETH',
-    false, // not a vault
-    "Pool Underlying WETH", // name
-    "WETH" // symbol
-  );
-
   // Deploy LinearInterestRateModelV3 contract
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
@@ -263,10 +254,11 @@ async function deployGearbox() {
 
   // Deploy ACL contract
   const ACL = await deployContract('ACL', 'ACL', false);
+  const underlierAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
   // Deploy AddressProviderV3 contract and set addresses
   const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
-  await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), mockWETH.address, false);
+  await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), underlierAddress, false);
   await AddressProviderV3.setAddress(toBytes32('TREASURY'), CONFIG.Core.Gearbox.treasury, false);
 
   // Deploy ContractsRegister and set its address in AddressProviderV3
@@ -279,24 +271,24 @@ async function deployGearbox() {
     'PoolV3',
     false, // not a vault
     AddressProviderV3.address, // addressProvider_
-    mockWETH.address, // underlyingToken_
+    underlierAddress, // underlyingToken_
     LinearInterestRateModelV3.address, // interestRateModel_
     CONFIG.Core.Gearbox.initialGlobalDebtCeiling, // Debt ceiling
     "Loop Liquidity Pool", // name_
     "lpETH " // symbol_
   );
 
-  // Mint and deposit WETH to the PoolV3 contract
-  const availableLiquidity = ethers.utils.parseEther('1000000'); // 1,000,000 WETH
+  // // Mint and deposit WETH to the PoolV3 contract
+  // const availableLiquidity = ethers.utils.parseEther('1000000'); // 1,000,000 WETH
 
-  await mockWETH.mint(signer, availableLiquidity);
-  await mockWETH.approve(PoolV3.address, availableLiquidity);
-  await PoolV3.deposit(availableLiquidity, signer);
+  // await mockWETH.mint(signer, availableLiquidity);
+  // await mockWETH.approve(PoolV3.address, availableLiquidity);
+  // await PoolV3.deposit(availableLiquidity, signer);
 
   console.log('Gearbox Contracts Deployed');
 
-  await verifyOnTenderly('ERC20PresetMinterPauser', mockWETH.address);
-  await storeContractDeployment(false, 'MockWETH', mockWETH.address, 'ERC20PresetMinterPauser');
+  // await verifyOnTenderly('ERC20PresetMinterPauser', mockWETH.address);
+  // await storeContractDeployment(false, 'MockWETH', mockWETH.address, 'ERC20PresetMinterPauser');
   
   await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
   await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
@@ -739,10 +731,10 @@ async function createPositions() {
 }
 
 ((async () => {
-  // await deployCore();
+  await deployCore();
   // await deployAuraVaults();
-  // await deployVaults();
-  // await registerVaults();
+  await deployVaults();
+  await registerVaults();
   // await deployRadiant();
   // await deployGearbox();
   // await logVaults();

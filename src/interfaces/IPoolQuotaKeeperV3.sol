@@ -108,10 +108,11 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     // function creditManagers() external view returns (address[] memory);
 
     //function addCreditManager(address _creditManager) external;
+    function setCreditManager(address token, address vault) external;
 
     function quotedTokens() external view returns (address[] memory);
 
-    function addQuotaToken(address token, address vault) external;
+    function addQuotaToken(address token) external;
 
     function updateRates() external;
 

@@ -144,7 +144,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             (uint16 rate, , ) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
             //(uint256 totalQuoted, ) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
 
-            quotaRevenue += (IPoolV3(pool).totalBorrowed() * rate) / PERCENTAGE_FACTOR;
+            quotaRevenue += (IPoolV3(pool).creditManagerBorrowed(creditManagers[token]) * rate) / PERCENTAGE_FACTOR;
 
             unchecked {
                 ++i;
@@ -159,8 +159,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Adds a new quota token
     /// @param token Address of the token
     function addQuotaToken(
-        address token,
-        address vault
+        address token
     )
         external
         override
@@ -173,7 +172,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         // The rate will be set during a general epoch update in the gauge
         quotaTokensSet.add(token); // U:[PQK-5]
         totalQuotaParams[token].cumulativeIndexLU = 1; // U:[PQK-5]
-        creditManagers[token] = vault; // U:[PQK-5]
+
         emit AddQuotaToken(token); // U:[PQK-5]
     }
 
@@ -234,6 +233,17 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             gauge = _gauge; // U:[PQK-8]
             emit SetGauge(_gauge); // U:[PQK-8]
         }
+    }
+
+    function setCreditManager(
+        address token,
+        address vault
+    )
+        external
+        override
+        configuratorOnly // U:[PQK-2]
+    {
+        creditManagers[token] = vault;
     }
 
     // --------- //

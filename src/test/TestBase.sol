@@ -123,7 +123,8 @@ contract TestBase is Test {
         voter.setFirstEpochTimestamp(block.timestamp);
         gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
         quotaKeeper.setGauge(address(gauge));
-        gauge.addQuotaToken(address(token), 10, 100, vault);
+        quotaKeeper.setCreditManager(address(token), address(vault));
+        gauge.addQuotaToken(address(token), 10, 100);
         gauge.setFrozenEpoch(false);
         vm.warp(block.timestamp + 1 weeks);
         vm.prank(address(gauge));
@@ -135,7 +136,8 @@ contract TestBase is Test {
         voter.setFirstEpochTimestamp(block.timestamp);
         gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
         quotaKeeper.setGauge(address(gauge));
-        gauge.addQuotaToken(address(token), 10, 100, vault);
+        quotaKeeper.setCreditManager(address(token), address(vault));
+        gauge.addQuotaToken(address(token), 10, 100);
         gauge.setFrozenEpoch(false);
         vm.warp(block.timestamp + 1 weeks);
         vm.prank(address(gauge));

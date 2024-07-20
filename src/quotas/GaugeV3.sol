@@ -7,7 +7,7 @@ pragma abicoder v1;
 // INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "@gearbox-protocol/core-v3/contracts/interfaces/IGaugeV3.sol";
 import {IGearStakingV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
-import {IPoolQuotaKeeperV3} from "src/interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // TRAITS

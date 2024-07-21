@@ -27,14 +27,14 @@ struct CollateralParams {
     SwapParams auxSwap;
 }
 
-/// @notice Struct containing parameters used for borrowing or repaying Stablecoin
-///         and optionally swapping Stablecoin to an arbitrary token or vice versa
+/// @notice Struct containing parameters used for borrowing or repaying underlying token
+///         and optionally swapping underlying token to an arbitrary token or vice versa
 struct CreditParams {
     // amount of debt to increase by or the amount of normal debt to decrease by [wad]
     uint256 amount;
     // address that will transfer the debt to repay or receive the debt to borrow
     address creditor;
-    // optional swap from Stablecoin to arbitrary token
+    // optional swap from underlying token to arbitrary token
     SwapParams auxSwap;
 }
 
@@ -46,7 +46,7 @@ struct LeverParams {
     address vault;
     // the vault's token
     address collateralToken;
-    // the swap parameters to swap collateral to Stablecoin or vice versa
+    // the swap parameters to swap collateral to underlying token or vice versa
     SwapParams primarySwap;
     // optional swap parameters to swap an arbitrary token to the collateral token or vice versa
     SwapParams auxSwap;
@@ -95,7 +95,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     error PositionAction__deposit_InvalidAuxSwap();
     error PositionAction__borrow_InvalidAuxSwap();
     error PositionAction__repay_InvalidAuxSwap();
-    error PositionAction__delegateViaStablecoin_InvalidAuxSwap();
     error PositionAction__increaseLever_invalidPrimarySwap();
     error PositionAction__increaseLever_invalidAuxSwap();
     error PositionAction__decreaseLever_invalidPrimarySwap();
@@ -162,7 +161,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @param leverParams LeverParams struct
     /// @param upFrontToken the token passed up front
     /// @param upFrontAmount the amount of `upFrontToken` (or amount received from the aux swap)[CDPVault.tokenScale()]
-    /// @param swapAmountOut the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
+    /// @param swapAmountOut the amount of tokens received from the underlying token flash loan swap [CDPVault.tokenScale()]
     /// @return Amount of collateral added to CDPVault [wad]
     function _onIncreaseLever(
         LeverParams memory leverParams,
@@ -206,7 +205,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         _withdraw(vault, position, collateralParams);
     }
 
-    /// @notice Adds debt to a CDP Vault by minting Stablecoin (and optionally swaps Stablecoin to an arbitrary token)
+    /// @notice Adds debt to a CDP Vault by borrowing underlying token (and optionally swaps underlying token to an arbitrary token)
     /// @param position The CDP Vault position
     /// @param vault The CDP Vault
     /// @param creditParams The borrow parameters
@@ -214,7 +213,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         _borrow(vault, position, creditParams);
     }
 
-    /// @notice Repays debt to a CDP Vault via Stablecoin (optionally swapping an arbitrary token to Stablecoin)
+    /// @notice Repays debt to a CDP Vault via underlying token (optionally swapping an arbitrary token to underlying token)
     /// @param position The CDP Vault position
     /// @param vault The CDP Vault
     /// @param creditParams The credit parameters
@@ -284,9 +283,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         }
     }
 
-    /// @notice Increase the leverage of a position by taking out a flash loan and buying Stablecoin
+    /// @notice Increase the leverage of a position by taking out a flash loan and buying underlying token
     /// @param leverParams The parameters for the lever action,
-    /// `primarySwap` - parameters to swap Stablecoin provided by the flash loan into the collateral token
+    /// `primarySwap` - parameters to swap underlying token provided by the flash loan into the collateral token
     /// `auxSwap` - parameters to swap the `upFrontToken` to the collateral token
     /// @param upFrontToken The token to transfer up front to the LeverAction contract
     /// @param upFrontAmount The amount of `upFrontToken` to transfer to the LeverAction contract [upFrontToken-Scale]
@@ -337,7 +336,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @notice Decrease the leverage of a position by taking out a credit flash loan to withdraw and sell collateral
     /// @param leverParams The parameters for the lever action:
     /// `primarySwap` swap parameters to swap the collateral withdrawn from the CDPVault using the flash loan to
-    /// Stablecoin `auxSwap` swap parameters to swap the collateral not used to payback the flash loan
+    /// underlying token `auxSwap` swap parameters to swap the collateral not used to payback the flash loan
     /// @param subCollateral The amount of collateral to withdraw from the position [wad]
     /// @param residualRecipient Optional parameter that must be provided if an `auxSwap` *is not* provided
     /// This parameter is the address to send the residual collateral to
@@ -422,7 +421,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             toInt256(addDebt)
         );
 
-        underlyingToken.approve(address(flashlender), addDebt);
+        underlyingToken.forceApprove(address(flashlender), addDebt);
 
         return CALLBACK_SUCCESS;
     }
@@ -482,14 +481,14 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         return collateral;
     }
 
-    /// @notice Mints Stablecoin and optionally swaps Stablecoin to an arbitrary token
+    /// @notice Borrows underlying token and optionally swaps underlying token to an arbitrary token
     /// @param vault The CDP Vault
     /// @param position The CDP Vault
     /// @param creditParams The credit parameters
     function _borrow(address vault, address position, CreditParams calldata creditParams) internal {
         ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(creditParams.amount));
         if (creditParams.auxSwap.assetIn == address(0)) {
-            underlyingToken.approve(address(this), creditParams.amount);
+            underlyingToken.forceApprove(address(this), creditParams.amount);
             underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
             // handle exit swap
@@ -498,12 +497,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         }
     }
 
-    /// @notice Repays debt by redeeming Stablecoin and optionally swaps an arbitrary token to stablecoin
+    /// @notice Repays debt by redeeming underlying token and optionally swaps an arbitrary token to underlying token
     /// @param vault The CDP Vault
     /// @param creditParams The credit parameters
     /// @param permitParams The permit parameters
     function _repay(address vault, address position, CreditParams calldata creditParams, PermitParams calldata permitParams) internal {
-        // transfer arbitrary token and swap to stablecoin
+        // transfer arbitrary token and swap to underlying token
         uint256 amount;
         if (creditParams.auxSwap.assetIn != address(0)) {
             if (creditParams.auxSwap.recipient != address(this)) revert PositionAction__repay_InvalidAuxSwap();
@@ -511,12 +510,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             amount = _transferAndSwap(creditParams.creditor, creditParams.auxSwap, permitParams);
         } else {
             if (creditParams.creditor != address(this)) {
-                // transfer stablecoin directly from creditor
+                // transfer directly from creditor
                 _transferFrom(address(underlyingToken), creditParams.creditor, address(this), creditParams.amount, permitParams);
             }
         }
 
-        underlyingToken.approve(address(vault), creditParams.amount);
+        underlyingToken.forceApprove(address(vault), creditParams.amount);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),

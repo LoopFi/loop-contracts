@@ -241,8 +241,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
-            owner: msg.sender,
-            collateralizer: to,
+            owner: to,
+            collateralizer: msg.sender,
             creditor: msg.sender,
             deltaCollateral: deltaCollateral,
             deltaDebt: 0
@@ -451,7 +451,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
         if (
             (deltaDebt > 0 || deltaCollateral < 0) &&
-            !_isCollateralized(newDebt, collateralValue, config.liquidationRatio)
+            !_isCollateralized(calcTotalDebt(_calcDebt(position)), collateralValue, config.liquidationRatio)
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
         if (quotaRevenueChange != 0) {
@@ -493,24 +493,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         );
 
         outstandingQuotaInterest = outstandingInterestDelta; // U:[CM-24]
-    }
-
-    function _updatePosition(address position) internal view returns (Position memory updatedPos) {
-        Position memory pos = positions[position];
-        // pos.cumulativeIndexLastUpdate =
-        uint256 accruedInterest = CreditLogic.calcAccruedInterest(
-            pos.debt,
-            pos.cumulativeIndexLastUpdate,
-            pool.baseInterestIndex()
-        );
-        uint256 currentDebt = pos.debt + accruedInterest;
-        uint256 spotPrice_ = spotPrice();
-        uint256 collateralValue = wmul(pos.collateral, spotPrice_);
-
-        if (spotPrice_ == 0 || _isCollateralized(currentDebt, collateralValue, vaultConfig.liquidationRatio))
-            revert CDPVault__modifyCollateralAndDebt_notSafe();
-
-        return pos;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -676,7 +658,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint128 cumulativeQuotaInterest
     )
         internal
-        view
+        pure
         returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint128 newCumulativeQuotaInterest)
     {
         uint256 amountToRepay = amount;
@@ -706,14 +688,14 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 amount: debt,
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
-            }); // U:[CL-3]
+            });
             // All interest accrued on the base interest is taken by the DAO to be distributed to LP stakers, dLP stakers and the DAO
             if (amountToRepay >= interestAccrued) {
                 amountToRepay -= interestAccrued;
 
-                profit += interestAccrued; // U:[CL-3]
+                profit += interestAccrued;
 
-                newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
+                newCumulativeIndex = cumulativeIndexNow;
             } else {
                 // If amount is not enough to repay interest, then send all to the stakers and update index
                 profit += amountToRepay; // U:[CL-3]
@@ -766,10 +748,12 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         return debtData.cumulativeQuotaInterest;
     }
 
+    /// @notice Returns debt data for a position
     function getDebtData(address position) external view returns (DebtData memory) {
         return _calcDebt(positions[position]);
     }
 
+    /// @notice Returns debt data for a position
     function getDebtInfo(
         address position
     ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {

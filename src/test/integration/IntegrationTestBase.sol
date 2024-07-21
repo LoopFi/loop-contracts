@@ -139,8 +139,7 @@ contract IntegrationTestBase is TestBase {
         uint256 amount = swapParams.swapType == SwapType.EXACT_IN ? swapParams.amount : swapParams.limit;
 
         // mint assetIn to leverActions so we can execute the swap
-        deal(swapParams.assetIn, address(this), amount);
-        ERC20(swapParams.assetIn).transfer(address(swapAction), amount);
+        deal(swapParams.assetIn, address(swapAction), amount);
 
         retAmount = swapAction.swap(swapParams);
     }

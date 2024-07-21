@@ -328,7 +328,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // take out flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         flashlender.flashLoan(
-            IERC3156FlashBorrower(self), 
+            IERC3156FlashBorrower(self),
             address(underlyingToken),
             leverParams.primarySwap.amount,
             abi.encode(leverParams, upFrontToken, upFrontAmount)

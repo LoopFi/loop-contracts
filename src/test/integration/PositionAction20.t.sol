@@ -53,7 +53,7 @@ contract PositionAction20Test is IntegrationTestBase {
             1.0 ether, // liquidation penalty
             1.05 ether // liquidation discount
         );
-
+        createGaugeAndSetGauge(address(vault));
         // setup user and userProxy
         user = vm.addr(0x12341234);
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));

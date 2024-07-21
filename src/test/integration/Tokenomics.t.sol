@@ -21,45 +21,42 @@ import {VaultRegistry} from "../../VaultRegistry.sol";
 
 contract MockPriceProvider is IPriceProvider {
     // Returns the latest price in ether.
-    function getTokenPrice() external pure returns (uint256){
+    function getTokenPrice() external pure returns (uint256) {
         return 1e18;
     }
 
     // Returns the latest price in usd.
-	function getTokenPriceUsd() external pure returns (uint256){
+    function getTokenPriceUsd() external pure returns (uint256) {
         return 2400 ether;
     }
 
-	function getLpTokenPrice() external pure returns (uint256){
+    function getLpTokenPrice() external pure returns (uint256) {
         return 1e18;
     }
 
-	function getLpTokenPriceUsd() external pure returns (uint256){
+    function getLpTokenPriceUsd() external pure returns (uint256) {
         return 2400 ether;
     }
 
-    function getStablecoinUsd() external pure returns (uint256){
+    function getStablecoinUsd() external pure returns (uint256) {
         return 2400 ether;
     }
 
-	function decimals() external pure returns (uint256){
+    function decimals() external pure returns (uint256) {
         return 18;
     }
 
-	function update() external {
-    }
+    function update() external {}
 
-	function getRewardTokenPrice(address /*rewardToken*/, uint256 /*amount*/) external pure returns (uint256){
+    function getRewardTokenPrice(address /*rewardToken*/, uint256 /*amount*/) external pure returns (uint256) {
         return 1e18;
     }
 
-	function baseAssetChainlinkAdapter() external view returns (address) {
-
-    }
+    function baseAssetChainlinkAdapter() external view returns (address) {}
 }
 
 interface IWeightedPoolFactory {
-        function create(
+    function create(
         string memory name,
         string memory symbol,
         address[] memory tokens,
@@ -81,10 +78,11 @@ contract RadiantDeployHelper {
     using SafeERC20 for ERC20;
 
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    ERC20 constant internal WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    
+    ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+
     IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
-    IWeightedPoolFactory internal constant weightedPoolFactory = IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
+    IWeightedPoolFactory internal constant weightedPoolFactory =
+        IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
 
     address public loopToken;
     IWETH public weth = IWETH(address(WETH));
@@ -121,18 +119,15 @@ contract RadiantDeployHelper {
         address tempAsset;
         for (uint256 i; i < assets.length; i++) {
             if (!loopTokenPlaced) {
-
                 // check if we can to insert at this position
                 if (uint160(assets[i]) > uint160(loopToken)) {
                     loopTokenPlaced = true;
                     tempAsset = assets[i];
                     assets[i] = address(loopToken);
-
                 } else if (i == assets.length - 1) {
                     // still not inserted, but we are at the end of the list, insert it here
                     assets[i] = loopToken;
                 }
-
             } else {
                 // token has been inserted, move every asset index up
                 address placeholder = assets[i];
@@ -173,10 +168,9 @@ contract RadiantDeployHelper {
             })
         );
         emit WeightedPoolDeployed(address(pool_));
-    } 
-
-    receive() external payable {
     }
+
+    receive() external payable {}
 }
 
 contract TokenomicsTest is IntegrationTestBase {
@@ -187,7 +181,7 @@ contract TokenomicsTest is IntegrationTestBase {
     EligibilityDataProvider public eligibilityDataProvider;
     MultiFeeDistribution public multiFeeDistribution;
     MockPriceProvider public priceProvider;
-    
+
     ERC20Mock public loopToken;
 
     RadiantDeployHelper public radiantDeployHelper;
@@ -211,7 +205,7 @@ contract TokenomicsTest is IntegrationTestBase {
     bytes32 internal govWeightedPoolId;
     ERC20 internal lpToken;
 
-    function setUp() public virtual override { 
+    function setUp() public virtual override {
         super.setUp();
 
         radiantDeployHelper = new RadiantDeployHelper();
@@ -232,45 +226,58 @@ contract TokenomicsTest is IntegrationTestBase {
 
         // setup the vault registry
         vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
+        createGaugeAndSetGauge(address(vault));
 
-        multiFeeDistribution = MultiFeeDistribution(address(new ERC1967Proxy(
-            address(new MultiFeeDistribution()),
-            abi.encodeWithSelector(
-                MultiFeeDistribution.initialize.selector,
-                address(loopToken),
-                lockZap,
-                dao,
-                address(priceProvider),
-                rewardsDuration,
-                rewardsLookback,
-                lockDuration,
-                burnRatio,
-                vestDuration
+        multiFeeDistribution = MultiFeeDistribution(
+            address(
+                new ERC1967Proxy(
+                    address(new MultiFeeDistribution()),
+                    abi.encodeWithSelector(
+                        MultiFeeDistribution.initialize.selector,
+                        address(loopToken),
+                        lockZap,
+                        dao,
+                        address(priceProvider),
+                        rewardsDuration,
+                        rewardsLookback,
+                        lockDuration,
+                        burnRatio,
+                        vestDuration
+                    )
+                )
             )
-        )));
+        );
 
-        eligibilityDataProvider = EligibilityDataProvider(address(new ERC1967Proxy(
-            address(new EligibilityDataProvider()),
-            abi.encodeWithSelector(
-                EligibilityDataProvider.initialize.selector,
-                IVaultRegistry(address(vaultRegistry)),
-		        IMultiFeeDistribution(address(multiFeeDistribution)),
-		        IPriceProvider(address(priceProvider))
+        eligibilityDataProvider = EligibilityDataProvider(
+            address(
+                new ERC1967Proxy(
+                    address(new EligibilityDataProvider()),
+                    abi.encodeWithSelector(
+                        EligibilityDataProvider.initialize.selector,
+                        IVaultRegistry(address(vaultRegistry)),
+                        IMultiFeeDistribution(address(multiFeeDistribution)),
+                        IPriceProvider(address(priceProvider))
+                    )
+                )
             )
-        ))); 
+        );
 
-        incentivesController = ChefIncentivesController(address(new ERC1967Proxy(
-            address(new ChefIncentivesController()),
-            abi.encodeWithSelector(
-                ChefIncentivesController.initialize.selector, 
-                address(this),
-		        address(eligibilityDataProvider),
-                IMultiFeeDistribution(address(multiFeeDistribution)),
-		        rewardsPerSecond,
-                address(loopToken),
-                endingTimeCadence
+        incentivesController = ChefIncentivesController(
+            address(
+                new ERC1967Proxy(
+                    address(new ChefIncentivesController()),
+                    abi.encodeWithSelector(
+                        ChefIncentivesController.initialize.selector,
+                        address(this),
+                        address(eligibilityDataProvider),
+                        IMultiFeeDistribution(address(multiFeeDistribution)),
+                        rewardsPerSecond,
+                        address(loopToken),
+                        endingTimeCadence
+                    )
+                )
             )
-        )));
+        );
 
         uint256 _allocPoint = 100;
         incentivesController.addPool(address(vault), _allocPoint);
@@ -301,7 +308,7 @@ contract TokenomicsTest is IntegrationTestBase {
         lockDurations[2] = 15552000;
         lockDurations[3] = 31104000;
 
-        rewardMultipliers[0] = 1; 
+        rewardMultipliers[0] = 1;
         rewardMultipliers[1] = 4;
         rewardMultipliers[2] = 10;
         rewardMultipliers[3] = 25;
@@ -342,7 +349,7 @@ contract TokenomicsTest is IntegrationTestBase {
         uint256[] memory maxAmountsIn = new uint256[](2);
         maxAmountsIn[radiantDeployHelper.wethIndex()] = wethLiquidityAmt;
         maxAmountsIn[radiantDeployHelper.loopIndex()] = amount;
-        
+
         vm.startPrank(user);
         loopToken.approve(address(balancerVault), amount);
         WETH.approve(address(balancerVault), wethLiquidityAmt);
@@ -383,7 +390,7 @@ contract TokenomicsTest is IntegrationTestBase {
         address user = vm.addr(uint256(keccak256("user")));
         uint256 collateral = 100 ether;
         uint256 debt = 50 ether;
-        
+
         _borrow(user, collateral, debt);
 
         bool isEligible = eligibilityDataProvider.isEligibleForRewards(user);
@@ -407,7 +414,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
         uint256 balance = ERC20(address(govWeightedPool)).balanceOf(user);
         emit log_named_uint("lp balance", balance);
-        emit log_named_uint("lp balance USD", balance*2400);
+        emit log_named_uint("lp balance USD", balance * 2400);
 
         vm.startPrank(user);
         ERC20(address(govWeightedPool)).approve(address(multiFeeDistribution), balance);
@@ -418,11 +425,11 @@ contract TokenomicsTest is IntegrationTestBase {
         emit log_named_uint("lockedUSD", lockedUSD);
 
         eligibilityDataProvider.setPriceToleranceRatio(8000);
-        
+
         uint256 priceToleranceRatio = eligibilityDataProvider.priceToleranceRatio();
         uint256 requiredValue = (requiredUSD * priceToleranceRatio) / 10000;
         emit log_named_uint("requiredValue", requiredValue);
-        
+
         bool isEligible = eligibilityDataProvider.isEligibleForRewards(user);
         assertEq(isEligible, true);
 
@@ -471,11 +478,8 @@ contract TokenomicsTest is IntegrationTestBase {
         // can be called by anyone
         incentivesController.claim(user, vaults);
 
-        (
-            uint256 totalVesting, 
-            uint256 unlocked, 
-            EarnedBalance[] memory earnedBalances
-        ) = multiFeeDistribution.earnedBalances(user);
+        (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution
+            .earnedBalances(user);
 
         assertEq(totalVesting, pendingRewards);
         assertEq(unlocked, 0);
@@ -543,10 +547,10 @@ contract TokenomicsTest is IntegrationTestBase {
         address[] memory minters = new address[](1);
         minters[0] = rugger;
         multiFeeDistribution.setMinters(minters);
-        
+
         address randomUser;
-        for (uint i=0; i < 20; ++i){
-            randomUser = vm.addr(uint256(keccak256(abi.encode("user",i))));
+        for (uint i = 0; i < 20; ++i) {
+            randomUser = vm.addr(uint256(keccak256(abi.encode("user", i))));
             uint256 randomUserStake = 20 ether;
             _borrow(randomUser, 1_000 ether, 500 ether);
             _depositInPool(randomUser, randomUserStake);
@@ -568,27 +572,27 @@ contract TokenomicsTest is IntegrationTestBase {
         address[] memory vaults = new address[](1);
         vaults[0] = address(vault);
 
-        for (uint i=0; i < 20; ++i){
-            randomUser = vm.addr(uint256(keccak256(abi.encode("user",i))));
+        for (uint i = 0; i < 20; ++i) {
+            randomUser = vm.addr(uint256(keccak256(abi.encode("user", i))));
             incentivesController.claim(randomUser, vaults);
         }
 
         uint256 totalBalance = loopToken.balanceOf(address(multiFeeDistribution));
-        
+
         vm.startPrank(rugger);
         multiFeeDistribution.vestTokens(rugger, totalBalance, false);
-        (uint256 rugAmount,,) = multiFeeDistribution.withdrawableBalance(rugger);
+        (uint256 rugAmount, , ) = multiFeeDistribution.withdrawableBalance(rugger);
         multiFeeDistribution.withdraw(rugAmount);
         assertEq(rugAmount, totalBalance);
         vm.stopPrank();
 
-        for (uint i=0; i < 20; ++i){
-            randomUser = vm.addr(uint256(keccak256(abi.encode("user",i))));
-            (uint256 amount,,) = multiFeeDistribution.withdrawableBalance(randomUser);
+        for (uint i = 0; i < 20; ++i) {
+            randomUser = vm.addr(uint256(keccak256(abi.encode("user", i))));
+            (uint256 amount, , ) = multiFeeDistribution.withdrawableBalance(randomUser);
             vm.startPrank(randomUser);
             vm.expectRevert("ERC20: transfer amount exceeds balance");
             multiFeeDistribution.withdraw(amount);
-            
+
             uint256 balanceBefore = lpToken.balanceOf(randomUser);
             lockInfo = multiFeeDistribution.lockInfo(randomUser);
             lockedAmount = lockInfo[0].amount;

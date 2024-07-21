@@ -18,6 +18,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {console} from "forge-std/console.sol";
 
 interface IPoolV3Loop is IPoolV3 {
     function mintProfit(uint256 profit) external;
@@ -153,6 +154,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     error CDPVault__liquidatePosition_invalidSpotPrice();
     error CDPVault__liquidatePosition_invalidParameters();
     error CDPVault__noBadDebt();
+    error CDPVault__BadDebt();
+    error CDPVault__repayAmountNotEnough();
+    error CDPVault__tooHighRepayAmount();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -392,6 +396,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
                 debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
                 position.cumulativeIndexLastUpdate
             ); // U:[CM-10]
+            position.cumulativeQuotaInterest = debtData.cumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
             quotaRevenueChange = _calcQuotaRevenueChange(deltaDebt);
             pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
@@ -533,73 +538,116 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         DebtData memory debtData = _calcDebt(position);
 
         // load price and calculate discounted price
-        uint256 discountedPrice = wmul(spotPrice(), liqConfig_.liquidationDiscount);
-        if (spotPrice() == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        uint256 spotPrice_ = spotPrice();
+        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
+        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        // Enusure that there's no bad debt
+        if (calcTotalDebt(debtData) > wmul(position.collateral, spotPrice_)) revert CDPVault__BadDebt();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
         uint256 deltaDebt = wmul(repayAmount, liqConfig_.liquidationPenalty);
         uint256 penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
+        if (takeCollateral > position.collateral) revert CDPVault__tooHighRepayAmount();
 
         // verify that the position is indeed unsafe
-        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice()), config.liquidationRatio))
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice_), config.liquidationRatio))
             revert CDPVault__liquidatePosition_notUnsafe();
 
-        // account for bad debt
-        uint256 loss;
-        if (takeCollateral > position.collateral) {
-            if (calcTotalDebt(debtData) <= wmul(position.collateral, spotPrice())) revert CDPVault__noBadDebt();
-            takeCollateral = position.collateral;
-            repayAmount = wmul(takeCollateral, discountedPrice);
-            penalty = wmul(repayAmount, WAD - liqConfig_.liquidationPenalty);
-            deltaDebt = debtData.debt;
-            loss = calcTotalDebt(debtData) - (repayAmount - penalty);
-        }
-
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount - penalty);
 
         uint256 newDebt;
         uint256 profit;
         uint256 maxRepayment = calcTotalDebt(debtData);
-
         uint256 newCumulativeIndex;
-        //uint128 newCumulativeQuotaInterest;
-        // uint128 quotaFees;
-
         if (deltaDebt == maxRepayment) {
             newDebt = 0;
             newCumulativeIndex = debtData.cumulativeIndexNow;
             profit = debtData.accruedInterest;
             position.cumulativeQuotaInterest = 0;
         } else {
-            if (loss != 0) {
-                profit = 0;
-                newDebt = 0;
-                newCumulativeIndex = debtData.cumulativeIndexNow;
-            } else {
-                (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
-                    deltaDebt, // delta debt
-                    debtData.debt,
-                    debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
-                    debtData.cumulativeIndexLastUpdate,
-                    debtData.cumulativeQuotaInterest
-                );
-            }
+            (newDebt, newCumulativeIndex, profit, position.cumulativeQuotaInterest) = calcDecrease(
+                deltaDebt, // delta debt
+                debtData.debt,
+                debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                debtData.cumulativeIndexLastUpdate,
+                debtData.cumulativeQuotaInterest
+            );
         }
-        // position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
-        //position.quotaFees = quotaFees;
         position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
         // update liquidated position
         position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
-        // cash[msg.sender] += takeCollateral;
         token.safeTransfer(msg.sender, takeCollateral);
 
         // Mint the penalty from the vault to the treasury
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
+
+        if (debtData.debt - newDebt != 0) {
+            IPoolV3(pool).updateQuotaRevenue(_calcQuotaRevenueChange(-int(debtData.debt - newDebt))); // U:[PQK-15]
+        }
+    }
+
+    /// @dev The liquidator has to approve the vault to transfer the sum of `repayAmounts`.
+    /// @param owner Owner of the position to liquidate
+    /// @param repayAmount Amount the liquidator wants to repay [wad]
+    function liquidatePositionBadDebt(address owner, uint256 repayAmount) external whenNotPaused {
+        // validate params
+        if (owner == address(0) || repayAmount == 0) revert CDPVault__liquidatePosition_invalidParameters();
+
+        // load configs
+        VaultConfig memory config = vaultConfig;
+        LiquidationConfig memory liqConfig_ = liquidationConfig;
+
+        // load liquidated position
+        Position memory position = positions[owner];
+        DebtData memory debtData = _calcDebt(position);
+        uint256 spotPrice_ = spotPrice();
+        if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
+        // verify that the position is indeed unsafe
+        if (_isCollateralized(calcTotalDebt(debtData), wmul(position.collateral, spotPrice_), config.liquidationRatio))
+            revert CDPVault__liquidatePosition_notUnsafe();
+
+        // load price and calculate discounted price
+        uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
+        // Enusure that the debt is greater than the collateral at discounted price
+        if (calcTotalDebt(debtData) <= wmul(position.collateral, discountedPrice)) revert CDPVault__noBadDebt();
+        // compute collateral to take, debt to repay
+        uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
+        if (takeCollateral < position.collateral) revert CDPVault__repayAmountNotEnough();
+
+        // account for bad debt
+        takeCollateral = position.collateral;
+        repayAmount = wmul(takeCollateral, discountedPrice);
+        uint256 loss = calcTotalDebt(debtData) - repayAmount;
+
+        // transfer the repay amount from the liquidator to the vault
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
+
+        position.cumulativeQuotaInterest = 0;
+        position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
+        // update liquidated position
+        position = _modifyPosition(
+            owner,
+            position,
+            0,
+            debtData.cumulativeIndexNow,
+            -toInt256(takeCollateral),
+            totalDebt
+        );
+
+        pool.repayCreditAccount(debtData.debt, 0, loss); // U:[CM-11]
+        // transfer the collateral amount from the vault to the liquidator
+        token.safeTransfer(msg.sender, takeCollateral);
+
+        int256 quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt));
+        if (quotaRevenueChange != 0) {
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+        }
     }
 
     /// @dev Computes new debt principal and interest index (and other values) after decreasing debt

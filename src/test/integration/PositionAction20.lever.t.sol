@@ -36,7 +36,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
     PermitParams emptyPermitParams;
     SwapParams emptySwap;
     PoolActionParams emptyPoolActionParams;
-    
+
     bytes32[] weightedPoolIdArray;
 
     function setUp() public override {
@@ -54,7 +54,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             1.0 ether, // liquidation penalty
             1.05 ether // liquidation discount
         );
-
+        createGaugeAndSetGauge(address(vault));
         // setup user and userProxy
         user = vm.addr(0x12341234);
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
@@ -102,7 +102,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_IN,
-                assetIn: address(underlyingToken), 
+                assetIn: address(underlyingToken),
                 amount: borrowAmount,
                 limit: amountOutMin,
                 recipient: address(positionAction),
@@ -132,7 +132,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
@@ -141,7 +141,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt, , , ,) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -159,7 +159,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             39_000 ether // amountOutMin
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
         assertEq(collateral, swapAmountOut + upFrontUnderliers);
@@ -168,7 +168,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt, , , ,) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -182,7 +182,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
 
         // now lever up further without passing any upFrontUnderliers
         uint256 borrowAmount = 5_000 ether; // amount to lever up
@@ -211,7 +211,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
-                auxSwap: auxSwap, 
+                auxSwap: auxSwap,
                 auxAction: emptyPoolActionParams
             });
         }
@@ -234,7 +234,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // assert that collateral is now equal to the initial collateral + the amount of token received from the swap
         assertEq(collateral, initialCollateral + expectedAmountOut);
@@ -254,7 +254,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // build increase lever params
         LeverParams memory leverParams;
         {
-
             address[] memory assets = new address[](2);
             assets[0] = address(underlyingToken);
             assets[1] = address(token);
@@ -294,7 +293,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // verify the collateral amount is the same as the upFrontUnderliers + amount of token returned from swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
@@ -361,7 +360,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // verify the collateral amount is the same as the upFrontUnderliers + amount of token returned from swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
@@ -454,12 +453,12 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
 
         // assert alice's position is levered up once by her and a 2nd time by bob
-        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , ,) = vault.positions(address(aliceProxy));
+        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , , ) = vault.positions(address(aliceProxy));
         assertGe(aliceCollateral, amountOutMin * 2 + upFrontUnderliers * 2);
         assertEq(aliceNormalDebt, borrowAmount * 2);
 
         // assert bob's position is unaffected
-        (uint256 bobCollateral, uint256 bobNormalDebt, , , ,) = vault.positions(address(bobProxy));
+        (uint256 bobCollateral, uint256 bobNormalDebt, , , , ) = vault.positions(address(bobProxy));
         assertEq(bobCollateral, 0);
         assertEq(bobNormalDebt, 0);
     }
@@ -473,7 +472,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
 
         emit log_named_uint("initialCollateral", initialCollateral);
         emit log_named_uint("initialNormalDebt", initialNormalDebt);
@@ -521,7 +520,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
@@ -533,7 +532,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt, , , ,) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -547,7 +546,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
 
         // accrue interest
         vm.warp(block.timestamp + 365 days);
@@ -569,7 +568,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 swapType: SwapType.EXACT_OUT,
                 assetIn: address(token),
                 amount: amountOut,
-                limit: maxAmountIn, 
+                limit: maxAmountIn,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(weightedPoolIdArray, assets)
@@ -593,21 +592,21 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = vault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
         // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
 
         // debt is decreased by amount out minus the accrued interest
-        assertEq(normalDebt, initialNormalDebt -  amountOut + accruedInterest);
+        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt, , , ,) = vault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0); 
+        assertEq(lnormalDebt, 0);
     }
 
     function test_decreaseLever_with_residual_recipient() public {
@@ -683,7 +682,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt, , , ,) = vault.positions(address(aliceProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(aliceProxy));
 
         uint256 amountOut = 5_000 ether;
         uint256 maxAmountIn = 5_100 ether;
@@ -693,7 +692,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             address[] memory assets = new address[](2);
             assets[0] = address(underlyingToken);
             assets[1] = address(token);
-
 
             leverParams = LeverParams({
                 position: address(aliceProxy),
@@ -733,8 +731,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(positionAction.decreaseLever.selector, leverParams, maxAmountIn, address(bob))
         );
 
-        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , ,) = vault.positions(address(aliceProxy));
-        (uint256 bobCollateral, uint256 bobNormalDebt, , , ,) = vault.positions(address(bobProxy));
+        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , , ) = vault.positions(address(aliceProxy));
+        (uint256 bobCollateral, uint256 bobNormalDebt, , , , ) = vault.positions(address(bobProxy));
 
         // assert alice's position is levered down by bob
         assertEq(aliceCollateral, initialCollateral - maxAmountIn);
@@ -747,13 +745,13 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
     // ERRORS
     function test_increaseLever_invalidSwaps() public {
-        uint256 upFrontUnderliers = 20_000*1e6;
-        uint256 auxAmountOutMin = upFrontUnderliers * 1e12 * 99 / 100; // allow 1% slippage on aux swap and convert to token decimals
+        uint256 upFrontUnderliers = 20_000 * 1e6;
+        uint256 auxAmountOutMin = (upFrontUnderliers * 1e12 * 99) / 100; // allow 1% slippage on aux swap and convert to token decimals
         uint256 borrowAmount = auxAmountOutMin; // we want the amount of stablecoin we borrow to be equal to the amount of underliers we receieve in aux swap
-        uint256 amountOutMin = borrowAmount * 99 / 100;
+        uint256 amountOutMin = (borrowAmount * 99) / 100;
 
         LeverParams memory leverParams;
-        {   
+        {
             // mint USDC to user
             deal(address(USDC), user, upFrontUnderliers);
 
@@ -789,7 +787,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, auxAssets)
-                }), 
+                }),
                 auxAction: emptyPoolActionParams
             });
         }
@@ -813,7 +811,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
         leverParams.primarySwap.recipient = address(positionAction); // fix the error
 
-
         leverParams.auxSwap.recipient = address(userProxy); // this should trigger PositionAction__increaseLever_invalidAuxSwap
         vm.expectRevert(PositionAction.PositionAction__increaseLever_invalidAuxSwap.selector);
         vm.prank(user);
@@ -834,9 +831,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         _increaseLever(
             userProxy,
             vault,
-            20_000*1 ether,
+            20_000 * 1 ether,
             40_000 ether, // borrowAmount
-            40_000 ether * 99/100 // amountOutMin
+            (40_000 ether * 99) / 100 // amountOutMin
         );
 
         // we will completely delever the position so use full collateral and debt amounts
@@ -844,15 +841,15 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 amountOut;
         uint256 maxAmountIn;
         {
-            (uint256 initialCollateral, uint256 initialNormalDebt, , , ,) = vault.positions(address(userProxy));
+            (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
             collateralAmount = initialCollateral; // delever the entire collateral amount
             amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
+            maxAmountIn = (initialNormalDebt * 101) / 100; // allow 1% slippage on primary swap
         }
-        
+
         // build decrease lever params
         LeverParams memory leverParams;
-        uint256 minResidualRate = 1e6 * 99/100; // allow 1% slippage on aux swap, rate should be in out token decimals
+        uint256 minResidualRate = (1e6 * 99) / 100; // allow 1% slippage on aux swap, rate should be in out token decimals
 
         {
             address[] memory assets = new address[](2);
@@ -886,15 +883,14 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     recipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, auxAssets)
-                }), 
+                }),
                 auxAction: emptyPoolActionParams
             });
-            
+
             // first simulate the primary swap to calculate values for aux swap
             leverParams.auxSwap.amount = collateralAmount - _simulateBalancerSwap(leverParams.primarySwap);
-            leverParams.auxSwap.limit = leverParams.auxSwap.amount * minResidualRate / 1 ether;
+            leverParams.auxSwap.limit = (leverParams.auxSwap.amount * minResidualRate) / 1 ether;
         }
-
 
         // trigger PositionAction__decreaseLever_invalidPrimarySwap
         leverParams.primarySwap.recipient = address(userProxy);
@@ -910,7 +906,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
         leverParams.primarySwap.recipient = address(positionAction); // fix the error
-
 
         // trigger PositionAction__decreaseLever_invalidAuxSwap
         leverParams.auxSwap.swapType = SwapType.EXACT_OUT;
@@ -970,7 +965,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
             // mint directly to swap actions for simplicity
             if (upFrontUnderliers > 0) deal(upFrontToken, address(proxy), upFrontUnderliers);
-            
+
             leverParams = LeverParams({
                 position: address(proxy),
                 vault: address(vault_),

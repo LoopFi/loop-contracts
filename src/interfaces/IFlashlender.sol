@@ -46,12 +46,42 @@ interface IERC3156FlashLender {
     ) external returns (bool);
 }
 
-interface IFlashlender is IERC3156FlashLender {
+interface ICreditFlashBorrower {
+    /// @dev Receives `amount` of internal Credit from the Credit flash lender
+    /// @param initiator The initiator of the loan
+    /// @param amount The amount of tokens lent [wad]
+    /// @param fee The additional amount of tokens to repay [wad]
+    /// @param data Arbitrary data structure, intended to contain user-defined parameters.
+    /// @return The keccak256 hash of "ICreditFlashLoanReceiver.onCreditFlashLoan"
+    function onCreditFlashLoan(
+        address initiator,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32);
+}
+
+interface ICreditFlashLender {
+    /// @notice Flashlender lends internal Credit to `receiver`
+    /// @dev Reverts if `Flashlender` gets reentered in the same transaction
+    /// @param receiver Address of the receiver of the flash loan [ICreditFlashBorrower]
+    /// @param amount Amount of `token` to borrow [wad]
+    /// @param data Arbitrary data structure, intended to contain user-defined parameters
+    /// @return true if flash loan
+    function creditFlashLoan(
+        ICreditFlashBorrower receiver,
+        uint256 amount,
+        bytes calldata data
+    ) external returns (bool);
+}
+interface IFlashlender is IERC3156FlashLender, ICreditFlashLender {
     function pool() external view returns (IPoolV3);
 
     function underlyingToken() external view returns (IERC20);
 
     function CALLBACK_SUCCESS() external view returns (bytes32);
+
+    function CALLBACK_SUCCESS_CREDIT() external view returns (bytes32);
 
     function maxFlashLoan(address token) external view override returns (uint256);
 
@@ -63,12 +93,18 @@ interface IFlashlender is IERC3156FlashLender {
         uint256 amount,
         bytes calldata data
     ) external returns (bool);
+    function creditFlashLoan(
+        ICreditFlashBorrower receiver,
+        uint256 amount,
+        bytes calldata data
+    ) external returns (bool);
 }
 
-abstract contract FlashLoanReceiverBase is IERC3156FlashBorrower {
+abstract contract FlashLoanReceiverBase is ICreditFlashBorrower, IERC3156FlashBorrower {
     IFlashlender public immutable flashlender;
 
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
     constructor(address flashlender_) {
         flashlender = IFlashlender(flashlender_);

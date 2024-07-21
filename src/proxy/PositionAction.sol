@@ -12,7 +12,7 @@ import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
 import {PoolAction, PoolActionParams} from "./PoolAction.sol";
 import {IVaultRegistry} from "../interfaces/IVaultRegistry.sol";
 
-import {IFlashlender, IERC3156FlashBorrower} from "../interfaces/IFlashlender.sol";
+import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "../interfaces/IFlashlender.sol";
 
 /// @notice Struct containing parameters used for adding or removing a position's collateral
 ///         and optionally swapping an arbitrary token to the collateral token
@@ -58,7 +58,7 @@ struct LeverParams {
 /// @notice Base contract for interacting with CDPVaults via a proxy
 /// @dev This contract is designed to be called via a proxy contract and can be dangerous to call directly
 ///      This contract does not support fee-on-transfer tokens
-abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseAction {
+abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower, TransferAction, BaseAction {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -70,6 +70,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     //////////////////////////////////////////////////////////////*/
 
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
     /// @notice The VaultRegistry contract
     IVaultRegistry public immutable vaultRegistry;
@@ -103,6 +104,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     error PositionAction__decreaseLever_invalidResidualRecipient();
     error PositionAction__onFlashLoan__invalidSender();
     error PositionAction__onFlashLoan__invalidInitiator();
+    error PositionAction__onCreditFlashLoan__invalidSender();
     error PositionAction__onlyDelegatecall();
     error PositionAction__unregisteredVault();
 
@@ -326,7 +328,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         // take out flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         flashlender.flashLoan(
-            IERC3156FlashBorrower(self),
+            IERC3156FlashBorrower(self), 
             address(underlyingToken),
             leverParams.primarySwap.amount,
             abi.encode(leverParams, upFrontToken, upFrontAmount)
@@ -361,9 +363,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         uint loanAmount = leverParams.primarySwap.amount;
-        flashlender.flashLoan(
-            IERC3156FlashBorrower(self),
-            address(underlyingToken),
+        flashlender.creditFlashLoan(
+            ICreditFlashBorrower(self),
             loanAmount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
@@ -377,14 +378,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
     /// @notice Callback function for the flash loan taken out in increaseLever
     /// @param data The encoded bytes that were passed into the flash loan
     function onFlashLoan(
-        address initiator,
+        address /*initiator*/,
         address /*token*/,
         uint256 amount,
         uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onFlashLoan__invalidSender();
-        if (initiator != address(this)) revert PositionAction__onFlashLoan__invalidInitiator();
 
         (LeverParams memory leverParams, address upFrontToken, uint256 upFrontAmount) = abi.decode(
             data,
@@ -422,9 +422,74 @@ abstract contract PositionAction is IERC3156FlashBorrower, TransferAction, BaseA
             toInt256(addDebt)
         );
 
-        underlyingToken.approve(address(flashlender), addDebt);
+        underlyingToken.forceApprove(address(flashlender), addDebt);
 
         return CALLBACK_SUCCESS;
+    }
+
+    /// @notice Callback function for the credit flash loan taken out in decreaseLever
+    /// @param data The encoded bytes that were passed into the credit flash loan
+    function onCreditFlashLoan(
+        address /*initiator*/,
+        uint256 /*amount*/,
+        uint256 /*fee*/,
+        bytes calldata data
+    ) external returns (bytes32) {
+        if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
+        (
+            LeverParams memory leverParams,
+            uint256 subCollateral,
+            address residualRecipient
+        ) = abi.decode(data,(LeverParams, uint256, address));
+
+        uint256 subDebt = leverParams.primarySwap.amount;
+
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        // sub collateral and debt
+        ICDPVault(leverParams.vault).modifyCollateralAndDebt(
+            leverParams.position,
+            address(this),
+            address(this),
+            0,
+            -toInt256(subDebt)
+        );
+
+        // withdraw collateral and handle any CDP specific actions
+        uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
+
+        bytes memory swapData = _delegateCall(
+            address(swapAction),
+            abi.encodeWithSelector(
+                swapAction.swap.selector,
+                leverParams.primarySwap
+            )
+        );
+        uint256 swapAmountIn = abi.decode(swapData, (uint256));
+
+        // swap collateral to stablecoin and calculate the amount leftover
+        uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+
+        // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
+        if (residualAmount > 0) {
+
+            // perform swap from collateral to arbitrary token if necessary
+            if (leverParams.auxSwap.assetIn != address(0)) {
+                _delegateCall(
+                    address(swapAction),
+                    abi.encodeWithSelector(
+                        swapAction.swap.selector,
+                        leverParams.auxSwap
+                    )
+                );
+            } else {
+                // otherwise just send the collateral to `residualRecipient`
+                IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+            }
+        }
+
+        underlyingToken.forceApprove(address(flashlender), subDebt);
+
+        return CALLBACK_SUCCESS_CREDIT;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -27,7 +27,7 @@ abstract contract TestReceiver is FlashLoanReceiverBase {
         // IPoolV3 pool = IFlashlender(flash).pool();
     }
 
-    function _mintStablecoinFee(uint256 amount) internal {
+    function _mintFee(uint256 amount) internal {
         if (amount > 0) {
             ERC20PresetMinterPauser token = ERC20PresetMinterPauser(address(flashlender.underlyingToken()));
             token.mint(address(this), amount);
@@ -48,11 +48,20 @@ contract TestImmediatePaybackReceiver is TestReceiver {
         uint256 fee_,
         bytes calldata
     ) external override returns (bytes32) {
-        _mintStablecoinFee(fee_);
+        _mintFee(fee_);
         // Just pay back the original amount
         approvePayback(amount_ + fee_);
 
         return CALLBACK_SUCCESS;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
+        _mintFee(fee_);
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -75,6 +84,16 @@ contract TestReentrancyReceiver is TestReceiver {
         approvePayback(amount_ + fee_);
 
         return CALLBACK_SUCCESS;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256 amount_,
+        uint256 fee_,
+        bytes calldata data_
+    ) external override returns (bytes32) {
+        flashlender.creditFlashLoan(immediatePaybackReceiver, amount_ + fee_, data_);
+
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -124,6 +143,15 @@ contract TestDEXTradeReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
+
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external override pure returns (bytes32) {
+        return CALLBACK_SUCCESS_CREDIT;
+    }
 }
 
 contract TestBadReturn is TestReceiver {
@@ -138,9 +166,18 @@ contract TestBadReturn is TestReceiver {
         uint256 fee_,
         bytes calldata
     ) external override returns (bytes32) {
-        _mintStablecoinFee(fee_);
+        _mintFee(fee_);
         approvePayback(amount_ + fee_);
 
+        return BAD_HASH;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
+        _mintFee(fee_);
         return BAD_HASH;
     }
 }
@@ -159,6 +196,14 @@ contract TestNoFeePaybackReceiver is TestReceiver {
         // Just pay back the original amount w/o fee
         approvePayback(amount_);
         return CALLBACK_SUCCESS;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external override pure returns (bytes32) {
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 

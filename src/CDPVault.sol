@@ -237,8 +237,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
-            owner: msg.sender,
-            collateralizer: to,
+            owner: to,
+            collateralizer: msg.sender,
             creditor: msg.sender,
             deltaCollateral: deltaCollateral,
             deltaDebt: 0

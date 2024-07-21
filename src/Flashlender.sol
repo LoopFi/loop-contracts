@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IFlashlender, IERC3156FlashBorrower} from "./interfaces/IFlashlender.sol";
+import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "./interfaces/IFlashlender.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 import {wmul} from "./utils/Math.sol";
 
@@ -17,6 +17,8 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
     // ERC3156 Callbacks
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
+
 
     /// @notice The Pool contract
     IPoolV3 public immutable pool;
@@ -39,6 +41,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     error Flash__flashLoan_unsupportedToken();
     error Flash__flashLoan_callbackFailed();
     error Flash__creditFlashLoan_callbackFailed();
+    error Flash__creditFlashLoan_unsupportedToken();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -97,6 +100,34 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
         if (receiver.onFlashLoan(msg.sender, token, amount, fee, data) != CALLBACK_SUCCESS)
             revert Flash__flashLoan_callbackFailed();
+
+        // reverts if not enough Stablecoin have been send back
+        underlyingToken.transferFrom(address(receiver), address(pool), total);
+        pool.repayCreditAccount(total - fee, fee, 0);
+
+        return true;
+    }
+
+    /// @notice Flashlender lends ICreditFlashBorrower Credit to `receiver`
+    /// @dev Reverts if `Flashlender` gets reentered in the same transaction
+    /// @param receiver Address of the receiver of the flash loan [ICreditFlashBorrower]
+    /// @param amount Amount of `token` to borrow [wad]
+    /// @param data Arbitrary data structure, intended to contain user-defined parameters
+    /// @return true if flash loan
+    function creditFlashLoan(
+        ICreditFlashBorrower receiver,
+        uint256 amount,
+        bytes calldata data
+    ) external override nonReentrant returns (bool) {
+        uint256 fee = wmul(amount, protocolFee);
+        uint256 total = amount + fee;
+
+        pool.lendCreditAccount(amount, address(receiver));
+
+        emit CreditFlashLoan(address(receiver), amount, fee);
+
+        if (receiver.onCreditFlashLoan(msg.sender, amount, fee, data) != CALLBACK_SUCCESS_CREDIT)
+            revert Flash__creditFlashLoan_callbackFailed();
 
         // reverts if not enough Stablecoin have been send back
         underlyingToken.transferFrom(address(receiver), address(pool), total);

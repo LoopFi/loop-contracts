@@ -17,13 +17,6 @@ contract ChainlinkOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    // /// @notice Chainlink aggregator address
-    // AggregatorV3Interface public immutable aggregator;
-    // /// @notice Stable period in seconds
-    // uint256 public immutable stalePeriod;
-    // /// @notice Aggregator decimal to WAD conversion scale
-    // uint256 public immutable aggregatorScale;
-
     struct Oracle {
         AggregatorV3Interface aggregator;
         uint256 stalePeriod;

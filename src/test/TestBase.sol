@@ -89,7 +89,7 @@ contract TestBase is Test {
         createOracles();
         createCore();
         createAndSetPoolQuotaKeeper();
-        createGaugeAndSetGauge();
+        //createGaugeAndSetGauge();
         createStakingLpEth();
         labelContracts();
     }
@@ -129,11 +129,25 @@ contract TestBase is Test {
         vm.label({account: address(silo), newLabel: "Silo"});
     }
 
-    function createGaugeAndSetGauge() internal virtual {
+    function createGaugeAndSetGauge(address vault) internal virtual {
         voter = new MockVoter();
         voter.setFirstEpochTimestamp(block.timestamp);
         gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
         quotaKeeper.setGauge(address(gauge));
+        quotaKeeper.setCreditManager(address(token), address(vault));
+        gauge.addQuotaToken(address(token), 10, 100);
+        gauge.setFrozenEpoch(false);
+        vm.warp(block.timestamp + 1 weeks);
+        vm.prank(address(gauge));
+        quotaKeeper.updateRates();
+    }
+
+    function createGaugeAndSetGauge(address vault, address token) internal virtual {
+        voter = new MockVoter();
+        voter.setFirstEpochTimestamp(block.timestamp);
+        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
+        quotaKeeper.setGauge(address(gauge));
+        quotaKeeper.setCreditManager(address(token), address(vault));
         gauge.addQuotaToken(address(token), 10, 100);
         gauge.setFrozenEpoch(false);
         vm.warp(block.timestamp + 1 weeks);

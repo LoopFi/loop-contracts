@@ -3,15 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 
-import {
-    TestBase,
-    ERC20PresetMinterPauser,
-    PoolV3,
-    IERC20,
-    TransparentUpgradeableProxy,
-    ProxyAdmin,
-    IPoolV3
-} from "../TestBase.sol";
+import {TestBase, ERC20PresetMinterPauser, PoolV3, IERC20, TransparentUpgradeableProxy, ProxyAdmin, IPoolV3} from "../TestBase.sol";
 
 import {WAD} from "../../utils/Math.sol";
 
@@ -22,12 +14,11 @@ import {CDPVault} from "../../CDPVault.sol";
 import {Flashlender} from "../../Flashlender.sol";
 
 abstract contract TestReceiver is FlashLoanReceiverBase {
-
     constructor(address flash) FlashLoanReceiverBase(flash) {
         // IPoolV3 pool = IFlashlender(flash).pool();
     }
 
-    function _mintStablecoinFee(uint256 amount) internal {
+    function _mintFee(uint256 amount) internal {
         if (amount > 0) {
             ERC20PresetMinterPauser token = ERC20PresetMinterPauser(address(flashlender.underlyingToken()));
             token.mint(address(this), amount);
@@ -35,11 +26,8 @@ abstract contract TestReceiver is FlashLoanReceiverBase {
     }
 }
 
-
 contract TestImmediatePaybackReceiver is TestReceiver {
-
-    constructor(address flash) TestReceiver(flash) {
-    }
+    constructor(address flash) TestReceiver(flash) {}
 
     function onFlashLoan(
         address,
@@ -48,11 +36,20 @@ contract TestImmediatePaybackReceiver is TestReceiver {
         uint256 fee_,
         bytes calldata
     ) external override returns (bytes32) {
-        _mintStablecoinFee(fee_);
+        _mintFee(fee_);
         // Just pay back the original amount
         approvePayback(amount_ + fee_);
 
         return CALLBACK_SUCCESS;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
+        _mintFee(fee_);
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -76,6 +73,16 @@ contract TestReentrancyReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
+    function onCreditFlashLoan(
+        address,
+        uint256 amount_,
+        uint256 fee_,
+        bytes calldata data_
+    ) external override returns (bytes32) {
+        flashlender.creditFlashLoan(immediatePaybackReceiver, amount_ + fee_, data_);
+
+        return CALLBACK_SUCCESS_CREDIT;
+    }
 }
 
 contract TestDEXTradeReceiver is TestReceiver {
@@ -84,11 +91,7 @@ contract TestDEXTradeReceiver is TestReceiver {
     ERC20PresetMinterPauser public token;
     CDPVault public vaultA;
 
-    constructor(
-        address flash,
-        address token_,
-        address vaultA_
-    ) TestReceiver(flash) {
+    constructor(address flash, address token_, address vaultA_) TestReceiver(flash) {
         pool = IFlashlender(flash).pool();
         underlyingToken = ERC20PresetMinterPauser(address(IFlashlender(flash).underlyingToken()));
         token = ERC20PresetMinterPauser(token_);
@@ -112,17 +115,20 @@ contract TestDEXTradeReceiver is TestReceiver {
 
         // Create a position and borrow underlying tokens
         token.approve(address(vaultA), type(uint256).max);
-        vaultA.modifyCollateralAndDebt(
-            me,
-            me,
-            me,
-            int256(tokenAmount),
-            int256(totalDebt)
-        );
+        vaultA.modifyCollateralAndDebt(me, me, me, int256(tokenAmount), int256(totalDebt));
 
         approvePayback(amount_ + fee_);
 
         return CALLBACK_SUCCESS;
+    }
+
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external override pure returns (bytes32) {
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -138,15 +144,23 @@ contract TestBadReturn is TestReceiver {
         uint256 fee_,
         bytes calldata
     ) external override returns (bytes32) {
-        _mintStablecoinFee(fee_);
+        _mintFee(fee_);
         approvePayback(amount_ + fee_);
 
+        return BAD_HASH;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
+        _mintFee(fee_);
         return BAD_HASH;
     }
 }
 
 contract TestNoFeePaybackReceiver is TestReceiver {
-
     constructor(address flash) TestReceiver(flash) {}
 
     function onFlashLoan(
@@ -159,6 +173,14 @@ contract TestNoFeePaybackReceiver is TestReceiver {
         // Just pay back the original amount w/o fee
         approvePayback(amount_);
         return CALLBACK_SUCCESS;
+    }
+    function onCreditFlashLoan(
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external override pure returns (bytes32) {
+        return CALLBACK_SUCCESS_CREDIT;
     }
 }
 
@@ -208,7 +230,7 @@ contract FlashlenderTest is TestBase {
             1.0 ether, // liquidation penalty
             1.05 ether // liquidation discount
         );
-
+        createGaugeAndSetGauge(address(vault));
         // deploy receivers
         immediatePaybackReceiver = new TestImmediatePaybackReceiver(address(flashlender));
         immediatePaybackReceiverOne = new TestImmediatePaybackReceiver(address(flashlenderOne));
@@ -222,11 +244,7 @@ contract FlashlenderTest is TestBase {
         noFeePaybackReceiver = new TestNoFeePaybackReceiver(address(flashlenderOne));
 
         reentrancyReceiver = new TestReentrancyReceiver(address(flashlender));
-        dexTradeReceiver = new TestDEXTradeReceiver(
-            address(flashlender),
-            address(token),
-            address(vault)
-        );
+        dexTradeReceiver = new TestDEXTradeReceiver(address(flashlender), address(token), address(vault));
         badReturn = new TestBadReturn(address(flashlender));
         noCallbacks = new TestNoCallbacks();
     }
@@ -262,7 +280,7 @@ contract FlashlenderTest is TestBase {
         uint256 expectedFee = flashlenderOne.flashFee(address(underlyingToken), flashLoanAmount);
 
         // assert fee is 1%
-        assertEq(expectedFee, 10 ether * 1e16 / 1 ether);
+        assertEq(expectedFee, (10 ether * 1e16) / 1 ether);
 
         address treasury = liquidityPool.treasury();
         uint256 currentShares = liquidityPool.balanceOf(treasury);
@@ -280,7 +298,7 @@ contract FlashlenderTest is TestBase {
         uint256 expectedFee = flashlenderFive.flashFee(address(underlyingToken), flashLoanAmount);
 
         // assert fee is 5%
-        assertEq(expectedFee, 10 ether * 5e16 / 1 ether);
+        assertEq(expectedFee, (10 ether * 5e16) / 1 ether);
 
         address treasury = liquidityPool.treasury();
         uint256 currentShares = liquidityPool.balanceOf(treasury);

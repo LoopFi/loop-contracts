@@ -245,6 +245,7 @@ contract MultiFeeDistributionTest is TestBase {
     }
 
     function test_removeReward_removesRewardData(address rewardToken) public {
+        vm.assume(rewardToken != address(0));
         address[] memory minters = new address[](1);
         minters[0] = address(this);
         multiFeeDistribution.setMinters(minters);

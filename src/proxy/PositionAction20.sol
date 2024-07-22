@@ -65,9 +65,9 @@ contract PositionAction20 is PositionAction {
         // for standard erc20 cdps treat the upFrontAmount and swapAmountOut as the collateral token
         uint256 addCollateralAmount = swapAmountOut + upFrontAmount;
 
-        // deposit into the CDP Vault
+        // allow deposit into the CDP Vault
         IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
-        return ICDPVault(leverParams.vault).deposit(address(this), addCollateralAmount);
+        return addCollateralAmount;
     }
 
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault

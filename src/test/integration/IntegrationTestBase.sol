@@ -13,7 +13,7 @@ import {CDPVault} from "../../CDPVault.sol";
 import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {ICurvePool} from "../../vendor/ICurvePool.sol";
-
+import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 
 /// @dev Base class for tests that use LeverActions, sets up the balancer pools and tokens and provides utility functions
 contract IntegrationTestBase is TestBase {
@@ -23,7 +23,7 @@ contract IntegrationTestBase is TestBase {
     address internal constant ONE_INCH = 0x1111111254EEB25477B68fb85Ed929f73A960582;
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-
+    address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
     // tokens
     ERC20 constant internal DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     ERC20 constant internal USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -31,7 +31,9 @@ contract IntegrationTestBase is TestBase {
     ERC20 constant internal WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 constant internal OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
     ERC20 constant internal WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-
+    ERC20 constant internal PENDLE_LP_STETH = ERC20(0xC374f7eC85F8C7DE3207a10bB1978bA104bdA3B2); // st-ETH 25DEC25
+    
+    address constant internal pendleLP_STETH_Holder = 0x3300eebeEA8239b90a435e403B130a853A0d7DfF;
     address constant internal USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address constant internal USDT_CHAINLINK_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
     address constant internal DAI_CHAINLINK_FEED = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;
@@ -81,12 +83,11 @@ contract IntegrationTestBase is TestBase {
 
     function setUp() public virtual override { 
         vm.createSelectFork(vm.rpcUrl("mainnet"), getForkBlockNumber());
-        
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router);
-        poolAction = new PoolAction(BALANCER_VAULT);
+        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER));
+        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
 
         // configure balancer pools
         stablePool = _createBalancerTokenPool();
@@ -113,7 +114,7 @@ contract IntegrationTestBase is TestBase {
     }
 
     function getForkBlockNumber() internal virtual pure returns (uint256){
-        return 17055414; // 15/04/2023 20:43:00 UTC
+        return 17055414;
     }
     
     /// @dev perform balancer swap via swapParams in simulated env and return the return amount

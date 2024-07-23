@@ -23,5 +23,5 @@ test-unit        :; forge test --ffi --match-path "src/test/unit/**/*.t.sol"
 
 # Deployment
 anvil            :; anvil --fork-url $(MAINNET_RPC_URL) --auto-impersonate
-deploy-anvil     :; rm -rf scripts/*-local.json && npx hardhat run scripts/Deploy.js --network local
+deploy-anvil     :; rm -rf scripts/*-local.json && npx hardhat run scripts/Deploy.js --network local --show-stack-traces
 deploy-tenderly  :; npx hardhat run scripts/Deploy.js --network tenderly

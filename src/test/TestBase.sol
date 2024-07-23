@@ -10,9 +10,11 @@ import {ERC20PresetMinterPauser} from "@openzeppelin/contracts/token/ERC20/prese
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {LinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/pool/LinearInterestRateModelV3.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+
 import {ICDM} from "../interfaces/ICDM.sol";
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
-import {IFlashlender} from "../interfaces/IFlashlender.sol";
 import {CDPVault} from "../CDPVault.sol";
 
 import {PatchedDeal} from "./utils/PatchedDeal.sol";
@@ -20,12 +22,22 @@ import {Stablecoin, MINTER_AND_BURNER_ROLE} from "../Stablecoin.sol";
 import {CDM, getCredit, getDebt, getCreditLine, ACCOUNT_CONFIG_ROLE} from "../CDM.sol";
 import {Minter} from "../Minter.sol";
 import {Flashlender} from "../Flashlender.sol";
-import {Buffer} from "../Buffer.sol";
 
 import {MockOracle} from "./MockOracle.sol";
-
 import {WAD, wdiv} from "../utils/Math.sol";
-import {CDM} from "../CDM.sol";
+import {PoolV3} from "../PoolV3.sol";
+import {VaultRegistry} from "../VaultRegistry.sol";
+
+import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
+import {AddressProviderV3} from "@gearbox-protocol/core-v3/contracts/core/AddressProviderV3.sol";
+import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
+import {PoolQuotaKeeperMock} from "src/test/PoolQuotaKeeperMock.sol";
+import {GaugeV3} from "src/quotas/GaugeV3.sol";
+import {PoolQuotaKeeperV3} from "src/quotas/PoolQuotaKeeperV3.sol";
+import {MockVoter} from "src/test/MockVoter.sol";
+import {StakingLPEth} from "src/StakingLPEth.sol";
+import {Silo} from "src/Silo.sol";
 
 contract CreditCreator {
     constructor(ICDM cdm) {
@@ -34,19 +46,26 @@ contract CreditCreator {
 }
 
 contract TestBase is Test {
+    address public treasury;
 
-    CDM internal cdm;
-    Stablecoin internal stablecoin;
-    Minter internal minter;
-    Buffer internal buffer;
+    AddressProviderV3 public addressProvider;
+    ACL public acl;
+    ContractsRegister public contractsRegister;
+    PoolV3 internal liquidityPool;
+    ERC20PresetMinterPauser internal mockWETH;
 
-    ProxyAdmin internal bufferProxyAdmin;
+    Flashlender internal flashlender;
 
-    IFlashlender internal flashlender;
+    VaultRegistry internal vaultRegistry;
 
     ERC20PresetMinterPauser internal token;
+    ERC20PresetMinterPauser internal underlyingToken;
     MockOracle internal oracle;
-
+    PoolQuotaKeeperV3 internal quotaKeeper;
+    GaugeV3 internal gauge;
+    MockVoter internal voter;
+    StakingLPEth internal stakingLpEth;
+    Silo internal silo;
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
 
@@ -70,10 +89,35 @@ contract TestBase is Test {
         _;
     }
 
-    function createAccounts() internal virtual {}
+    function setUp() public virtual {
+        setCurrentTimestamp(block.timestamp);
+
+        createAccounts();
+        createAssets();
+        createOracles();
+        createCore();
+        createAndSetPoolQuotaKeeper();
+        //createGaugeAndSetGauge();
+        createStakingLpEth();
+        labelContracts();
+    }
+
+    function createAccounts() internal virtual {
+        treasury = vm.addr(uint256(keccak256("treasury")));
+    }
 
     function createAssets() internal virtual {
         token = new ERC20PresetMinterPauser("TestToken", "TST");
+        mockWETH = new ERC20PresetMinterPauser("Pool Underlying WETH", "WETH");
+    }
+
+    function createAddressProvider() internal virtual {
+        acl = new ACL();
+        addressProvider = new AddressProviderV3(address(acl));
+        addressProvider.setAddress(AP_WETH_TOKEN, address(mockWETH), false);
+        addressProvider.setAddress(AP_TREASURY, treasury, false);
+        contractsRegister = new ContractsRegister(address(addressProvider));
+        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), false);
     }
 
     function createOracles() internal virtual {
@@ -81,25 +125,75 @@ contract TestBase is Test {
         setOraclePrice(WAD);
     }
 
-    function createCore() internal virtual {
-        cdm = new CDM(address(this), address(this), address(this));
-        setGlobalDebtCeiling(initialGlobalDebtCeiling);
-        stablecoin = new Stablecoin();
-        minter = new Minter(cdm, stablecoin, address(this), address(this));
-        stablecoin.grantRole(MINTER_AND_BURNER_ROLE, address(minter));
-        flashlender = new Flashlender(minter, 0);
-        cdm.setParameter(address(flashlender), "debtCeiling", uint256(type(int256).max));
-        bufferProxyAdmin = new ProxyAdmin();
-        buffer = Buffer(address(new TransparentUpgradeableProxy(
-            address(new Buffer(cdm)),
-            address(bufferProxyAdmin),
-            abi.encodeWithSelector(Buffer.initialize.selector, address(this), address(this))
-        )));
-        cdm.setParameter(address(buffer), "debtCeiling", initialGlobalDebtCeiling);
+    function createAndSetPoolQuotaKeeper() internal virtual {
+        quotaKeeper = new PoolQuotaKeeperV3(address(liquidityPool));
+        liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
+    }
 
-        // create an unbound credit line to use for testing        
-        creditCreator = new CreditCreator(cdm);
-        cdm.setParameter(address(creditCreator), "debtCeiling", uint256(type(int256).max));
+    function createStakingLpEth() internal virtual {
+        stakingLpEth = new StakingLPEth(address(liquidityPool), "StakingLPEth", "sLP-ETH");
+        vm.label({account: address(stakingLpEth), newLabel: "StakingLPEth"});
+        silo = stakingLpEth.silo();
+        vm.label({account: address(silo), newLabel: "Silo"});
+    }
+
+    function createGaugeAndSetGauge(address vault) internal virtual {
+        voter = new MockVoter();
+        voter.setFirstEpochTimestamp(block.timestamp);
+        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
+        quotaKeeper.setGauge(address(gauge));
+        quotaKeeper.setCreditManager(address(token), address(vault));
+        gauge.addQuotaToken(address(token), 10, 100);
+        gauge.setFrozenEpoch(false);
+        vm.warp(block.timestamp + 1 weeks);
+        vm.prank(address(gauge));
+        quotaKeeper.updateRates();
+    }
+
+    function createGaugeAndSetGauge(address vault, address token) internal virtual {
+        voter = new MockVoter();
+        voter.setFirstEpochTimestamp(block.timestamp);
+        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
+        quotaKeeper.setGauge(address(gauge));
+        quotaKeeper.setCreditManager(address(token), address(vault));
+        gauge.addQuotaToken(address(token), 10, 100);
+        gauge.setFrozenEpoch(false);
+        vm.warp(block.timestamp + 1 weeks);
+        vm.prank(address(gauge));
+        quotaKeeper.updateRates();
+    }
+
+    function createCore() internal virtual {
+        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3({
+            U_1: 85_00,
+            U_2: 95_00,
+            R_base: 10_00,
+            R_slope1: 20_00,
+            R_slope2: 30_00,
+            R_slope3: 40_00,
+            _isBorrowingMoreU2Forbidden: false
+        });
+        createAddressProvider();
+
+        liquidityPool = new PoolV3({
+            addressProvider_: address(addressProvider),
+            underlyingToken_: address(mockWETH),
+            interestRateModel_: address(irm),
+            totalDebtLimit_: initialGlobalDebtCeiling,
+            name_: "Loop Liquidity Pool",
+            symbol_: "lpETH "
+        });
+
+        underlyingToken = mockWETH;
+
+        uint256 availableLiquidity = 1_000_000 ether;
+        mockWETH.mint(address(this), availableLiquidity);
+        mockWETH.approve(address(liquidityPool), availableLiquidity);
+        liquidityPool.deposit(availableLiquidity, address(this));
+
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
+        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
+        vaultRegistry = new VaultRegistry();
     }
 
     function createCDPVault(
@@ -108,31 +202,27 @@ contract TestBase is Test {
         uint128 debtFloor,
         uint64 liquidationRatio,
         uint64 liquidationPenalty,
-        uint64 liquidationDiscount,
-        uint256 baseRate
+        uint64 liquidationDiscount
     ) internal returns (CDPVault) {
-        return createCDPVault(
-            CDPVaultConstants({
-                cdm: cdm,
-                oracle: oracle,
-                buffer: buffer,
-                token: token_,
-                tokenScale: 10**IERC20Metadata(address(token_)).decimals()
-
-            }),
-            CDPVaultConfig({
-                debtFloor: debtFloor,
-                liquidationRatio: liquidationRatio,
-                liquidationPenalty: liquidationPenalty,
-                liquidationDiscount: liquidationDiscount,
-                baseRate: baseRate,
-                roleAdmin: address(this),
-                vaultAdmin: address(this),
-                pauseAdmin: address(this),
-                vaultUnwinder: address(this)
-            }),
-            debtCeiling
-        );
+        return
+            createCDPVault(
+                CDPVaultConstants({
+                    pool: liquidityPool,
+                    oracle: oracle,
+                    token: token_,
+                    tokenScale: 10 ** IERC20Metadata(address(token_)).decimals()
+                }),
+                CDPVaultConfig({
+                    debtFloor: debtFloor,
+                    liquidationRatio: liquidationRatio,
+                    liquidationPenalty: liquidationPenalty,
+                    liquidationDiscount: liquidationDiscount,
+                    roleAdmin: address(this),
+                    vaultAdmin: address(this),
+                    pauseAdmin: address(this)
+                }),
+                debtCeiling
+            );
     }
 
     function createCDPVault(
@@ -143,25 +233,16 @@ contract TestBase is Test {
         vault = new CDPVault(constants, configs);
 
         if (debtCeiling > 0) {
-            constants.cdm.setParameter(address(vault), "debtCeiling", debtCeiling);
+            constants.pool.setCreditManagerDebtLimit(address(vault), debtCeiling);
         }
 
-        cdm.modifyPermission(address(vault), true);
-
-        (int256 balance, uint256 debtCeiling_) = cdm.accounts(address(vault));
-        assertEq(balance, 0);
-        assertEq(debtCeiling_, debtCeiling);
-
+        vaultRegistry.addVault(ICDPVault(address(vault)));
         vm.label({account: address(vault), newLabel: "CDPVault"});
     }
-    
+
     function labelContracts() internal virtual {
-        vm.label({account: address(cdm), newLabel: "CDM"});
-        vm.label({account: address(stablecoin), newLabel: "Stablecoin"});
-        vm.label({account: address(minter), newLabel: "Minter"});
-        vm.label({account: address(flashlender), newLabel: "Flashlender"});
-        vm.label({account: address(buffer), newLabel: "Buffer"});
         vm.label({account: address(token), newLabel: "CollateralToken"});
+        vm.label({account: address(mockWETH), newLabel: "UnderlyingToken"});
         vm.label({account: address(oracle), newLabel: "Oracle"});
     }
 
@@ -171,7 +252,7 @@ contract TestBase is Test {
     }
 
     function setGlobalDebtCeiling(uint256 _globalDebtCeiling) public {
-        cdm.setParameter("globalDebtCeiling", _globalDebtCeiling);
+        liquidityPool.setTotalDebtLimit(_globalDebtCeiling);
     }
 
     function setOraclePrice(uint256 price) public {
@@ -179,23 +260,22 @@ contract TestBase is Test {
     }
 
     function createCredit(address to, uint256 amount) public {
-        cdm.modifyBalance(address(creditCreator), to, amount);
+        mockWETH.mint(to, amount);
     }
 
     function credit(address account) internal view returns (uint256) {
-        (int256 balance,) = cdm.accounts(account);
-        return getCredit(balance);
+        uint256 balance = mockWETH.balanceOf(account);
+        return balance;
     }
 
-    function debt(address account) internal view returns (uint256) {
-        (int256 balance,) = cdm.accounts(account);
-        return getDebt(balance);
+    function virtualDebt(CDPVault vault, address position) internal view returns (uint256) {
+        return vault.virtualDebt(position);
     }
 
-    function creditLine(address account) internal view returns (uint256) {
-        (int256 balance, uint256 debtCeiling) = cdm.accounts(account);
-        return getCreditLine(balance, debtCeiling);
-    }
+    // function creditLine(address account) internal view returns (uint256) {
+    //     (int256 balance, uint256 debtCeiling) = cdm.accounts(account);
+    //     return getCreditLine(balance, debtCeiling);
+    // }
 
     function liquidationPrice(ICDPVaultBase vault_) internal returns (uint256) {
         (, uint64 liquidationRatio_) = vault_.vaultConfig();
@@ -203,27 +283,28 @@ contract TestBase is Test {
     }
 
     function _getDefaultVaultConstants() internal view returns (CDPVaultConstants memory) {
-        return CDPVaultConstants({
-            cdm: cdm,
-            oracle: oracle,
-            buffer: buffer,
-            token: token,
-            tokenScale: 10**IERC20Metadata(address(token)).decimals()
-        });
+        return
+            CDPVaultConstants({
+                pool: liquidityPool,
+                oracle: oracle,
+                token: token,
+                tokenScale: 10 ** IERC20Metadata(address(token)).decimals()
+            });
     }
 
     function _getDefaultVaultConfig() internal view returns (CDPVaultConfig memory) {
-        return CDPVaultConfig({
-            debtFloor: 0,
-            liquidationRatio: 1.25 ether,
-            baseRate: WAD,
-            liquidationPenalty: uint64(WAD),
-            liquidationDiscount: uint64(WAD),
-            roleAdmin: address(this),
-            vaultAdmin: address(this),
-            pauseAdmin: address(this),
-            vaultUnwinder: address(this)
-        });
+        return
+            CDPVaultConfig({
+                debtFloor: 0,
+                liquidationRatio: 1.25 ether,
+                baseRate: WAD,
+                liquidationPenalty: uint64(WAD),
+                liquidationDiscount: uint64(WAD),
+                roleAdmin: address(this),
+                vaultAdmin: address(this),
+                pauseAdmin: address(this),
+                vaultUnwinder: address(this)
+            });
     }
 
     function setUp() public virtual {
@@ -238,16 +319,15 @@ contract TestBase is Test {
     }
 
     function getContracts() public view returns (address[] memory contracts) {
-        contracts = new address[](7);
-        contracts[0] = address(cdm);
-        contracts[1] = address(stablecoin);
-        contracts[2] = address(minter);
-        contracts[3] = address(buffer);
-        contracts[5] = address(flashlender);
-        contracts[6] = address(token);
+        contracts = new address[](5);
+        contracts[0] = address(treasury);
+        contracts[1] = address(addressProvider);
+        contracts[2] = address(liquidityPool);
+        contracts[3] = address(acl);
+        contracts[4] = address(mockWETH);
     }
 
-    function deal(address token_, address to, uint256 amount) virtual override internal {
+    function deal(address token_, address to, uint256 amount) internal virtual override {
         if (usePatchedDeal) {
             uint256 chainId = block.chainid;
             vm.chainId(1);

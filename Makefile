@@ -10,6 +10,7 @@ update           :; forge update
 build            :; forge build --sizes
 clean            :; forge clean
 lint             :; yarn install && yarn run lint
+format           :; npx prettier --write "src/**/*.sol"
 
 # Testing
 test             :; forge test --match-path "src/test/**/*.t.sol" --gas-report

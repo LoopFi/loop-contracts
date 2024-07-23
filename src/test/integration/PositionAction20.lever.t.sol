@@ -7,15 +7,15 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
 
 import {IntegrationTestBase} from "./IntegrationTestBase.sol";
-import {wdiv, WAD, wmul} from "../../utils/Math.sol";
+import {wdiv, WAD} from "../../utils/Math.sol";
 import {Permission} from "../../utils/Permission.sol";
 
 import {CDPVault} from "../../CDPVault.sol";
 
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAction.sol";
-import {PoolAction, PoolActionParams} from "../../proxy/PoolAction.sol";
 import {LeverParams, PositionAction} from "../../proxy/PositionAction.sol";
+import {PoolActionParams} from "../../proxy/PoolAction.sol";
 
 import {PositionAction20} from "../../proxy/PositionAction20.sol";
 
@@ -27,10 +27,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
     address user;
     uint256 constant userPk = 0x12341234;
 
-    // vaults
-    CDPVault usdtVault;
-    CDPVault usdcVault;
-    CDPVault daiVault;
+    CDPVault vault;
 
     // actions
     PositionAction20 positionAction;
@@ -38,8 +35,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
     // common variables as state variables to help with stack too deep
     PermitParams emptyPermitParams;
     SwapParams emptySwap;
-    
-    bytes32[] stablePoolIdArray;
+    PoolActionParams emptyPoolActionParams;
+
+    bytes32[] weightedPoolIdArray;
 
     function setUp() public override {
         super.setUp();
@@ -47,59 +45,41 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // configure permissions and system settings
         setGlobalDebtCeiling(15_000_000 ether);
 
-        // deploy vaults
-        usdtVault = createCDPVault(
-            USDT, // token
+        // deploy vault
+        vault = createCDPVault(
+            token, // token
             5_000_000 ether, // debt ceiling
             0, // debt floor
             1.25 ether, // liquidation ratio
             1.0 ether, // liquidation penalty
-            1.05 ether, // liquidation discount
-            BASE_RATE_1_005 // base rate
+            1.05 ether // liquidation discount
         );
-        usdcVault = createCDPVault(
-            USDC, // token
-            5_000_000 ether, // debt ceiling
-            0, // debt floor
-            1.25 ether, // liquidation ratio
-            1.0 ether, // liquidation penalty
-            1.05 ether, // liquidation discount
-            BASE_RATE_1_005 // base rate
-        );
-        daiVault = createCDPVault(
-            DAI, // token
-            5_000_000 ether, // debt ceiling
-            0, // debt floor
-            1.25 ether, // liquidation ratio
-            1.0 ether, // liquidation penalty
-            1.05 ether, // liquidation discount
-            BASE_RATE_1_005 // base rate
-        );
-
+        createGaugeAndSetGauge(address(vault));
         // setup user and userProxy
         user = vm.addr(0x12341234);
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
 
+        vm.prank(address(userProxy));
+        token.approve(address(user), type(uint256).max);
+        vm.prank(address(userProxy));
+        mockWETH.approve(address(user), type(uint256).max);
+
         // deploy actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction));
+        positionAction = new PositionAction20(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction),
+            address(vaultRegistry)
+        );
 
         // configure oracle spot prices
-        oracle.updateSpot(address(DAI), 1 ether);
-        oracle.updateSpot(address(USDC), 1 ether);
-        oracle.updateSpot(address(USDT), 1 ether);
+        oracle.updateSpot(address(token), 1 ether);
 
-        // configure vaults
-        cdm.setParameter(address(daiVault), "debtCeiling", 5_000_000 ether);
-        cdm.setParameter(address(usdcVault), "debtCeiling", 5_000_000 ether);
-        cdm.setParameter(address(usdtVault), "debtCeiling", 5_000_000 ether);
-
-        // setup state variables to avoid stack too deep
-        stablePoolIdArray.push(stablePoolId);
+        weightedPoolIdArray.push(weightedUnderlierPoolId);
 
         vm.label(address(userProxy), "UserProxy");
         vm.label(address(user), "User");
-        vm.label(address(daiVault), "DAIVault");
-        vm.label(address(usdcVault), "USDCVault");
+        vm.label(address(vault), "CDPVault");
         vm.label(address(positionAction), "PositionAction");
     }
 
@@ -108,35 +88,35 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 borrowAmount = 70_000 ether;
         uint256 amountOutMin = 69_000 ether;
 
-        deal(address(DAI), user, upFrontUnderliers);
+        deal(address(token), user, upFrontUnderliers);
 
         // build increase lever params
         address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
 
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
-            vault: address(daiVault),
-            collateralToken: address(DAI),
+            vault: address(vault),
+            collateralToken: address(token),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_IN,
-                assetIn: address(stablecoin),
-                amount: borrowAmount, // amount of stablecoin to swap in
-                limit: amountOutMin, // min amount of DAI to receive
+                assetIn: address(underlyingToken),
+                amount: borrowAmount,
+                limit: amountOutMin,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
+                args: abi.encode(weightedPoolIdArray, assets)
             }),
             auxSwap: emptySwap,
-            auxAction: emptyJoin
+            auxAction: emptyPoolActionParams
         });
 
         uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
 
         vm.prank(user);
-        DAI.approve(address(userProxy), upFrontUnderliers);
+        token.approve(address(userProxy), upFrontUnderliers);
 
         // call increaseLever
         vm.prank(user);
@@ -145,23 +125,23 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(DAI),
+                address(token),
                 upFrontUnderliers,
                 address(user),
                 emptyPermitParams
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
+        // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -173,193 +153,66 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         uint256 swapAmountOut = _increaseLever(
             userProxy, // position
-            daiVault, // vault
+            vault, // vault
             upFrontUnderliers,
             borrowAmount,
             39_000 ether // amountOutMin
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
+        // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
         assertEq(collateral, swapAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, _debtToNormalDebt(address(daiVault), borrowAmount));
-
-        assertEq(_normalDebtToDebt(address(daiVault), normalDebt), borrowAmount);
+        assertEq(normalDebt, borrowAmount);
 
         // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
-
-    }
-
-    function test_increaseLever_USDC() public {
-        uint256 upFrontUnderliers = 20_000 * 1e6;
-        uint256 borrowAmount = 70_000 ether;
-        uint256 amountOutMin = 69_000 * 1e6;
-
-        deal(address(USDC), user, upFrontUnderliers);
-
-        // build increase lever params
-        address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(USDC);
-
-        LeverParams memory leverParams = LeverParams({
-            position: address(userProxy),
-            vault: address(usdcVault),
-            collateralToken: address(USDC),
-            primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.BALANCER,
-                swapType: SwapType.EXACT_IN,
-                assetIn: address(stablecoin),
-                amount: borrowAmount, // amount of stablecoin to swap in
-                limit: amountOutMin, // min amount of DAI to receive
-                recipient: address(positionAction),
-                deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
-            }),
-            auxSwap: emptySwap,
-            auxAction: emptyJoin
-        });
-
-        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-
-        vm.prank(user);
-        USDC.approve(address(userProxy), upFrontUnderliers);
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(USDC),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the upFrontAmount + the amount of USDC received from the swap
-        assertEq(collateral, wdiv(expectedAmountOut + upFrontUnderliers, usdcVault.tokenScale()));
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
-    }
-
-    function test_increaseLever_USDT() public {
-        uint256 upFrontUnderliers = 20_000 * 1e6;
-        uint256 borrowAmount = 70_000 ether;
-        uint256 amountOutMin = 69_000 * 1e6;
-
-        deal(address(USDT), user, upFrontUnderliers);
-
-        // build increase lever params
-        bytes32[] memory poolIds = new bytes32[](1);
-        poolIds[0] = stablePoolId;
-
-        address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(USDT);
-
-        LeverParams memory leverParams = LeverParams({
-            position: address(userProxy),
-            vault: address(usdtVault),
-            collateralToken: address(USDT),
-            primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.BALANCER,
-                swapType: SwapType.EXACT_IN,
-                assetIn: address(stablecoin),
-                amount: borrowAmount, // amount of stablecoin to swap in
-                limit: amountOutMin, // min amount of DAI to receive
-                recipient: address(positionAction),
-                deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
-            }),
-            auxSwap: emptySwap,
-            auxAction: emptyJoin
-        });
-
-        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-
-        // no transfer
-
-        vm.startPrank(user);
-        USDT.safeApprove(address(userProxy), upFrontUnderliers);
-        vm.stopPrank();
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(USDT),
-                upFrontUnderliers,
-                user,
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdtVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the upFrontAmount + the amount of USDC received from the swap
-        assertEq(collateral, wdiv(expectedAmountOut + upFrontUnderliers, usdtVault.tokenScale()));
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
     }
 
     function test_increaseLever_zero_upfront() public {
         // lever up first and record the current collateral and normalized debt
         _increaseLever(
             userProxy, // position
-            daiVault,
+            vault,
             20_000 ether, // upFrontUnderliers
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
 
         // now lever up further without passing any upFrontUnderliers
         uint256 borrowAmount = 5_000 ether; // amount to lever up
-        uint256 amountOutMin = 4_950 ether; // min amount of DAI to receive
+        uint256 amountOutMin = 4_950 ether; // min amount of token to receive
 
         // build increase lever params
         LeverParams memory leverParams;
         {
             SwapParams memory auxSwap;
-            bytes32[] memory poolIds = new bytes32[](1);
-            poolIds[0] = stablePoolId;
 
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
+                    assetIn: address(underlyingToken),
+                    amount: borrowAmount, // amount of underlying to swap in
+                    limit: amountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(poolIds, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
-                auxSwap: auxSwap, 
-                auxAction: emptyJoin
+                auxSwap: auxSwap,
+                auxAction: emptyPoolActionParams
             });
         }
 
@@ -381,9 +234,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // assert that collateral is now equal to the initial collateral + the amount of DAI received from the swap
+        // assert that collateral is now equal to the initial collateral + the amount of token received from the swap
         assertEq(collateral, initialCollateral + expectedAmountOut);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
@@ -396,32 +249,31 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 amountOutMin = 69_000 ether;
 
         // put the tokens directly on the proxy
-        deal(address(DAI), address(userProxy), upFrontUnderliers);
+        deal(address(token), address(userProxy), upFrontUnderliers);
 
         // build increase lever params
         LeverParams memory leverParams;
         {
-
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
+                    assetIn: address(underlyingToken),
+                    amount: borrowAmount,
+                    limit: amountOutMin,
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: emptySwap,
-                auxAction: emptyJoin
+                auxAction: emptyPoolActionParams
             });
         }
 
@@ -434,16 +286,16 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(DAI),
+                address(token),
                 upFrontUnderliers,
                 address(userProxy),
                 emptyPermitParams
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // verify the collateral amount is the same as the upFrontUnderliers + amount of DAI returned from swap
+        // verify the collateral amount is the same as the upFrontUnderliers + amount of token returned from swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as borrowAmount
@@ -459,36 +311,36 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         address alice = vm.addr(0x56785678);
         vm.label(alice, "alice");
 
-        deal(address(DAI), address(alice), upFrontUnderliers);
+        deal(address(token), address(alice), upFrontUnderliers);
 
         // approve the userProxy to spend the collateral token from alice
         vm.startPrank(alice);
-        DAI.approve(address(userProxy), type(uint256).max);
+        token.approve(address(userProxy), type(uint256).max);
         vm.stopPrank();
 
         // build increase lever params
         LeverParams memory leverParams;
         {
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
+                    assetIn: address(underlyingToken),
+                    amount: borrowAmount,
+                    limit: amountOutMin,
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: emptySwap,
-                auxAction: emptyJoin
+                auxAction: emptyPoolActionParams
             });
         }
 
@@ -501,16 +353,16 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(DAI),
+                address(token),
                 upFrontUnderliers,
                 alice,
                 emptyPermitParams
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // verify the collateral amount is the same as the upFrontUnderliers + amount of DAI returned from swap
+        // verify the collateral amount is the same as the upFrontUnderliers + amount of token returned from swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as borrowAmount
@@ -534,38 +386,38 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         vm.label(address(aliceProxy), "aliceProxy");
 
         // alice creates an initial position
-        _increaseLever(aliceProxy, daiVault, upFrontUnderliers, borrowAmount, amountOutMin);
+        _increaseLever(aliceProxy, vault, upFrontUnderliers, borrowAmount, amountOutMin);
 
         // build increaseLever Params
         LeverParams memory leverParams;
         {
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(aliceProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
+                    assetIn: address(underlyingToken),
                     amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
+                    limit: amountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: emptySwap,
-                auxAction: emptyJoin
+                auxAction: emptyPoolActionParams
             });
         }
 
-        deal(address(DAI), bob, upFrontUnderliers);
+        deal(address(token), bob, upFrontUnderliers);
 
         vm.prank(bob);
-        DAI.approve(address(bobProxy), upFrontUnderliers);
+        token.approve(address(bobProxy), upFrontUnderliers);
 
         // call increaseLever on alice's position as bob but expect failure because bob does not have permission
         vm.prank(bob);
@@ -575,7 +427,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(DAI),
+                address(token),
                 upFrontUnderliers,
                 bob,
                 emptyPermitParams
@@ -584,7 +436,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // call setPermissionAgent as alice to allow bob to modify alice's position
         vm.prank(address(aliceProxy));
-        daiVault.setPermissionAgent(address(bobProxy), true);
+        vault.setPermissionAgent(address(bobProxy), true);
 
         // call increaseLever on alice's position as bob and now expect success
         vm.prank(bob);
@@ -593,7 +445,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(DAI),
+                address(token),
                 upFrontUnderliers,
                 bob,
                 emptyPermitParams
@@ -601,12 +453,12 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
 
         // assert alice's position is levered up once by her and a 2nd time by bob
-        (uint256 aliceCollateral, uint256 aliceNormalDebt) = daiVault.positions(address(aliceProxy));
+        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , , ) = vault.positions(address(aliceProxy));
         assertGe(aliceCollateral, amountOutMin * 2 + upFrontUnderliers * 2);
         assertEq(aliceNormalDebt, borrowAmount * 2);
 
         // assert bob's position is unaffected
-        (uint256 bobCollateral, uint256 bobNormalDebt) = daiVault.positions(address(bobProxy));
+        (uint256 bobCollateral, uint256 bobNormalDebt, , , , ) = vault.positions(address(bobProxy));
         assertEq(bobCollateral, 0);
         assertEq(bobNormalDebt, 0);
     }
@@ -615,41 +467,47 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // lever up first and record the current collateral and normalized debt
         _increaseLever(
             userProxy, // position
-            daiVault,
+            vault,
             20_000 ether, // upFrontUnderliers
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
+
+        emit log_named_uint("initialCollateral", initialCollateral);
+        emit log_named_uint("initialNormalDebt", initialNormalDebt);
+        emit log_named_uint("underlyingToken balance", underlyingToken.balanceOf(address(userProxy)));
 
         // build decrease lever params
         uint256 amountOut = 5_000 ether;
         uint256 maxAmountIn = 5_100 ether;
 
         address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
 
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
-            vault: address(daiVault),
-            collateralToken: address(DAI),
+            vault: address(vault),
+            collateralToken: address(token),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_OUT,
-                assetIn: address(DAI),
+                assetIn: address(token),
                 amount: amountOut, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of DAI to pay
+                limit: maxAmountIn, // max amount of token to pay
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
+                args: abi.encode(weightedPoolIdArray, assets)
             }),
             auxSwap: emptySwap,
-            auxAction: emptyJoin
+            auxAction: emptyPoolActionParams
         });
 
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
 
+        emit log_named_uint("expectedAmountIn", expectedAmountIn);
+        emit log_named_uint("START DELEVER", 0);
         // call decreaseLever
         vm.prank(user);
         userProxy.execute(
@@ -662,19 +520,19 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
+        // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
 
-        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping DAI
+        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping token
         assertEq(normalDebt, initialNormalDebt - amountOut);
 
         // assert that the left over was transfered to the user proxy
-        assertEq(maxAmountIn - expectedAmountIn, DAI.balanceOf(address(userProxy)));
+        assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
         assertEq(lnormalDebt, 0);
     }
@@ -683,12 +541,12 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // lever up first and record the current collateral and normalized debt
         _increaseLever(
             userProxy, // position
-            daiVault,
+            vault,
             20_000 ether, // upFrontUnderliers
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
 
         // accrue interest
         vm.warp(block.timestamp + 365 days);
@@ -698,34 +556,29 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 maxAmountIn = 5_100 ether;
 
         address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
 
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
-            vault: address(daiVault),
-            collateralToken: address(DAI),
+            vault: address(vault),
+            collateralToken: address(token),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_OUT,
-                assetIn: address(DAI),
-                amount: amountOut, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of DAI to pay
+                assetIn: address(token),
+                amount: amountOut,
+                limit: maxAmountIn,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
+                args: abi.encode(weightedPoolIdArray, assets)
             }),
             auxSwap: emptySwap,
-            auxAction: emptyJoin
+            auxAction: emptyPoolActionParams
         });
 
-        // Compute the amount of DAI that will be swapped
-        
-        uint64 rateAccumulator = daiVault.virtualRateAccumulator();
-        uint256 accruedInterest = wmul(amountOut, (rateAccumulator - WAD));
-        leverParams.primarySwap.amount = amountOut + accruedInterest;
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-        leverParams.primarySwap.amount = amountOut;
+        (, uint256 accruedInterest, ) = vault.getDebtInfo(address(userProxy));
 
         // call decreaseLever
         vm.prank(user);
@@ -739,150 +592,21 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
 
-        // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
+        // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
 
-        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping DAI
-        assertEq(normalDebt, initialNormalDebt - amountOut);
+        // debt is decreased by amount out minus the accrued interest
+        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest);
 
-        // assert the leftover DAI is sent back to the user
-        assertEq(maxAmountIn - expectedAmountIn, DAI.balanceOf(address(userProxy)));
+        // assert that the left over was transfered to the user proxy
+        assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
         assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0); 
-    }
-
-    function test_decreaseLever_USDC() public {
-        // lever up first and record the current collateral and normalized debt
-        _increaseLever(
-            userProxy, // position
-            usdcVault,
-            20_000 * 1e6, // upFrontUnderliers
-            40_000 ether, // borrowAmount
-            39_000 * 1e6 // amountOutMin
-        );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = usdcVault.positions(address(userProxy));
-
-        // build decrease lever params
-        uint256 amountOut = 5_000 ether;
-        uint256 maxAmountIn = 5_100 * 1e6;
-        uint256 tokenScale = usdcVault.tokenScale();
-
-        address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(USDC);
-
-        LeverParams memory leverParams = LeverParams({
-            position: address(userProxy),
-            vault: address(usdcVault),
-            collateralToken: address(USDC),
-            primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.BALANCER,
-                swapType: SwapType.EXACT_OUT,
-                assetIn: address(USDC),
-                amount: amountOut, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of USDC to pay
-                recipient: address(positionAction),
-                deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
-            }),
-            auxSwap: emptySwap,
-            auxAction: emptyJoin
-        });
-
-        uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-
-        // call decreaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                wdiv(maxAmountIn, tokenScale), // collateral to decrease by
-                address(userProxy) // residualRecipient
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
-
-        // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
-        assertEq(collateral, initialCollateral - wdiv(maxAmountIn, tokenScale));
-
-        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping DAI
-        assertEq(normalDebt, initialNormalDebt - amountOut);
-
-        // assert that the left over was transfered to the user proxy
-        assertEq(maxAmountIn - expectedAmountIn, USDC.balanceOf(address(userProxy)));
-    }
-
-    function test_decreaseLever_USDT() public {
-        // lever up first and record the current collateral and normalized debt
-        _increaseLever(
-            userProxy, // position
-            usdtVault, // vault
-            20_000 * 1e6, // upFrontUnderliers
-            40_000 ether, // borrowAmount
-            39_000 * 1e6 // amountOutMin
-        );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = usdtVault.positions(address(userProxy));
-
-        // build decrease lever params
-        uint256 amountOut = 5_000 ether;
-        uint256 maxAmountIn = 5_100 * 1e6;
-        uint256 tokenScale = usdtVault.tokenScale();
-
-        address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(USDT);
-
-        LeverParams memory leverParams = LeverParams({
-            position: address(userProxy),
-            vault: address(usdtVault),
-            collateralToken: address(USDT),
-            primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.BALANCER,
-                swapType: SwapType.EXACT_OUT,
-                assetIn: address(USDT),
-                amount: amountOut, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of USDT to pay
-                recipient: address(positionAction),
-                deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
-            }),
-            auxSwap: emptySwap,
-            auxAction: emptyJoin
-        });
-
-        uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-
-        // call decreaseLever
-        vm.startPrank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                wdiv(maxAmountIn, tokenScale), // collateral to decrease by
-                address(userProxy) // residualRecipient, zero address == flash loan initiator == userProxy
-            )
-        );
-        vm.stopPrank();
-
-        (uint256 collateral, uint256 normalDebt) = usdtVault.positions(address(userProxy));
-
-        // assert new collateral amount is the same as initialCollateral minus the amount of DAI we swapped for stablecoin
-        assertEq(collateral, initialCollateral - wdiv(maxAmountIn, tokenScale));
-
-        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping DAI
-        assertEq(normalDebt, initialNormalDebt - amountOut);
-
-        // assert that the left over was transfered to the user proxy
-        assertEq(maxAmountIn - expectedAmountIn, USDT.balanceOf(address(userProxy)));
+        assertEq(lnormalDebt, 0);
     }
 
     function test_decreaseLever_with_residual_recipient() public {
@@ -891,7 +615,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // lever up first and record the current collateral and normalized debt
         _increaseLever(
             userProxy, // position
-            daiVault,
+            vault,
             20_000 ether, // upFrontUnderliers
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
@@ -902,25 +626,25 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 maxAmountIn = 5_100 ether;
 
         address[] memory assets = new address[](2);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
 
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
-            vault: address(daiVault),
-            collateralToken: address(DAI),
+            vault: address(vault),
+            collateralToken: address(token),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.BALANCER,
                 swapType: SwapType.EXACT_OUT,
-                assetIn: address(DAI),
-                amount: amountOut, // exact amount of stablecoin to receive
-                limit: maxAmountIn, // max amount of DAI to pay
+                assetIn: address(token),
+                amount: amountOut,
+                limit: maxAmountIn,
                 recipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(stablePoolIdArray, assets)
+                args: abi.encode(weightedPoolIdArray, assets)
             }),
             auxSwap: emptySwap,
-            auxAction: emptyJoin
+            auxAction: emptyPoolActionParams
         });
 
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
@@ -938,7 +662,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
 
         // assert that the left over was transfered to the residualRecipient
-        assertEq(maxAmountIn - expectedAmountIn, DAI.balanceOf(address(residualRecipient)));
+        assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(residualRecipient)));
     }
 
     function test_decreaseLever_with_permission_agent() public {
@@ -953,12 +677,12 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // create alice's initial position
         _increaseLever(
             aliceProxy,
-            daiVault,
+            vault,
             20_000 ether, // upFrontUnderliers
             40_000 ether, // borrowAmount
             39_000 ether // amountOutMin
         );
-        (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(aliceProxy));
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(aliceProxy));
 
         uint256 amountOut = 5_000 ether;
         uint256 maxAmountIn = 5_100 ether;
@@ -966,26 +690,25 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         {
             // now decrease alice's leverage as bob
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
-
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(aliceProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_OUT,
-                    assetIn: address(DAI),
-                    amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of DAI to pay
+                    assetIn: address(token),
+                    amount: amountOut,
+                    limit: maxAmountIn,
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: emptySwap,
-                auxAction: emptyJoin
+                auxAction: emptyPoolActionParams
             });
         }
 
@@ -999,7 +722,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // call setPermissionAgent as alice to allow bob to modify alice's position
         vm.prank(address(aliceProxy));
-        daiVault.setPermissionAgent(address(bobProxy), true);
+        vault.setPermissionAgent(address(bobProxy), true);
 
         // now call decreaseLever on alice's position as bob and expect success because alice gave bob permission
         vm.prank(bob);
@@ -1008,8 +731,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(positionAction.decreaseLever.selector, leverParams, maxAmountIn, address(bob))
         );
 
-        (uint256 aliceCollateral, uint256 aliceNormalDebt) = daiVault.positions(address(aliceProxy));
-        (uint256 bobCollateral, uint256 bobNormalDebt) = daiVault.positions(address(bobProxy));
+        (uint256 aliceCollateral, uint256 aliceNormalDebt, , , , ) = vault.positions(address(aliceProxy));
+        (uint256 bobCollateral, uint256 bobNormalDebt, , , , ) = vault.positions(address(bobProxy));
 
         // assert alice's position is levered down by bob
         assertEq(aliceCollateral, initialCollateral - maxAmountIn);
@@ -1020,888 +743,52 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(bobNormalDebt, 0);
     }
 
-    // lever up DAI position by entering with WETH
-    function test_increaseLever_DAI_vault_with_aux_swap_from_WETH() public {
-        uint256 upFrontUnderliers = 5 ether;
-        uint256 auxAmountOutMin =  _getWethRateInDai() * upFrontUnderliers / 1 ether * 99 /100;
-        uint256 borrowAmount = auxAmountOutMin; // we want the amount of stablecoin we borrow to be equal to the amount of underliers we swap in
-        uint256 amountOutMin = borrowAmount * 98 / 100;
-
-        uint256 expectedAmountOut; // amount out after swaping stablecoin for collateral token
-        uint256 auxExpectedAmoutOut; // amount out after swaping upFrontUnderliers for collateral token
-
-        LeverParams memory leverParams;
-
-        {
-            deal(address(WETH), user, upFrontUnderliers);
-
-            // build increase lever params
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
-
-            bytes32[] memory auxPoolIds = new bytes32[](1);
-            auxPoolIds[0] = wethDaiPoolId;
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(WETH);
-            auxAssets[1] = address(DAI);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(WETH),
-                    amount: upFrontUnderliers, // amount of WETH to swap in
-                    limit: auxAmountOutMin, // min amount of DAI to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(auxPoolIds, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-
-            expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-
-            auxExpectedAmoutOut = _simulateBalancerSwap(leverParams.auxSwap);
-        }
-
-        vm.prank(user);
-        WETH.approve(address(userProxy), upFrontUnderliers);
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(WETH),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the swap
-        assertEq(collateral, expectedAmountOut + auxExpectedAmoutOut);
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
-
-        // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-        
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(WETH.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // completely delever and exit DAI position and receieve WETH on exit
-    function test_decreaseLever_DAI_vault_with_aux_swap_to_WETH() public {
-        uint256 upFrontUnderliers = 10_000*1 ether;
-        _increaseLever(
-            userProxy,
-            daiVault,
-            upFrontUnderliers,
-            10_000 ether, // borrowAmount
-            10_000 ether * 99/100 // amountOutMin
-        );
-
-        // we will completely delever the position so use full collateral and debt amounts
-        uint256 collateralAmount;
-        uint256 amountOut;
-        uint256 maxAmountIn;
-        {
-            (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
-            collateralAmount = initialCollateral; // delever the entire collateral amount
-            amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
-        }
-        
-        // build decrease lever params
-        LeverParams memory leverParams;
-        uint256 expectedAmountIn;
-        uint256 expectedAuxAmoutOut;
-        uint256 minResidualRate = _getDaiRateInWeth() * 99/100; // allow 1% slippage on aux swap
-
-        {
-
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
-
-            bytes32[] memory auxPoolIds = new bytes32[](2);
-            auxPoolIds[0] = daiOhmPoolId;
-            auxPoolIds[1] = wethOhmPoolId;
-
-            address[] memory auxAssets = new address[](3);
-            auxAssets[0] = address(DAI);
-            auxAssets[1] = address(OHM);  // TODO why is this needed?
-            auxAssets[2] = address(WETH);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_OUT,
-                    assetIn: address(DAI),
-                    amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of DAI to pay
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(DAI),
-                    amount: 0, // this will be autocalculated
-                    limit: 0, // this will be calculated by the `minResidualRate` variable
-                    recipient: address(user),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(auxPoolIds, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // simulate the primary swap
-            expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-
-            // simulate the aux swap by setting the amount and limit
-            leverParams.auxSwap.amount = collateralAmount - expectedAmountIn;
-            leverParams.auxSwap.limit = minResidualRate * leverParams.auxSwap.amount / 1 ether;
-            expectedAuxAmoutOut = _simulateBalancerSwap(leverParams.auxSwap);
-        }
-
-        // call decreaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                collateralAmount, // collateral to decrease by
-                user // residualRecipient
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(collateral, 0);
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(normalDebt, 0);
-
-        // assert that the left over collateral was transfered to the user proxy
-        assertEq(expectedAuxAmoutOut, WETH.balanceOf(address(user)));
-        
-        
-        // assert that the amount of WETH we got back is relatively equal to the amount of DAI we put in
-        assertApproxEqRel(
-            WETH.balanceOf(address(user)),
-            upFrontUnderliers * minResidualRate / 1 ether,
-            2e16 // allow for a 2% difference due to swap losses
-        );
-
-        // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(WETH.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // lever up DAI position by entering with USDC
-    function test_increaseLever_DAI_vault_with_aux_swap_from_USDC() public {
-        uint256 upFrontUnderliers = 20_000*1e6;
-        uint256 auxAmountOutMin = upFrontUnderliers * 1e12 * 99 / 100; // allow 1% slippage on aux swap and convert to dai decimals
-        uint256 borrowAmount = auxAmountOutMin; // we want the amount of stablecoin we borrow to be equal to the amount of underliers we receieve in aux swap
-        uint256 amountOutMin = borrowAmount * 99 / 100;
-
-        uint256 expectedAmountOut; // amount out after swaping stablecoin for collateral token
-        uint256 auxExpectedAmountOut; // amount out after swaping upFrontUnderliers for collateral token
-
-        LeverParams memory leverParams;
-
-        {   
-            // mint USDC to user
-            deal(address(USDC), user, upFrontUnderliers);
-
-            // build increase lever params
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(USDC);
-            auxAssets[1] = address(DAI);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(USDC),
-                    amount: upFrontUnderliers, // amount of USDC to swap in
-                    limit: auxAmountOutMin, // min amount of DAI to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // get expected return amounts
-            (auxExpectedAmountOut, expectedAmountOut) = _simulateBalancerSwapMulti(leverParams.auxSwap, leverParams.primarySwap);
-        }
-
-        vm.prank(user);
-        USDC.approve(address(userProxy), upFrontUnderliers);
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(USDC),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the upFrontAmount + the amount of DAI received from the primary swap and aux swap
-        assertEq(collateral, expectedAmountOut + auxExpectedAmountOut);
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
-
-        // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-        
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(USDC.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // completely delever and exit DAI position and receive USDC on exit
-    function test_decreaseLever_DAI_vault_with_aux_swap_to_USDC() public {
-        uint256 upFrontUnderliers = 20_000*1 ether;
-        _increaseLever(
-            userProxy,
-            daiVault,
-            upFrontUnderliers,
-            40_000 ether, // borrowAmount
-            40_000 ether * 99/100 // amountOutMin
-        );
-
-        // we will completely delever the position so use full collateral and debt amounts
-        uint256 collateralAmount;
-        uint256 amountOut;
-        uint256 maxAmountIn;
-        {
-            (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
-            collateralAmount = initialCollateral; // delever the entire collateral amount
-            amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
-        }
-        
-        // build decrease lever params
-        LeverParams memory leverParams;
-        uint256 expectedAmountIn;
-        uint256 expectedAuxAmoutOut;
-        uint256 minResidualRate = 1e6 * 99/100; // allow 1% slippage on aux swap, rate should be in out token decimals
-
-        {
-
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(DAI);
-            auxAssets[1] = address(USDC);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_OUT,
-                    assetIn: address(DAI),
-                    amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of DAI to pay
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(DAI),
-                    amount: 0, // this will be autocalculated
-                    limit: 0, // this will be calculated by the `minResidualRate` variable
-                    recipient: address(user),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // first simulate the primary swap to calculate values for aux swap
-            expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-            leverParams.auxSwap.amount = collateralAmount - expectedAmountIn;
-            leverParams.auxSwap.limit = leverParams.auxSwap.amount * minResidualRate / 1 ether;
-
-            // now simulate both swaps
-            (expectedAmountIn, expectedAuxAmoutOut) = _simulateBalancerSwapMulti(leverParams.primarySwap, leverParams.auxSwap);
-        }
-
-        // call decreaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                collateralAmount, // collateral to decrease by
-                user // residualRecipient
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = daiVault.positions(address(userProxy));
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(collateral, 0);
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(normalDebt, 0);
-
-        // assert that the left over collateral was transfered to the user proxy
-        assertEq(expectedAuxAmoutOut, USDC.balanceOf(address(user)));
-        
-        
-        // assert that the amount of USDC we got back is relatively equal to the amount of DAI we put in
-        assertApproxEqRel(
-            USDC.balanceOf(address(user)),
-            upFrontUnderliers * minResidualRate / 1 ether,
-            1e16 // allow for a 1% difference due to swap losses
-        );
-
-        // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = daiVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(USDC.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // lever up USDT position by entering with DAI
-    function test_increaseLever_USDT_vault_with_aux_swap_from_DAI() public {
-        uint256 upFrontUnderliers = 20_000*1 ether; // DAI decimals
-        uint256 auxAmountOutMin = upFrontUnderliers * 99 / 100e12; // allow 1% slippage on aux swap and convert to usdt decimals
-        uint256 borrowAmount = auxAmountOutMin * 1e12; // borrow the same amount of stablecoin as the aux swap returns in USDT (so we are levering up 2x)
-        uint256 amountOutMin = borrowAmount * 99 / 100e12; // allow 1% slippage on primary swap and convert to usdt decimals
-
-        uint256 expectedAmountOut; // amount out after swaping stablecoin for collateral token
-        uint256 auxExpectedAmountOut; // amount out after swaping upFrontUnderliers for collateral token
-
-        LeverParams memory leverParams;
-
-        {   
-            deal(address(DAI), user, upFrontUnderliers);
-
-            // build increase lever params
-
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(USDT);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(DAI);
-            auxAssets[1] = address(USDT);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(usdtVault),
-                collateralToken: address(USDT),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of USDT to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(DAI),
-                    amount: upFrontUnderliers, // amount of DAI to swap in
-                    limit: auxAmountOutMin, // min amount of USDT to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // get expected return amounts
-            (auxExpectedAmountOut, expectedAmountOut) = _simulateBalancerSwapMulti(leverParams.auxSwap, leverParams.primarySwap);
-        }
-
-        vm.prank(user);
-        DAI.approve(address(userProxy), upFrontUnderliers);
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(DAI),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdtVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the amount of USDT received from the primary swap and aux swap
-        assertEq(collateral, (expectedAmountOut + auxExpectedAmountOut)*1e12);
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
-
-        // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = usdtVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-        
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(USDT.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // completely delever and exit USDT position and receive DAI on exit
-    function test_decreaseLever_USDT_vault_with_aux_swap_to_DAI() public {
-        uint256 upFrontUnderliers = 20_000*1e6;
-        _increaseLever(
-            userProxy,
-            usdtVault,
-            upFrontUnderliers,
-            40_000 ether, // borrowAmount
-            40_000 * 1e6 * 99/100 // amountOutMin
-        );
-
-        // we will completely delever the position so use full collateral and debt amounts
-        uint256 collateralAmount;
-        uint256 amountOut;
-        uint256 maxAmountIn;
-        {
-            (uint256 initialCollateral, uint256 initialNormalDebt) = usdtVault.positions(address(userProxy));
-            collateralAmount = initialCollateral; // delever the entire collateral amount
-            amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
-        }
-        
-        // build decrease lever params
-        LeverParams memory leverParams;
-        uint256 expectedAmountIn;
-        uint256 expectedAuxAmoutOut;
-        uint256 minResidualRate = 1 ether * 99/100; // allow 1% slippage on aux swap, rate should be in out token decimals
-
-        {
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(USDT);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(USDT);
-            auxAssets[1] = address(DAI);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(usdtVault),
-                collateralToken: address(USDT),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_OUT,
-                    assetIn: address(USDT),
-                    amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of DAI to pay
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(USDT),
-                    amount: 0, // this will be autocalculated
-                    limit: 0, // this will be calculated by the `minResidualRate` variable
-                    recipient: address(user),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // first simulate the primary swap to calculate values for aux swap
-            expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-            leverParams.auxSwap.amount = collateralAmount/1e12 - expectedAmountIn;
-            leverParams.auxSwap.limit = leverParams.auxSwap.amount * minResidualRate / 1 ether;
-
-            // now simulate both swaps
-            (expectedAmountIn, expectedAuxAmoutOut) = _simulateBalancerSwapMulti(leverParams.primarySwap, leverParams.auxSwap);
-        }
-
-        // call decreaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                collateralAmount, // collateral to decrease by
-                user // residualRecipient
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdtVault.positions(address(userProxy));
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(collateral, 0);
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(normalDebt, 0);
-
-        // assert that the left over collateral was transfered to the user proxy
-        assertEq(expectedAuxAmoutOut, DAI.balanceOf(address(user)));
-        
-        
-        // assert that the amount of DAI we got back is relatively equal to the amount of USDT we put in
-        assertApproxEqRel(
-            DAI.balanceOf(address(user)),
-            upFrontUnderliers * minResidualRate / 1e6, // convert to dai decimals
-            1e16 // allow for a 3% difference due to swap losses
-        );
-
-        // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = usdtVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-
-        // and no tokens were left on the contract
-        assertEq(DAI.balanceOf(address(positionAction)),  0);
-        assertEq(USDT.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // lever up USDC position by entering with USDT
-    function test_increaseLever_USDC_vault_with_aux_swap_to_USDT() public {
-        uint256 upFrontUnderliers = 20_000*1e6; // USDT decimals
-        uint256 auxAmountOutMin = upFrontUnderliers * 99/100; // allow 1% slippage on aux swap
-        uint256 borrowAmount = auxAmountOutMin * 1e12; // borrow the same amount of stablecoin as the aux swap returns in USDT (so we are levering up 2x)
-        uint256 amountOutMin = borrowAmount * 99 / 100e12; // allow 1% slippage on primary swap and convert to usdt decimals
-
-        uint256 expectedAmountOut; // amount out after swaping stablecoin for collateral token
-        uint256 auxExpectedAmountOut; // amount out after swaping upFrontUnderliers for collateral token
-
-        LeverParams memory leverParams;
-        {
-            deal(address(USDT), user, upFrontUnderliers);
-
-            // build increase lever params
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(USDC);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(USDT);
-            auxAssets[1] = address(USDC);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(usdcVault),
-                collateralToken: address(USDC),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of USDC to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(USDT),
-                    amount: upFrontUnderliers, // amount of USDT to swap in
-                    limit: auxAmountOutMin, // min amount of USDC to receive
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // get expected return amounts
-            (auxExpectedAmountOut, expectedAmountOut) = _simulateBalancerSwapMulti(leverParams.auxSwap, leverParams.primarySwap);
-        }
-
-        vm.prank(user);
-        USDT.forceApprove(address(userProxy), upFrontUnderliers);
-
-        // call increaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(USDT),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
-
-        // assert that collateral is now equal to the amount of USDC received from the primary swap and aux swap
-        assertEq(collateral, (expectedAmountOut + auxExpectedAmountOut)*1e12);
-
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
-
-        // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = usdcVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-        
-        // and no tokens were left on the contract
-        assertEq(USDC.balanceOf(address(positionAction)),  0);
-        assertEq(USDT.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
-    // completely delever and exit USDC position and receive USDT on exit
-    function test_decreaseLever_USDC_vault_with_aux_swap_to_USDT() public {
-        uint256 upFrontUnderliers = 20_000*1e6;
-        _increaseLever(
-            userProxy,
-            usdcVault,
-            upFrontUnderliers,
-            40_000 ether, // borrowAmount
-            40_000 * 1e6 * 99/100 // amountOutMin
-        );
-
-        // we will completely delever the position so use full collateral and debt amounts
-        uint256 collateralAmount;
-        uint256 amountOut;
-        uint256 maxAmountIn;
-        {
-            (uint256 initialCollateral, uint256 initialNormalDebt) = usdcVault.positions(address(userProxy));
-            collateralAmount = initialCollateral; // delever the entire collateral amount
-            amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
-        }
-        
-        // build decrease lever params
-        LeverParams memory leverParams;
-        uint256 expectedAmountIn;
-        uint256 expectedAuxAmoutOut;
-        uint256 minResidualRate = 1e6 * 99/100; // allow 1% slippage on aux swap, rate should be in out token decimals
-
-        {
-            address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(USDC);
-
-            address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(USDC);
-            auxAssets[1] = address(USDT);
-
-            leverParams = LeverParams({
-                position: address(userProxy),
-                vault: address(usdcVault),
-                collateralToken: address(USDC),
-                primarySwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_OUT,
-                    assetIn: address(USDC),
-                    amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of USDC to pay
-                    recipient: address(positionAction),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
-                }),
-                auxSwap: SwapParams({
-                    swapProtocol: SwapProtocol.BALANCER,
-                    swapType: SwapType.EXACT_IN,
-                    assetIn: address(USDC),
-                    amount: 0, // this will be autocalculated
-                    limit: 0, // this will be calculated by the `minResidualRate` variable
-                    recipient: address(user),
-                    deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
-            });
-            
-            // first simulate the primary swap to calculate values for aux swap
-            expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-            leverParams.auxSwap.amount = collateralAmount/1e12 - expectedAmountIn;
-            leverParams.auxSwap.limit = leverParams.auxSwap.amount * minResidualRate / 1e6;
-
-            // now simulate both swaps
-            (expectedAmountIn, expectedAuxAmoutOut) = _simulateBalancerSwapMulti(leverParams.primarySwap, leverParams.auxSwap);
-        }
-
-        // call decreaseLever
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.decreaseLever.selector, // function
-                leverParams, // lever params
-                collateralAmount, // collateral to decrease by
-                user // residualRecipient
-            )
-        );
-
-        (uint256 collateral, uint256 normalDebt) = usdcVault.positions(address(userProxy));
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(collateral, 0);
-
-        // this should be equal to zero since we are completely delevering
-        assertEq(normalDebt, 0);
-
-        // assert that the left over collateral was transfered to the user proxy
-        assertEq(expectedAuxAmoutOut, USDT.balanceOf(address(user)));
-        
-        
-        // assert that the amount of USDT we got back is relatively equal to the amount of DAI we put in
-        assertApproxEqRel(
-            USDT.balanceOf(address(user)),
-            upFrontUnderliers * minResidualRate / 1e6, // convert to usdt decimals
-            1e16 // allow for a 1% difference due to swap losses
-        );
-
-        // ensure there isn't any left over debt or collateral from using leverAction
-        (uint256 lcollateral, uint256 lnormalDebt) = usdcVault.positions(address(positionAction));
-        assertEq(lcollateral, 0);
-        assertEq(lnormalDebt, 0);
-
-        // and no tokens were left on the contract
-        assertEq(USDC.balanceOf(address(positionAction)),  0);
-        assertEq(USDT.balanceOf(address(positionAction)), 0);
-        assertEq(stablecoin.balanceOf(address(positionAction)), 0);
-    }
-
     // ERRORS
     function test_increaseLever_invalidSwaps() public {
-        uint256 upFrontUnderliers = 20_000*1e6;
-        uint256 auxAmountOutMin = upFrontUnderliers * 1e12 * 99 / 100; // allow 1% slippage on aux swap and convert to dai decimals
+        uint256 upFrontUnderliers = 20_000 * 1e6;
+        uint256 auxAmountOutMin = (upFrontUnderliers * 1e12 * 99) / 100; // allow 1% slippage on aux swap and convert to token decimals
         uint256 borrowAmount = auxAmountOutMin; // we want the amount of stablecoin we borrow to be equal to the amount of underliers we receieve in aux swap
-        uint256 amountOutMin = borrowAmount * 99 / 100;
+        uint256 amountOutMin = (borrowAmount * 99) / 100;
 
         LeverParams memory leverParams;
-        {   
+        {
             // mint USDC to user
             deal(address(USDC), user, upFrontUnderliers);
 
             // build increase lever params
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             address[] memory auxAssets = new address[](2);
             auxAssets[0] = address(USDC);
-            auxAssets[1] = address(DAI);
+            auxAssets[1] = address(token);
 
             leverParams = LeverParams({
                 position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
-                    amount: borrowAmount, // amount of stablecoin to swap in
-                    limit: amountOutMin, // min amount of DAI to receive
+                    assetIn: address(underlyingToken),
+                    amount: borrowAmount,
+                    limit: amountOutMin,
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
                     assetIn: address(USDC),
                     amount: upFrontUnderliers, // amount of USDC to swap in
-                    limit: auxAmountOutMin, // min amount of DAI to receive
+                    limit: auxAmountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
+                    args: abi.encode(weightedPoolIdArray, auxAssets)
+                }),
+                auxAction: emptyPoolActionParams
             });
         }
 
@@ -1924,7 +811,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
         leverParams.primarySwap.recipient = address(positionAction); // fix the error
 
-
         leverParams.auxSwap.recipient = address(userProxy); // this should trigger PositionAction__increaseLever_invalidAuxSwap
         vm.expectRevert(PositionAction.PositionAction__increaseLever_invalidAuxSwap.selector);
         vm.prank(user);
@@ -1944,10 +830,10 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
     function test_decreaseLever_invalidSwaps() public {
         _increaseLever(
             userProxy,
-            daiVault,
-            20_000*1 ether,
+            vault,
+            20_000 * 1 ether,
             40_000 ether, // borrowAmount
-            40_000 ether * 99/100 // amountOutMin
+            (40_000 ether * 99) / 100 // amountOutMin
         );
 
         // we will completely delever the position so use full collateral and debt amounts
@@ -1955,57 +841,56 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         uint256 amountOut;
         uint256 maxAmountIn;
         {
-            (uint256 initialCollateral, uint256 initialNormalDebt) = daiVault.positions(address(userProxy));
+            (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
             collateralAmount = initialCollateral; // delever the entire collateral amount
             amountOut = initialNormalDebt; // delever the entire debt amount
-            maxAmountIn = initialNormalDebt * 101/100; // allow 1% slippage on primary swap
+            maxAmountIn = (initialNormalDebt * 101) / 100; // allow 1% slippage on primary swap
         }
-        
+
         // build decrease lever params
         LeverParams memory leverParams;
-        uint256 minResidualRate = 1e6 * 99/100; // allow 1% slippage on aux swap, rate should be in out token decimals
+        uint256 minResidualRate = (1e6 * 99) / 100; // allow 1% slippage on aux swap, rate should be in out token decimals
 
         {
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
-            assets[1] = address(DAI);
+            assets[0] = address(underlyingToken);
+            assets[1] = address(token);
 
             address[] memory auxAssets = new address[](2);
-            auxAssets[0] = address(DAI);
+            auxAssets[0] = address(token);
             auxAssets[1] = address(USDC);
 
             leverParams = LeverParams({
                 position: address(userProxy),
-                vault: address(daiVault),
-                collateralToken: address(DAI),
+                vault: address(vault),
+                collateralToken: address(token),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_OUT,
-                    assetIn: address(DAI),
+                    assetIn: address(token),
                     amount: amountOut, // exact amount of stablecoin to receive
-                    limit: maxAmountIn, // max amount of DAI to pay
+                    limit: maxAmountIn, // max amount of token to pay
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(DAI),
+                    assetIn: address(token),
                     amount: 0,
                     limit: 0,
                     recipient: address(user),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, auxAssets)
-                }), 
-                auxAction: emptyJoin
+                    args: abi.encode(weightedPoolIdArray, auxAssets)
+                }),
+                auxAction: emptyPoolActionParams
             });
-            
+
             // first simulate the primary swap to calculate values for aux swap
             leverParams.auxSwap.amount = collateralAmount - _simulateBalancerSwap(leverParams.primarySwap);
-            leverParams.auxSwap.limit = leverParams.auxSwap.amount * minResidualRate / 1 ether;
+            leverParams.auxSwap.limit = (leverParams.auxSwap.amount * minResidualRate) / 1 ether;
         }
-
 
         // trigger PositionAction__decreaseLever_invalidPrimarySwap
         leverParams.primarySwap.recipient = address(userProxy);
@@ -2021,7 +906,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
         leverParams.primarySwap.recipient = address(positionAction); // fix the error
-
 
         // trigger PositionAction__decreaseLever_invalidAuxSwap
         leverParams.auxSwap.swapType = SwapType.EXACT_OUT;
@@ -2051,7 +935,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 address(0) // <=== this should trigger the error
             )
         );
-
     }
 
     function test_onFlashLoan_cannotCallDirectly() public {
@@ -2064,42 +947,41 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         positionAction.onCreditFlashLoan(address(0), 0, 0, "");
     }
 
-
     // simple helper function to increase lever
     function _increaseLever(
         PRBProxy proxy,
-        CDPVault vault,
+        CDPVault vault_,
         uint256 upFrontUnderliers,
         uint256 amountToLever,
         uint256 amountToLeverLimit
     ) public returns (uint256 expectedAmountIn) {
         LeverParams memory leverParams;
         {
-            address upFrontToken = address(vault.token());
+            address upFrontToken = address(vault_.token());
 
             address[] memory assets = new address[](2);
-            assets[0] = address(stablecoin);
+            assets[0] = address(underlyingToken);
             assets[1] = address(upFrontToken);
 
             // mint directly to swap actions for simplicity
             if (upFrontUnderliers > 0) deal(upFrontToken, address(proxy), upFrontUnderliers);
-            
+
             leverParams = LeverParams({
                 position: address(proxy),
-                vault: address(vault),
-                collateralToken: address(vault.token()),
+                vault: address(vault_),
+                collateralToken: address(vault_.token()),
                 primarySwap: SwapParams({
                     swapProtocol: SwapProtocol.BALANCER,
                     swapType: SwapType.EXACT_IN,
-                    assetIn: address(stablecoin),
+                    assetIn: address(underlyingToken),
                     amount: amountToLever, // amount of stablecoin to swap in
-                    limit: amountToLeverLimit, // min amount of DAI to receive
+                    limit: amountToLeverLimit, // min amount of tokens to receive
                     recipient: address(positionAction),
                     deadline: block.timestamp + 100,
-                    args: abi.encode(stablePoolIdArray, assets)
+                    args: abi.encode(weightedPoolIdArray, assets)
                 }),
                 auxSwap: emptySwap, // no aux swap
-                auxAction: emptyJoin 
+                auxAction: emptyPoolActionParams
             });
 
             expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
@@ -2111,7 +993,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             abi.encodeWithSelector(
                 positionAction.increaseLever.selector,
                 leverParams,
-                address(vault.token()),
+                address(vault_.token()),
                 upFrontUnderliers,
                 address(proxy),
                 emptyPermitParams

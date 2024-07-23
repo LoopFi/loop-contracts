@@ -12,6 +12,7 @@ sender = '0xf000000000000000000000000000000000000000'
 tx_origin = '0xf000000000000000000000000000000000000000'
 chain_id = 99
 block_timestamp = 2592000 # as to be greater than epochFixTimeout
+libs = ["node_modules", "lib"]
 
 [profile.ci.fuzz]
 runs = 5000

@@ -25,7 +25,7 @@ contract ProxyTest is Test {
 
     function getNextProxyAddress(address owner) public view returns (address) {
         bytes32 creationBytecodeHash = keccak256(type(PRBProxy).creationCode);
-         bytes32 salt = bytes32(abi.encodePacked(owner));
+        bytes32 salt = bytes32(abi.encodePacked(owner));
         return computeCreate2Address(salt, creationBytecodeHash, address(registry));
     }
 
@@ -48,7 +48,12 @@ contract ProxyTest is Test {
         address target = address(0x3);
         vm.mockCall(target, abi.encodeWithSignature("mockAction()"), abi.encodeWithSignature("mockAction()"));
         bytes memory deployData = abi.encodeWithSignature("mockAction()");
-        vm.expectRevert(abi.encodeWithSelector(IPRBProxyRegistry.PRBProxyRegistry_PluginWithZeroMethods.selector, address(emptyPlugin)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPRBProxyRegistry.PRBProxyRegistry_PluginWithZeroMethods.selector,
+                address(emptyPlugin)
+            )
+        );
         registry.deployAndExecuteAndInstallPlugin(target, deployData, emptyPlugin);
     }
 

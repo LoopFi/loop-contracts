@@ -26,7 +26,6 @@ struct PoolActionParams {
     Protocol protocol;
     uint256 minOut;
     address recipient;
-    
     /// @dev `args` can be used for protocol specific parameters
     bytes args;
 }
@@ -58,7 +57,7 @@ contract PoolAction is TransferAction {
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-    
+
     constructor(address balancerVault_, address _pendleRouter) {
         balancerVault = IVault(balancerVault_);
         pendleRouter = IPActionAddRemoveLiqV3(_pendleRouter);
@@ -70,7 +69,7 @@ contract PoolAction is TransferAction {
 
     /// @notice Execute a transfer from an EOA and then join via `PoolActionParams`
     /// @param from The address to transfer from
-    /// @param permitParams A list of parameters for the permit transfers, 
+    /// @param permitParams A list of parameters for the permit transfers,
     /// must be the same length and in the same order as `PoolActionParams` assets
     /// @param poolActionParams The parameters for the join
     function transferAndJoin(
@@ -80,31 +79,34 @@ contract PoolAction is TransferAction {
     ) external {
         if (from != address(this)) {
             if (poolActionParams.protocol == Protocol.BALANCER) {
-                (, address[] memory assets, , uint256[] memory maxAmountsIn) = abi.decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
+                (, address[] memory assets, , uint256[] memory maxAmountsIn) = abi.decode(
+                    poolActionParams.args,
+                    (bytes32, address[], uint256[], uint256[])
+                );
 
-                if (
-                    assets.length != 
-                    permitParams.length
-                ) {
+                if (assets.length != permitParams.length) {
                     revert PoolAction__transferAndJoin_invalidPermitParams();
                 }
 
-                for (uint256 i = 0; i < assets.length;) {
+                for (uint256 i = 0; i < assets.length; ) {
                     if (maxAmountsIn[i] != 0) {
                         _transferFrom(assets[i], from, address(this), maxAmountsIn[i], permitParams[i]);
                     }
-                    
+
                     unchecked {
                         ++i;
                     }
                 }
-            } else if(poolActionParams.protocol == Protocol.PENDLE) {
-                (, , TokenInput memory input,) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
-                
+            } else if (poolActionParams.protocol == Protocol.PENDLE) {
+                (, , TokenInput memory input, ) = abi.decode(
+                    poolActionParams.args,
+                    (address, ApproxParams, TokenInput, LimitOrderData)
+                );
+
                 if (input.tokenIn != address(0)) {
                     _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
                 }
-            } else  revert PoolAction__transferAndJoin_unsupportedProtocol();
+            } else revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
         join(poolActionParams);
@@ -113,9 +115,9 @@ contract PoolAction is TransferAction {
     /// @notice Perform a join using the specified protocol
     /// @param poolActionParams The parameters for the join
     function join(PoolActionParams memory poolActionParams) public payable {
-        if(poolActionParams.protocol == Protocol.BALANCER) {
+        if (poolActionParams.protocol == Protocol.BALANCER) {
             _balancerJoin(poolActionParams);
-        } else if(poolActionParams.protocol == Protocol.PENDLE) {
+        } else if (poolActionParams.protocol == Protocol.PENDLE) {
             _pendleJoin(poolActionParams);
         } else {
             revert PoolAction__join_unsupportedProtocol();
@@ -124,17 +126,13 @@ contract PoolAction is TransferAction {
 
     /// @notice Perform a join using the Balancer protocol
     /// @param poolActionParams The parameters for the join
-    /// @dev For more information regarding the Balancer join function check the 
+    /// @dev For more information regarding the Balancer join function check the
     /// documentation in {IBalancerVault}
     function _balancerJoin(PoolActionParams memory poolActionParams) internal {
-        (
-            bytes32 poolId, 
-            address[] memory assets,
-            uint256[] memory assetsIn,
-            uint256[] memory maxAmountsIn
-        ) = abi.decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
-        
-        for (uint256 i = 0; i < assets.length;) {
+        (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
+            .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
+
+        for (uint256 i = 0; i < assets.length; ) {
             if (maxAmountsIn[i] != 0) {
                 IERC20(assets[i]).forceApprove(address(balancerVault), maxAmountsIn[i]);
             }
@@ -159,7 +157,7 @@ contract PoolAction is TransferAction {
 
     /// @notice Perform a join using the Pendle protocol
     /// @param poolActionParams The parameters for the join
-    /// @dev For more information regarding the Pendle join function check Pendle 
+    /// @dev For more information regarding the Pendle join function check Pendle
     /// documentation
     function _pendleJoin(PoolActionParams memory poolActionParams) internal {
         (
@@ -167,14 +165,20 @@ contract PoolAction is TransferAction {
             ApproxParams memory guessPtReceivedFromSy,
             TokenInput memory input,
             LimitOrderData memory limit
-        ) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
-        
-        
-        if (input.tokenIn != address(0)) {
-                IERC20(input.tokenIn ).forceApprove(address(pendleRouter),input.netTokenIn);
-            }
+        ) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput, LimitOrderData));
 
-        (uint256 netLpOut,,) = pendleRouter.addLiquiditySingleToken{value: msg.value}(poolActionParams.recipient, market, poolActionParams.minOut, guessPtReceivedFromSy, input, limit);
+        if (input.tokenIn != address(0)) {
+            IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
+        }
+
+        (uint256 netLpOut, , ) = pendleRouter.addLiquiditySingleToken{value: msg.value}(
+            poolActionParams.recipient,
+            market,
+            poolActionParams.minOut,
+            guessPtReceivedFromSy,
+            input,
+            limit
+        );
     }
 
     /// @notice Helper function to update the join parameters for a levered position
@@ -184,35 +188,31 @@ contract PoolAction is TransferAction {
     /// @param flashLoanAmount The amount of the flash loan
     /// @param upfrontAmount The amount of the upfront token
     function updateLeverJoin(
-        PoolActionParams memory poolActionParams, 
+        PoolActionParams memory poolActionParams,
         address joinToken,
-        address upFrontToken, 
+        address upFrontToken,
         uint256 flashLoanAmount,
         uint256 upfrontAmount,
         address poolToken
     ) external pure returns (PoolActionParams memory outParams) {
         outParams = poolActionParams;
-        
+
         if (poolActionParams.protocol == Protocol.BALANCER) {
-            (
-                bytes32 poolId, 
-                address[] memory assets,
-                uint256[] memory assetsIn,
-                uint256[] memory maxAmountsIn
-            ) = abi.decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
+            (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
+                .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
 
             uint256 len = assets.length;
             // the offset is needed because of the BPT token that needs to be skipped from the join
             bool skipIndex = false;
             uint256 joinAmount = flashLoanAmount;
-            if(upFrontToken == joinToken) {
+            if (upFrontToken == joinToken) {
                 joinAmount += upfrontAmount;
             }
 
             // update the join parameters with the new amounts
-            for (uint256 i = 0; i < len;) {
+            for (uint256 i = 0; i < len; ) {
                 uint256 assetIndex = i - (skipIndex ? 1 : 0);
-                if (assets[i] == joinToken){
+                if (assets[i] == joinToken) {
                     maxAmountsIn[i] = joinAmount;
                     assetsIn[assetIndex] = joinAmount;
                 } else if (assets[i] == upFrontToken && assets[i] != poolToken) {
@@ -238,16 +238,14 @@ contract PoolAction is TransferAction {
     /// @notice Exit a protocol specific pool
     /// @param poolActionParams The parameters for the exit
     function exit(PoolActionParams memory poolActionParams) public returns (uint256 retAmount) {
-        if(poolActionParams.protocol == Protocol.BALANCER) {
+        if (poolActionParams.protocol == Protocol.BALANCER) {
             retAmount = _balancerExit(poolActionParams);
-        } else if(poolActionParams.protocol == Protocol.PENDLE) {
+        } else if (poolActionParams.protocol == Protocol.PENDLE) {
             retAmount = _pendleExit(poolActionParams);
-        } else
-            revert PoolAction__exit_unsupportedProtocol();
-        
+        } else revert PoolAction__exit_unsupportedProtocol();
     }
 
-    function _balancerExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount){
+    function _balancerExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
         (
             bytes32 poolId,
             address bpt,
@@ -260,7 +258,8 @@ contract PoolAction is TransferAction {
         if (bptAmount != 0) IERC20(bpt).forceApprove(address(balancerVault), bptAmount);
 
         balancerVault.exitPool(
-            poolId, address(this), 
+            poolId,
+            address(this),
             payable(poolActionParams.recipient),
             ExitPoolRequest({
                 assets: assets,
@@ -270,11 +269,11 @@ contract PoolAction is TransferAction {
             })
         );
 
-        for (uint256 i = 0; i <= outIndex;) {
-            if (assets[i] == bpt){
+        for (uint256 i = 0; i <= outIndex; ) {
+            if (assets[i] == bpt) {
                 outIndex++;
             }
-                
+
             unchecked {
                 ++i;
             }
@@ -283,19 +282,19 @@ contract PoolAction is TransferAction {
         return IERC20(assets[outIndex]).balanceOf(address(poolActionParams.recipient));
     }
 
-    function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount){
-        (
-        address market, uint256 netLpIn, address tokenOut
-        ) = abi.decode(poolActionParams.args, (address,uint256, address));
-            
+    function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
+        (address market, uint256 netLpIn, address tokenOut) = abi.decode(
+            poolActionParams.args,
+            (address, uint256, address)
+        );
+
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
-        if(poolActionParams.recipient != address(this)){
+        if (poolActionParams.recipient != address(this)) {
             IPMarket(market).transferFrom(poolActionParams.recipient, market, netLpIn);
         } else {
             IPMarket(market).transfer(market, netLpIn);
         }
-
 
         uint256 netSyToRedeem;
 
@@ -311,6 +310,5 @@ contract PoolAction is TransferAction {
         }
 
         return SY.redeem(poolActionParams.recipient, netSyToRedeem, tokenOut, poolActionParams.minOut, true);
-     }
-    
+    }
 }

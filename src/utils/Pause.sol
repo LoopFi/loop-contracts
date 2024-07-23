@@ -10,7 +10,6 @@ import {IPause} from "../interfaces/IPause.sol";
 bytes32 constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
 abstract contract Pause is AccessControl, Pausable, IPause {
-
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -21,7 +20,7 @@ abstract contract Pause is AccessControl, Pausable, IPause {
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _pause() override internal {
+    function _pause() internal override {
         super._pause();
         pausedAt = block.timestamp;
     }

@@ -48,7 +48,6 @@ struct SwapParams {
 
 /// @title SwapAction
 contract SwapAction is TransferAction {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -108,7 +107,10 @@ contract SwapAction is TransferAction {
     /// @return retAmount Amount of tokens taken or received from the swap
     function swap(SwapParams memory swapParams) public payable returns (uint256 retAmount) {
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
-            (bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(swapParams.args,(bytes32[], address[]));
+            (bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(
+                swapParams.args,
+                (bytes32[], address[])
+            );
             retAmount = balancerSwap(
                 swapParams.swapType,
                 swapParams.assetIn,
@@ -119,7 +121,7 @@ contract SwapAction is TransferAction {
                 swapParams.recipient,
                 swapParams.deadline
             );
-        }  else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
+        } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             retAmount = uniV3Swap(
                 swapParams.swapType,
                 swapParams.assetIn,
@@ -256,21 +258,22 @@ contract SwapAction is TransferAction {
         IERC20(assetIn).forceApprove(address(balancerVault), amountToApprove);
 
         // execute swap and return the value of the last index in the asset delta array to get amountIn/amountOut
-        return abs(
-            balancerVault.batchSwap(
-                kind,
-                swaps,
-                assets,
-                FundManagement({
-                    sender: address(this),
-                    fromInternalBalance: false,
-                    recipient: payable(recipient),
-                    toInternalBalance: false
-                }),
-                limits,
-                deadline
-            )[pathLength]
-        );
+        return
+            abs(
+                balancerVault.batchSwap(
+                    kind,
+                    swaps,
+                    assets,
+                    FundManagement({
+                        sender: address(this),
+                        fromInternalBalance: false,
+                        recipient: payable(recipient),
+                        toInternalBalance: false
+                    }),
+                    limits,
+                    deadline
+                )[pathLength]
+            );
     }
 
     /// @notice Perform a swap using uniswap v3 exactInput or exactOutput function
@@ -297,26 +300,28 @@ contract SwapAction is TransferAction {
     ) internal returns (uint256) {
         if (swapType == SwapType.EXACT_IN) {
             IERC20(assetIn).forceApprove(address(uniRouter), amount);
-            return uniRouter.exactInput(
-                ExactInputParams({
-                    path: args,
-                    recipient: recipient,
-                    amountIn: amount,
-                    amountOutMinimum: limit,
-                    deadline: deadline
-                })
-            );
+            return
+                uniRouter.exactInput(
+                    ExactInputParams({
+                        path: args,
+                        recipient: recipient,
+                        amountIn: amount,
+                        amountOutMinimum: limit,
+                        deadline: deadline
+                    })
+                );
         } else {
             IERC20(assetIn).forceApprove(address(uniRouter), limit);
-            return uniRouter.exactOutput(
-                ExactOutputParams({
-                    path: args,
-                    recipient: recipient,
-                    amountOut: amount,
-                    amountInMaximum: limit,
-                    deadline: deadline
-                })
-            );
+            return
+                uniRouter.exactOutput(
+                    ExactOutputParams({
+                        path: args,
+                        recipient: recipient,
+                        amountOut: amount,
+                        amountInMaximum: limit,
+                        deadline: deadline
+                    })
+                );
         }
     }
 
@@ -375,8 +380,8 @@ contract SwapAction is TransferAction {
     /// @param swapParams The parameters for the swap
     /// @return token The token that will be swapped into
     function getSwapToken(SwapParams calldata swapParams) public pure returns (address token) {
-        if(swapParams.swapProtocol == SwapProtocol.BALANCER){
-            (, address[] memory primarySwapPath) = abi.decode(swapParams.args,(bytes32[], address[]));
+        if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
+            (, address[] memory primarySwapPath) = abi.decode(swapParams.args, (bytes32[], address[]));
             // the last token in the path is the token that will be swapped into
             token = primarySwapPath[primarySwapPath.length - 1];
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.19;
 
-import "./ICDM.sol";
-import "./IStablecoin.sol";
-import "./IMinter.sol";
+import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IERC3156FlashBorrower {
     /// @dev Receive `amount` of `token` from the flash lender
@@ -75,13 +74,10 @@ interface ICreditFlashLender {
         bytes calldata data
     ) external returns (bool);
 }
-
 interface IFlashlender is IERC3156FlashLender, ICreditFlashLender {
-    function cdm() external view returns (ICDM);
+    function pool() external view returns (IPoolV3);
 
-    function minter() external view returns (IMinter);
-
-    function stablecoin() external view returns (IStablecoin);
+    function underlyingToken() external view returns (IERC20);
 
     function CALLBACK_SUCCESS() external view returns (bytes32);
 
@@ -97,7 +93,6 @@ interface IFlashlender is IERC3156FlashLender, ICreditFlashLender {
         uint256 amount,
         bytes calldata data
     ) external returns (bool);
-
     function creditFlashLoan(
         ICreditFlashBorrower receiver,
         uint256 amount,
@@ -117,7 +112,6 @@ abstract contract FlashLoanReceiverBase is ICreditFlashBorrower, IERC3156FlashBo
 
     function approvePayback(uint256 amount) internal {
         // Lender takes back the Stablecoin as per ERC3156 spec
-        flashlender.stablecoin().approve(address(flashlender), amount);
+        flashlender.underlyingToken().approve(address(flashlender), amount);
     }
-
 }

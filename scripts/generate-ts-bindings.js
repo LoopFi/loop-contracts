@@ -7,12 +7,12 @@ const FILE_PATH = path.join(TARGET_DIRECTORY, FILE_NAME);
 
 async function main() {
   const contracts = [
-    { name: 'Stablecoin', path: '../out/Stablecoin.sol/Stablecoin.json'},
-    { name: 'CDM', path: '../out/CDM.sol/CDM.json'},
-    { name: 'Buffer', path: '../out/Buffer.sol/Buffer.json'},
+    // { name: 'Stablecoin', path: '../out/Stablecoin.sol/Stablecoin.json'},
+    // { name: 'CDM', path: '../out/CDM.sol/CDM.json'},
+    // { name: 'Buffer', path: '../out/Buffer.sol/Buffer.json'},
     { name: 'CDPVault', path: '../out/CDPVault.sol/CDPVault.json'},
-    { name: 'Minter', path: '../out/Minter.sol/Minter.json'},
-    { name: 'PSM', path: '../out/PSM.sol/PSM.json'},
+    // { name: 'Minter', path: '../out/Minter.sol/Minter.json'},
+    // { name: 'PSM', path: '../out/PSM.sol/PSM.json'},
     { name: 'Flashlender', path: '../out/Flashlender.sol/Flashlender.json'},
     { name: 'SwapAction', path: '../out/SwapAction.sol/SwapAction.json'},
     { name: 'PoolAction', path: '../out/PoolAction.sol/PoolAction.json'},
@@ -32,6 +32,7 @@ async function main() {
     { name: 'LoopToken', path: '../out/ERC20Mock.sol/ERC20Mock.json'},
     { name: 'PriceProvider', path: '../out/Tokenomics.t.sol/MockPriceProvider.json'},
     { name: 'BalancerPool', path: '../out/IBalancerVault.sol/IVault.json'},
+    { name: 'PoolV3', path: '../out/PoolV3.sol/PoolV3.json'},
   ];
 
   const abis = {};

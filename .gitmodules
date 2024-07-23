@@ -13,6 +13,12 @@
 [submodule "lib/permit2"]
 	path = lib/permit2
 	url = https://github.com/Uniswap/permit2
+[submodule "lib/pendle"]
+	path = lib/pendle
+	url = git@github.com:pendle-finance/pendle-core-v2-public.git
+[submodule "lib/aave-address-book"]
+	path = lib/aave-address-book
+	url = https://github.com/bgd-labs/aave-address-book
 [submodule "lib/core-v3"]
 	path = lib/core-v3
 	url = https://github.com/Gearbox-protocol/core-v3

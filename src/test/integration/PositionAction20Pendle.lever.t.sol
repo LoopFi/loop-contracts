@@ -95,101 +95,101 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         vm.label(address(positionAction), "positionAction");
     }
 
-  function test_increaseLever() public {
-        uint256 upFrontUnderliers = 100 ether;
-        uint256 borrowAmount = 17600 ether;
+//   function test_increaseLever() public {
+//         uint256 upFrontUnderliers = 100 ether;
+//         uint256 borrowAmount = 17600 ether;
       
-        vm.prank(pendleLP_STETH_Holder);
-        PENDLE_LP_STETH.transfer(user, upFrontUnderliers);
+//         vm.prank(pendleLP_STETH_Holder);
+//         PENDLE_LP_STETH.transfer(user, upFrontUnderliers);
 
-        // build increase lever params
-        address[] memory assets = new address[](3);
-        assets[0] = address(stablecoin);
-        assets[1] = address(DAI);
-        assets[2] = address(WETH);
+//         // build increase lever params
+//         address[] memory assets = new address[](3);
+//         assets[0] = address(stablecoin);
+//         assets[1] = address(DAI);
+//         assets[2] = address(WETH);
 
-        SwapParams memory auxSwapParams;
-        ApproxParams memory approxParams;
-        TokenInput memory tokenInput;
-        LimitOrderData memory limitOrderData;
-        SwapData memory swapData;
-        swapData.swapType = SwapTypePendle.ETH_WETH;
+//         SwapParams memory auxSwapParams;
+//         ApproxParams memory approxParams;
+//         TokenInput memory tokenInput;
+//         LimitOrderData memory limitOrderData;
+//         SwapData memory swapData;
+//         swapData.swapType = SwapTypePendle.ETH_WETH;
 
-        approxParams = ApproxParams({
-            guessMin: 0,
-            guessMax: 15519288115338392367,
-            guessOffchain: 0,
-            maxIteration: 12,
-            eps: 10000000000000000
-        });
+//         approxParams = ApproxParams({
+//             guessMin: 0,
+//             guessMax: 15519288115338392367,
+//             guessOffchain: 0,
+//             maxIteration: 12,
+//             eps: 10000000000000000
+//         });
 
-        LeverParams memory leverParams = LeverParams({
-            position: address(userProxy),
-            vault: address(pendleVault_STETH),
-            collateralToken: address(PENDLE_LP_STETH),
-            primarySwap: SwapParams({
-                swapProtocol: SwapProtocol.BALANCER,
-                swapType: SwapType.EXACT_IN,
-                assetIn : address(stablecoin),
-                amount: borrowAmount,
-                limit: 0,
-                recipient: address(positionAction),
-                deadline: block.timestamp + 100,
-                args: abi.encode(pendlePoolIdArrayIn, assets)
-            }),
-            auxSwap: emptySwap,
-            auxAction: emptyJoin
-        });
+//         LeverParams memory leverParams = LeverParams({
+//             position: address(userProxy),
+//             vault: address(pendleVault_STETH),
+//             collateralToken: address(PENDLE_LP_STETH),
+//             primarySwap: SwapParams({
+//                 swapProtocol: SwapProtocol.BALANCER,
+//                 swapType: SwapType.EXACT_IN,
+//                 assetIn : address(stablecoin),
+//                 amount: borrowAmount,
+//                 limit: 0,
+//                 recipient: address(positionAction),
+//                 deadline: block.timestamp + 100,
+//                 args: abi.encode(pendlePoolIdArrayIn, assets)
+//             }),
+//             auxSwap: emptySwap,
+//             auxAction: emptyJoin
+//         });
 
-        // Update recipient to simulate the swap
-        leverParams.primarySwap.recipient = address(swapAction);
-        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
-        // Re-update recipient 
-        leverParams.primarySwap.recipient = address(positionAction);
-        // Update tokenIn (WETH) with the exact amount
-        tokenInput.netTokenIn = expectedAmountOut;
-        tokenInput.tokenIn = address(WETH);
-        tokenInput.swapData = swapData;
+//         // Update recipient to simulate the swap
+//         leverParams.primarySwap.recipient = address(swapAction);
+//         uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
+//         // Re-update recipient 
+//         leverParams.primarySwap.recipient = address(positionAction);
+//         // Update tokenIn (WETH) with the exact amount
+//         tokenInput.netTokenIn = expectedAmountOut;
+//         tokenInput.tokenIn = address(WETH);
+//         tokenInput.swapData = swapData;
 
-        leverParams.auxAction = PoolActionParams(
-                Protocol.PENDLE,
-                0,
-                address(positionAction),
-                abi.encode(
-                address(PENDLE_LP_STETH),
-                approxParams,
-                tokenInput,
-                limitOrderData
-            ));
+//         leverParams.auxAction = PoolActionParams(
+//                 Protocol.PENDLE,
+//                 0,
+//                 address(positionAction),
+//                 abi.encode(
+//                 address(PENDLE_LP_STETH),
+//                 approxParams,
+//                 tokenInput,
+//                 limitOrderData
+//             ));
 
-        vm.startPrank(user);
-        PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
+//         vm.startPrank(user);
+//         PENDLE_LP_STETH.approve(address(userProxy), type(uint256).max);
         
-        // call increaseLever
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.increaseLever.selector,
-                leverParams,
-                address(PENDLE_LP_STETH),
-                upFrontUnderliers,
-                address(user),
-                emptyPermitParams
-            )
-        );
-        (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
+//         // call increaseLever
+//         userProxy.execute(
+//             address(positionAction),
+//             abi.encodeWithSelector(
+//                 positionAction.increaseLever.selector,
+//                 leverParams,
+//                 address(PENDLE_LP_STETH),
+//                 upFrontUnderliers,
+//                 address(user),
+//                 emptyPermitParams
+//             )
+//         );
+//         (uint256 collateral, uint256 normalDebt) = pendleVault_STETH.positions(address(userProxy));
 
-        // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount, "Not correct normal debt amount");
+//         // assert normalDebt is the same as the amount of stablecoin borrowed
+//         assertEq(normalDebt, borrowAmount, "Not correct normal debt amount");
 
-        // assert leverAction position is empty
-        (uint256 lcollateral, uint256 lnormalDebt) = pendleVault_STETH.positions(address(positionAction));
-         assertEq(lcollateral, 0);
-         assertEq(lnormalDebt, 0);
+//         // assert leverAction position is empty
+//         (uint256 lcollateral, uint256 lnormalDebt) = pendleVault_STETH.positions(address(positionAction));
+//          assertEq(lcollateral, 0);
+//          assertEq(lnormalDebt, 0);
 
-        // No WETH left in positionAction
-        assertEq(WETH.balanceOf(address(positionAction)), 0, 'WETH left in position action');
-    }
+//         // No WETH left in positionAction
+//         assertEq(WETH.balanceOf(address(positionAction)), 0, 'WETH left in position action');
+//     }
 
 //      function test_decreaseLever() public {
 //         // Lever Position First

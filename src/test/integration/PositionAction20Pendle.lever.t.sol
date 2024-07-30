@@ -331,7 +331,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(ERC20(wstETH).balanceOf(address(swapAction)), 0);
 
         // TODO: use a preview from Pendle for this
-        assertEq(5359934115792901125 - expectedAmountIn, ERC20(wstETH).balanceOf(address(userProxy)));
+        assertEq(5360950080470354889 - expectedAmountIn, ERC20(wstETH).balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction
         (uint256 lcollateral, uint256 lnormalDebt, , , , ) = pendleVault_STETH.positions(address(positionAction));

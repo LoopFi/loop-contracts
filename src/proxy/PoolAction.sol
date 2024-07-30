@@ -169,7 +169,7 @@ contract PoolAction is TransferAction {
                 IERC20(input.tokenIn ).forceApprove(address(pendleRouter),input.netTokenIn);
             }
 
-        (uint256 netLpOut,,) = pendleRouter.addLiquiditySingleToken{value: msg.value}(poolActionParams.recipient, market, poolActionParams.minOut, guessPtReceivedFromSy, input, limit);
+        pendleRouter.addLiquiditySingleToken{value: msg.value}(poolActionParams.recipient, market, poolActionParams.minOut, guessPtReceivedFromSy, input, limit);
     }
 
     /// @notice Helper function to update the join parameters for a levered position

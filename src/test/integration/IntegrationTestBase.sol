@@ -64,8 +64,6 @@ contract IntegrationTestBase is TestBase {
 
     IComposableStablePool internal weightedUnderlierPool;
     bytes32 internal weightedUnderlierPoolId;
-
-    
     
     bytes32 internal constant daiOhmPoolId = 0x76fcf0e8c7ff37a47a799fa2cd4c13cde0d981c90002000000000000000003d2;
     bytes32 internal constant wethOhmPoolId = 0xd1ec5e215e8148d76f4460e4097fd3d5ae0a35580002000000000000000003d3;

@@ -59,10 +59,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     uint256 internal userPk;
     uint256 internal constant NONCE = 0;
     
-    // PRBProxyRegistry internal prbProxyRegistry;
-    // PoolAction internal poolAction;
-    // SwapAction internal swapAction;
-
     function getForkBlockNumber() override internal pure returns (uint256) {
         return 19356381;
     }

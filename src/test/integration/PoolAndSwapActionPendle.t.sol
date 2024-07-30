@@ -89,7 +89,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_join_and_exit_Pendle_Ether() public {
         PoolActionParams memory poolActionParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -150,7 +149,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_join_with_WETH_and_exit_Pendle() public {
         PoolActionParams memory poolActionParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -274,7 +272,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_swap_Pendle_In_And_Out_Ether() public {
         SwapParams memory swapParams;
-        PermitParams memory permitParams;
+        // PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -355,7 +353,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_swap_Pendle_In_And_Out_WETH() public {
          SwapParams memory swapParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;

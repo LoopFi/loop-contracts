@@ -113,7 +113,6 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assets[0] = address(underlyingToken);
         assets[1] = address(WETH);
 
-        SwapParams memory auxSwapParams;
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
         LimitOrderData memory limitOrderData;
@@ -178,7 +177,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 emptyPermitParams
             )
         );
-        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
+        (, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
         assertEq(normalDebt, borrowAmount, "Not correct normal debt amount");
@@ -192,7 +191,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(WETH.balanceOf(address(positionAction)), 0, "WETH left in position action");
     }
 
-    function test_decreaseLever() public {
+    function test_decreaseLever_pendle() public {
         // Lever Position First
         uint256 upFrontUnderliers = 100 ether;
         uint256 borrowAmount = 17600 ether;
@@ -331,7 +330,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(ERC20(wstETH).balanceOf(address(poolAction)), 0);
         assertEq(ERC20(wstETH).balanceOf(address(swapAction)), 0);
 
-        // TODO: use a preview from Penlde for this
+        // TODO: use a preview from Pendle for this
         assertEq(5359934115792901125 - expectedAmountIn, ERC20(wstETH).balanceOf(address(userProxy)));
 
         // ensure there isn't any left over debt or collateral from using leverAction

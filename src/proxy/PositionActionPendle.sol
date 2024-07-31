@@ -48,23 +48,25 @@ contract PositionActionPendle is PositionAction {
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault
     /// @param leverParams LeverParams struct
-    /// @param upFrontAmount the amount of tokens passed up front [CDPVault.tokenScale()]
-    /// @param swapAmountOut the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
+    /// @param /*upFrontToken*/ the address of the token passed up front
+    /// @param /*upFrontAmount*/ the amount of tokens passed up front [CDPVault.tokenScale()]
+    /// @param /*swapAmountOut*/ the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
     /// @return addCollateralAmount Amount of collateral added to CDPVault position [wad]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address /*upFrontToken*/,
-        uint256 upFrontAmount,
-        uint256 swapAmountOut
+        uint256 /*upFrontAmount*/,
+        uint256 /*swapAmountOut*/
     ) internal override returns (uint256 addCollateralAmount) {
         if (leverParams.auxAction.args.length != 0) {
-            bytes memory joinData = _delegateCall(
+            _delegateCall(
                 address(poolAction), abi.encodeWithSelector(poolAction.join.selector, leverParams.auxAction)
             );
         }
         addCollateralAmount = ICDPVault(leverParams.vault).token().balanceOf(address(this));
+        IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
         // deposit into the CDP Vault
-        return _onDeposit(leverParams.vault, address(this) ,address(0), addCollateralAmount);
+        return addCollateralAmount;
     }
 
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault
@@ -75,7 +77,7 @@ contract PositionActionPendle is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        uint collateralAmount = _onWithdraw(leverParams.vault, address(this), address(0), subCollateral);
+        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral);
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(

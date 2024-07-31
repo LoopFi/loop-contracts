@@ -13,8 +13,9 @@ lint             :; yarn install && yarn run lint
 format           :; npx prettier --write "src/**/*.sol"
 
 # Testing
-test             :; forge test --match-path "src/test/**/*.t.sol" --gas-report
+test             :; forge test --match-path "src/test/**/*.t.sol"
 # test             :; forge test --match-path "src/test/**/CDPVault.t.sol"
+test-gas             :; forge test --match-path "src/test/**/*.t.sol" --gas-report
 test-contract    :; forge test --match-contract $(contract)
 test-fuzz        :; forge test --ffi --match-path "src/test/fuzz/**/*.t.sol"
 test-invariant   :; forge test --ffi --match-path "src/test/invariant/**/*.t.sol"

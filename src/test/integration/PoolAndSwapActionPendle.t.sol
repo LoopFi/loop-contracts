@@ -59,10 +59,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     uint256 internal userPk;
     uint256 internal constant NONCE = 0;
     
-    // PRBProxyRegistry internal prbProxyRegistry;
-    // PoolAction internal poolAction;
-    // SwapAction internal swapAction;
-
     function getForkBlockNumber() override internal pure returns (uint256) {
         return 19356381;
     }
@@ -93,7 +89,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_join_and_exit_Pendle_Ether() public {
         PoolActionParams memory poolActionParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -154,7 +149,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_join_with_WETH_and_exit_Pendle() public {
         PoolActionParams memory poolActionParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -278,7 +272,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_swap_Pendle_In_And_Out_Ether() public {
         SwapParams memory swapParams;
-        PermitParams memory permitParams;
+        // PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;
@@ -359,7 +353,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
     function test_swap_Pendle_In_And_Out_WETH() public {
          SwapParams memory swapParams;
-        PermitParams memory permitParams;
 
         ApproxParams memory approxParams;
         TokenInput memory tokenInput;

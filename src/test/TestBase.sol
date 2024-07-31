@@ -126,6 +126,11 @@ contract TestBase is Test {
     function createAndSetPoolQuotaKeeper() internal virtual {
         quotaKeeper = new PoolQuotaKeeperV3(address(liquidityPool));
         liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
+
+        voter = new MockVoter();
+        voter.setFirstEpochTimestamp(block.timestamp);
+        gauge = new GaugeV3(address(liquidityPool), address(voter));
+        quotaKeeper.setGauge(address(gauge));
     }
 
     function createStakingLpEth() internal virtual {
@@ -136,25 +141,15 @@ contract TestBase is Test {
     }
 
     function createGaugeAndSetGauge(address vault) internal virtual {
-        voter = new MockVoter();
-        voter.setFirstEpochTimestamp(block.timestamp);
-        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
-        quotaKeeper.setGauge(address(gauge));
-        quotaKeeper.setCreditManager(address(token), address(vault));
-        gauge.addQuotaToken(address(token), 10, 100);
-        gauge.setFrozenEpoch(false);
-        vm.warp(block.timestamp + 1 weeks);
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+        address token_ = address(CDPVault(vault).token());
+        createGaugeAndSetGauge(vault, token_);
     }
 
-    function createGaugeAndSetGauge(address vault, address token) internal virtual {
-        voter = new MockVoter();
-        voter.setFirstEpochTimestamp(block.timestamp);
-        gauge = new GaugeV3(address(liquidityPool), address(voter)); // set MockVoter
-        quotaKeeper.setGauge(address(gauge));
-        quotaKeeper.setCreditManager(address(token), address(vault));
-        gauge.addQuotaToken(address(token), 10, 100);
+    function createGaugeAndSetGauge(address vault, address token_) internal virtual {
+        quotaKeeper.setCreditManager(address(token_), address(vault));
+        if (!gauge.isTokenAdded(address(token_))) {
+            gauge.addQuotaToken(address(token_), 10, 100);
+        }
         gauge.setFrozenEpoch(false);
         vm.warp(block.timestamp + 1 weeks);
         vm.prank(address(gauge));
@@ -192,6 +187,7 @@ contract TestBase is Test {
         flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
         liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
         vaultRegistry = new VaultRegistry();
+
     }
 
     function createCDPVault(

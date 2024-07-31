@@ -35,6 +35,9 @@ async function main() {
     { name: 'PoolV3', path: '../out/PoolV3.sol/PoolV3.json'},
     { name: 'PositionActionPendle', path: '../out/PositionActionPendle.sol/PositionActionPendle.json'},
     { name: 'PendleLPOracle', path: '../out/PendleLPOracle.sol/PendleLPOracle.json'},
+    { name: 'MockVoter', path: '../out/MockVoter.sol/MockVoter.json'},
+    { name: 'GaugeV3', path: '../out/GaugeV3.sol/GaugeV3.json'},
+    { name: 'PoolQuotaKeeperV3', path: '../out/PoolQuotaKeeperV3.sol/PoolQuotaKeeperV3.json'},
   ];
 
   const abis = {};

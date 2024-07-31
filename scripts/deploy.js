@@ -176,20 +176,7 @@ async function deployCore() {
     await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
   }
 
-  // const cdm = await deployContract('CDM', 'CDM', false, signer, signer, signer);
-  // await cdm["setParameter(bytes32,uint256)"](toBytes32("globalDebtCeiling"), CONFIG.Core.CDM.initialGlobalDebtCeiling);
-
-  // const stablecoin = await deployContract('Stablecoin');
-  // const minter = await deployContract('Minter', 'Minter', false, cdm.address, stablecoin.address, signer, signer);
-  // await deployProxy('Buffer', [cdm.address], [signer, signer]);
   await deployContract('MockOracle');
-
-
-  // for (const [key, config] of Object.entries(CONFIG.Core.PSM)) {
-  //   const psm = await deployContract('PSM', key, false, minter.address, cdm.address, config.collateral,  stablecoin.address, signer, signer, signer);
-  //   await cdm["setParameter(address,bytes32,uint256)"](psm.address, toBytes32("debtCeiling"), config.debtCeiling);
-  //   console.log('Set debtCeiling for PSM', psm.address, 'to', fromWad(config.debtCeiling), 'Credit');
-  // }
 
   const pool = await deployGearbox();
 
@@ -219,14 +206,60 @@ async function deployCore() {
   await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
 
   console.log('------------------------------------');
+}
 
-  // await stablecoin.grantRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_AND_BURNER_ROLE")), minter.address);
-  // console.log('Granted MINTER_AND_BURNER_ROLE to Minter');
+async function deployGauge() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        DEPLOYING GAUGE
+//////////////////////////////////////////////////////////////*/
+  `);
 
-  // await cdm["setParameter(address,bytes32,uint256)"](flashlender.address, toBytes32("debtCeiling"), CONFIG.Core.Flashlender.initialDebtCeiling);
-  // console.log('Set debtCeiling to', fromWad(CONFIG.Core.Flashlender.initialDebtCeiling), 'Credit for Flashlender');
+  const {
+    PoolV3: liquidityPool,
+  } = await loadDeployedContracts();
 
-  // console.log('------------------------------------');
+  // Deploy MockVoter contract
+  const mockVoter = await deployContract('MockVoter', 'MockVoter', false);
+  console.log(`MockVoter deployed to: ${mockVoter.address}`);
+
+  // Set the first epoch timestamp in the MockVoter
+  const firstEpochTimestamp = Math.floor(Date.now() / 1000); // current timestamp in seconds
+  await mockVoter.setFirstEpochTimestamp(firstEpochTimestamp);
+  console.log(`Set first epoch timestamp to: ${firstEpochTimestamp}`);
+
+  // Deploy GaugeV3 contract
+  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, mockVoter.address);
+  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
+
+  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
+  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
+  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
+
+  // Set Gauge in QuotaKeeper
+  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
+  console.log('Set gauge in QuotaKeeper');
+
+  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
+  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+
+    const tokenAddress = await vault.token();
+    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+
+    const quotaAmount = 10; // Replace with actual quota amount if needed
+    const maxQuota = 100;   // Replace with actual max quota if needed
+    await gaugeV3.addQuotaToken(tokenAddress, quotaAmount, maxQuota);
+    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+  }
+
+  // Unfreeze the epoch in Gauge
+  await gaugeV3.setFrozenEpoch(false);
+  console.log('Set frozen epoch to false in GaugeV3');
+
+  //await quotaKeeper.updateRates();
+  
+  console.log('Gauge and related configurations have been set.');
 }
 
 async function deployGearbox() {
@@ -235,8 +268,6 @@ async function deployGearbox() {
                         DEPLOYING GEARBOX
 //////////////////////////////////////////////////////////////*/
   `);
-
-  const signer = await getSignerAddress();
 
   // Deploy LinearInterestRateModelV3 contract
   const LinearInterestRateModelV3 = await deployContract(
@@ -735,6 +766,7 @@ async function createPositions() {
   // await deployAuraVaults();
   await deployVaults();
   await registerVaults();
+  await deployGauge();
   // await deployRadiant();
   // await deployGearbox();
   // await logVaults();

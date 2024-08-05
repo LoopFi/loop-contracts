@@ -299,7 +299,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         uint256 upFrontAmount,
         address collateralizer,
         PermitParams calldata permitParams
-    ) external onlyDelegatecall {
+    ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
         if (
             leverParams.primarySwap.swapType != SwapType.EXACT_IN ||
@@ -346,7 +346,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         LeverParams calldata leverParams,
         uint256 subCollateral,
         address residualRecipient
-    ) external onlyDelegatecall {
+    ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
         if (leverParams.primarySwap.swapType != SwapType.EXACT_OUT || leverParams.primarySwap.recipient != self)
             revert PositionAction__decreaseLever_invalidPrimarySwap();

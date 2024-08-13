@@ -82,5 +82,4 @@ interface ICDPVault is ICDPVaultBase {
     function virtualDebt(address position) external view returns (uint256);
 
     function getAccruedInterest(address position) external view returns (uint256 accruedInterest);
-
 }

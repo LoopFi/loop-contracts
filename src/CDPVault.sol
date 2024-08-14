@@ -39,9 +39,6 @@ interface IRewardManager {
     ) external returns (address[] memory, uint256[] memory, address to);
 }
 
-interface IPRBProxy {
-    function owner() external view returns (address);
-}
 // Authenticated Roles
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
 bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");

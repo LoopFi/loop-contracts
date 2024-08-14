@@ -20,6 +20,8 @@ contract RewardManager is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];
 
+    error OnlyVault();
+
     uint256 public lastRewardBlock;
 
     mapping(address => RewardState) public rewardState;
@@ -27,6 +29,11 @@ contract RewardManager is RewardManagerAbstract {
     IPendleMarketV3 public immutable market;
     address public immutable vault;
     IPRBProxyRegistry public immutable proxyRegistry;
+
+    modifier onlyVault() {
+        if (msg.sender != vault) revert OnlyVault();
+        _;
+    }
 
     constructor(address _vault, address _market, address _proxyRegistry) {
         market = IPendleMarketV3(_market);
@@ -104,8 +111,6 @@ contract RewardManager is RewardManagerAbstract {
         return (tokens, rewardAmounts, to);
     }
 
-    //function _getRewardTokens() internal view virtual returns (address[] memory);
-
     function _rewardSharesTotal() internal view virtual returns (uint256) {
         return _totalShares;
     }
@@ -114,7 +119,7 @@ contract RewardManager is RewardManagerAbstract {
         address user,
         uint collateralAmountBefore,
         int256 deltaCollateral
-    ) external virtual {
+    ) external virtual onlyVault {
         _updateAndDistributeRewards(user, collateralAmountBefore, deltaCollateral);
     }
 
@@ -122,7 +127,7 @@ contract RewardManager is RewardManagerAbstract {
         address user,
         uint collateralAmountBefore,
         int256 deltaCollateral
-    ) external virtual returns (address[] memory tokens, uint256[] memory amounts, address to) {
+    ) external virtual onlyVault returns (address[] memory tokens, uint256[] memory amounts, address to) {
         _updateAndDistributeRewards(user, collateralAmountBefore, deltaCollateral);
         return _doTransferOutRewards(user);
     }

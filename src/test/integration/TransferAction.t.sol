@@ -19,14 +19,7 @@ import {TransferAction, ApprovalType, PermitParams} from "../../proxy/TransferAc
 import {console2 as console} from "forge-std/console2.sol";
 
 contract TransferActionWrapper is TransferAction {
-
-    function transferFrom(
-        ERC20 token,
-        address from,
-        address to,
-        uint256 amount,
-        PermitParams memory params
-    ) external {
+    function transferFrom(ERC20 token, address from, address to, uint256 amount, PermitParams memory params) external {
         _transferFrom(address(token), from, to, amount, params);
     }
 }
@@ -35,10 +28,10 @@ contract TransferActionTest is Test {
     using SafeERC20 for ERC20;
     using SafeERC20 for ERC20Permit;
 
-    ERC20 constant internal DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    ERC20 constant internal WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ERC20Permit constant internal USDC = ERC20Permit(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    ERC20Permit constant internal USDT = ERC20Permit(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    ERC20 internal constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ERC20Permit internal constant USDC = ERC20Permit(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    ERC20Permit internal constant USDT = ERC20Permit(0xdAC17F958D2ee523a2206206994597C13D831ec7);
 
     ISignatureTransfer permit2 = ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
@@ -62,7 +55,6 @@ contract TransferActionTest is Test {
         PRBProxyRegistry prbProxyRegistry = new PRBProxyRegistry();
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
         proxy = PRBProxy(payable(address(prbProxyRegistry.deploy())));
-
     }
 
     function test_standard_transferFrom() public {
@@ -72,14 +64,7 @@ contract TransferActionTest is Test {
         PermitParams memory params;
         proxy.execute(
             address(wrapper),
-            abi.encodeWithSelector(
-                wrapper.transferFrom.selector,
-                DAI,
-                address(this),
-                address(proxy),
-                100 ether,
-                params
-            )
+            abi.encodeWithSelector(wrapper.transferFrom.selector, DAI, address(this), address(proxy), 100 ether, params)
         );
 
         assertEq(DAI.balanceOf(address(this)), 0);
@@ -271,6 +256,4 @@ contract TransferActionTest is Test {
         assertEq(WETH.balanceOf(address(userProxy)), amount);
         assertEq(permit2.nonceBitmap(user, nonceWord), 1);
     }
-
-
 }

@@ -260,7 +260,7 @@ contract ChefIncentivesControllerTest is TestBase {
         incentivesController.setEmissionSchedule(startTimeOffets, rewardsPerSeconds);
     }
 
-    function test_recoverERC20( uint256 tokenAmount) public {
+    function test_recoverERC20(uint256 tokenAmount) public {
         address tokenAddress = address(0x1);
         _excludeContracts(tokenAddress);
 

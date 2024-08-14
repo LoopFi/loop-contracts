@@ -38,7 +38,12 @@ contract PositionAction4626 is PositionAction {
     /// @param src Token passed in by the caller
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address /*position*/, address src, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(
+        address vault,
+        address /*position*/,
+        address src,
+        uint256 amount
+    ) internal override returns (uint256) {
         address collateral = address(ICDPVault(vault).token());
 
         // if the src is not the collateralToken, we need to deposit the underlying into the ERC4626 vault
@@ -58,7 +63,12 @@ contract PositionAction4626 is PositionAction {
     /// @param dst Token the caller expects to receive
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address /*position*/, address dst, uint256 amount) internal override returns (uint256) {
+    function _onWithdraw(
+        address vault,
+        address /*position*/,
+        address dst,
+        uint256 amount
+    ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(this), amount);
 
         // if collateral is not the dst token, we need to withdraw the underlying from the ERC4626 vault

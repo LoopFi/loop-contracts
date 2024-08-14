@@ -84,7 +84,12 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
 
         // deploy position actions
-        positionAction = new PositionAction20(address(flashlender), address(swapAction), address(poolAction), address(vaultRegistry));
+        positionAction = new PositionAction20(
+            address(flashlender),
+            address(swapAction),
+            address(poolAction),
+            address(vaultRegistry)
+        );
 
         vm.label(user, "user");
         vm.label(address(userProxy), "userProxy");
@@ -115,7 +120,6 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.prank(user);
         PENDLE_LP_STETH.approve(address(userProxy), depositAmount);
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -128,7 +132,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -147,7 +151,6 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             auxSwap: emptySwap
         });
 
-
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -160,7 +163,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
@@ -191,7 +194,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
     }
@@ -202,7 +205,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         _deposit(userProxy, address(pendleVault_STETH), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 500*1 ether;
+        uint256 borrowAmount = 500 * 1 ether;
 
         // build borrow params
         CreditParams memory creditParams = CreditParams({
@@ -222,21 +225,20 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             )
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         assertEq(collateral, initialDeposit);
         assertEq(normalDebt, borrowAmount);
     }
-
 
     function test_depositAndBorrow_PENDLE() public {
         // accure interest
         uint256 depositAmount = 10_000 ether;
         uint256 borrowAmount = 5_000 ether;
         _depositAndBorrow(userProxy, address(pendleVault_STETH), depositAmount, borrowAmount);
-        
+
         vm.warp(block.timestamp + 10 * 365 days);
 
-        (uint256 collateral, uint256 debt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
 
@@ -248,8 +250,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
 
     // REPAY TESTS
     function test_repay_PENDLE() public {
-        uint256 depositAmount = 1_000*1 ether; // LP_STETH
-        uint256 borrowAmount = 500*1 ether; // stablecoin
+        uint256 depositAmount = 1_000 * 1 ether; // LP_STETH
+        uint256 borrowAmount = 500 * 1 ether; // stablecoin
         _depositAndBorrow(userProxy, address(pendleVault_STETH), depositAmount, borrowAmount);
 
         // build repay params
@@ -274,7 +276,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, depositAmount);
@@ -284,8 +286,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
     }
 
     function test_withdrawAndRepay_PENDLE() public {
-        uint256 depositAmount = 5_000*1 ether;
-        uint256 borrowAmount = 2_500*1 ether;
+        uint256 depositAmount = 5_000 * 1 ether;
+        uint256 borrowAmount = 2_500 * 1 ether;
 
         // deposit and borrow
         _depositAndBorrow(userProxy, address(pendleVault_STETH), depositAmount, borrowAmount);
@@ -300,11 +302,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
                 collateralizer: user,
                 auxSwap: emptySwap
             });
-            creditParams = CreditParams({
-                amount: borrowAmount,
-                creditor: user,
-                auxSwap: emptySwap
-            });
+            creditParams = CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap});
         }
 
         vm.startPrank(user);
@@ -323,7 +321,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         uint256 creditAmount = credit(address(userProxy));
 
         assertEq(collateral, 0);
@@ -332,8 +330,6 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         assertEq(underlyingToken.balanceOf(user), 0);
         assertEq(PENDLE_LP_STETH.balanceOf(user), depositAmount);
     }
-
-
 
     // MULTISEND
 
@@ -369,7 +365,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             creditParams,
             emptyPermitParams
         );
-        data[1] = abi.encodeWithSelector(CDPVault.modifyCollateralAndDebt.selector,
+        data[1] = abi.encodeWithSelector(
+            CDPVault.modifyCollateralAndDebt.selector,
             address(userProxy),
             address(userProxy),
             address(userProxy),
@@ -384,15 +381,10 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.multisend.selector,
-                targets,
-                data,
-                delegateCall
-            )
+            abi.encodeWithSelector(positionAction.multisend.selector, targets, data, delegateCall)
         );
 
-        (uint256 collateral, uint256 debt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 debt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         assertEq(collateral, depositAmount);
         assertEq(debt, borrowAmount);
     }
@@ -417,7 +409,13 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         targets[1] = address(pendleVault_STETH);
 
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(positionAction.deposit.selector, address(userProxy), pendleVault_STETH, collateralParams, emptyPermitParams);
+        data[0] = abi.encodeWithSelector(
+            positionAction.deposit.selector,
+            address(userProxy),
+            pendleVault_STETH,
+            collateralParams,
+            emptyPermitParams
+        );
         data[1] = abi.encodeWithSelector(
             pendleVault_STETH.modifyCollateralAndDebt.selector,
             address(userProxy),
@@ -434,15 +432,10 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.multisend.selector,
-                targets,
-                data,
-                delegateCall
-            )
+            abi.encodeWithSelector(positionAction.multisend.selector, targets, data, delegateCall)
         );
 
-        (uint256 collateral, uint256 normalDebt, , , ,) = pendleVault_STETH.positions(address(userProxy));
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 100 ether);
@@ -535,7 +528,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         vm.stopPrank();
     }
 
-    function getForkBlockNumber() override internal pure returns (uint256) {
+    function getForkBlockNumber() internal pure override returns (uint256) {
         return 19356381;
     }
 }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import "lib/pendle/contracts/interfaces/IRewardManager.sol";
+import "pendle/interfaces/IRewardManager.sol";
 
-import "lib/pendle/contracts/core/libraries/ArrayLib.sol";
-import "lib/pendle/contracts/core/libraries/TokenHelper.sol";
-import "lib/pendle/contracts/core/libraries/math/PMath.sol";
+import "pendle/core/libraries/ArrayLib.sol";
+import "pendle/core/libraries/TokenHelper.sol";
+import "pendle/core/libraries/math/PMath.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./RewardManagerAbstract.sol";
 import {console} from "forge-std/console.sol";

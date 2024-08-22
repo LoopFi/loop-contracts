@@ -23,7 +23,6 @@ module.exports = {
       },
       "initialDebtCeiling": toWad('100000000'),
     },
-    "PRBProxyRegistry": "0x584009E9eDe26e212182c9745F5c000191296a78",
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -41,7 +40,26 @@ module.exports = {
     },
     "Gearbox": {
       "initialGlobalDebtCeiling": toWad('100000000'),
-      "treasury": "0x0000000000000000000000000000000000000123"
+    },
+    "Treasury": {
+      "constructorArguments": {
+        "payees":[
+          "deployer",
+          "stakingLpEth"
+        ],
+        "shares":[
+          20,
+          80
+        ],
+        "admin": "deployer"
+      }
+    },
+  },
+  "Pools": {
+    "LiquidityPoolWETH": {
+      "name": "Loop Liquidity Pool - WETH",
+      "symbol": "lpWETH",
+      "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" //WETH
     }
   },
   "Vendors": {

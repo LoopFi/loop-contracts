@@ -266,11 +266,6 @@ contract TestBase is Test {
         return vault.virtualDebt(position);
     }
 
-    // function creditLine(address account) internal view returns (uint256) {
-    //     (int256 balance, uint256 debtCeiling) = cdm.accounts(account);
-    //     return getCreditLine(balance, debtCeiling);
-    // }
-
     function liquidationPrice(ICDPVaultBase vault_) internal returns (uint256) {
         (, uint64 liquidationRatio_) = vault_.vaultConfig();
         return wdiv(vault_.spotPrice(), uint256(liquidationRatio_));

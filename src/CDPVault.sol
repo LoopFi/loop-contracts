@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICDPVaultBase, CDPVaultConstants, CDPVaultConfig} from "./interfaces/ICDPVault.sol";
@@ -62,6 +63,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     IPoolV3 public immutable pool;
     IERC20 public immutable poolUnderlying;
+    uint256 public immutable poolUnderlyingScale;
 
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -168,6 +170,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         tokenScale = constants.tokenScale;
 
         poolUnderlying = IERC20(pool.underlyingToken());
+        poolUnderlyingScale = 10 ** IERC20Metadata(address(poolUnderlying)).decimals();
 
         vaultConfig = VaultConfig({debtFloor: config.debtFloor, liquidationRatio: config.liquidationRatio});
 
@@ -251,10 +254,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @notice Borrows credit against collateral
     /// @param borrower Address of the borrower
     /// @param position Address of the position
-    /// @param amount Amount of debt to generate [wad]
+    /// @param amount Amount of debt to generate [Underlying token scale]
     /// @dev The borrower will receive the amount of credit in the underlying token
-    function borrow(address borrower, address position, uint256 amount) external {
-        int256 deltaDebt = toInt256(amount);
+    function borrow(address borrower, address position, uint256 amount) external returns (int256 deltaDebt) {
+        uint256 scaledAmount = wdiv(amount, poolUnderlyingScale);
+        deltaDebt = toInt256(scaledAmount);
         modifyCollateralAndDebt({
             owner: position,
             collateralizer: position,
@@ -262,15 +266,18 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: 0,
             deltaDebt: deltaDebt
         });
+
+        return deltaDebt;
     }
 
     /// @notice Repays credit against collateral
     /// @param borrower Address of the borrower
     /// @param position Address of the position
-    /// @param amount Amount of debt to repay [wad]
+    /// @param amount Amount of debt to repay [Underlying token scale]
     /// @dev The borrower will repay the amount of credit in the underlying token
-    function repay(address borrower, address position, uint256 amount) external {
-        int256 deltaDebt = -toInt256(amount);
+    function repay(address borrower, address position, uint256 amount) external returns (int256 deltaDebt){
+        uint256 scaledAmount = wdiv(amount, poolUnderlyingScale);
+        deltaDebt = -toInt256(scaledAmount);
         modifyCollateralAndDebt({
             owner: position,
             collateralizer: position,
@@ -278,6 +285,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: 0,
             deltaDebt: deltaDebt
         });
+
+        return deltaDebt;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -362,7 +371,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param collateralizer Address of who puts up or receives the collateral delta
     /// @param creditor Address of who provides or receives the credit delta for the debt delta
     /// @param deltaCollateral Amount of collateral to put up (+) or to remove (-) from the position [wad]
-    /// @param deltaDebt Amount of normalized debt (gross, before rate is applied) to generate (+) or
+    /// @param deltaDebt Amount of normalized debt (gross, before rate is applied) to generate (+) or 
     /// to settle (-) on this position [wad]
     function modifyCollateralAndDebt(
         address owner,
@@ -389,43 +398,55 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 profit;
         int256 quotaRevenueChange;
         if (deltaDebt > 0) {
+            uint256 debtToIncrease = uint256(deltaDebt);
+
+            // Internal debt calculation remains in 18-decimal precision
             (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease(
-                uint256(deltaDebt), // delta debt
+                debtToIncrease,
                 position.debt,
-                debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                debtData.cumulativeIndexNow,
                 position.cumulativeIndexLastUpdate
-            ); // U:[CM-10]
+            );
+
             position.cumulativeQuotaInterest = debtData.cumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
             quotaRevenueChange = _calcQuotaRevenueChange(deltaDebt);
-            pool.lendCreditAccount(uint256(deltaDebt), creditor); // F:[CM-20]
+
+            uint256 scaledDebtIncrease = wmul(debtToIncrease, poolUnderlyingScale);
+            pool.lendCreditAccount(scaledDebtIncrease, creditor);
+
         } else if (deltaDebt < 0) {
+            uint256 debtToDecrease = abs(deltaDebt);
+
             uint256 maxRepayment = calcTotalDebt(debtData);
-            uint256 amount = abs(deltaDebt);
-            if (amount >= maxRepayment) {
-                amount = maxRepayment; // U:[CM-11]
-                deltaDebt = -toInt256(maxRepayment);
+            if (debtToDecrease >= maxRepayment) {
+                debtToDecrease = maxRepayment;
+                deltaDebt = -toInt256(debtToDecrease);
             }
 
-            poolUnderlying.safeTransferFrom(creditor, address(pool), amount);
+            uint256 scaledDebtDecrease = wmul(debtToDecrease, poolUnderlyingScale);
+            poolUnderlying.safeTransferFrom(creditor, address(pool), scaledDebtDecrease);
 
             uint128 newCumulativeQuotaInterest;
-            if (amount == maxRepayment) {
+            if (debtToDecrease == maxRepayment) {
                 newDebt = 0;
                 newCumulativeIndex = debtData.cumulativeIndexNow;
                 profit = debtData.accruedInterest;
                 newCumulativeQuotaInterest = 0;
             } else {
                 (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = calcDecrease(
-                    amount, // delta debt
+                    debtToDecrease,
                     position.debt,
-                    debtData.cumulativeIndexNow, // current cumulative base interest index in Ray
+                    debtData.cumulativeIndexNow,
                     position.cumulativeIndexLastUpdate,
                     debtData.cumulativeQuotaInterest
                 );
             }
+
             quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt - newDebt));
-            pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+
+            uint256 scaledRemainingDebt = wmul(debtData.debt - newDebt, poolUnderlyingScale);
+            pool.repayCreditAccount(scaledRemainingDebt, profit, 0);
 
             position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
@@ -454,7 +475,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         ) revert CDPVault__modifyCollateralAndDebt_notSafe();
 
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+            int256 scaledQuotaRevenueChange = wmul(poolUnderlyingScale, quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(scaledQuotaRevenueChange);
         }
         emit ModifyCollateralAndDebt(owner, collateralizer, creditor, deltaCollateral, deltaDebt);
     }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
-import {Test} from "forge-std/Test.sol";
+import {TestBase} from "../TestBase.sol";
 
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
@@ -18,7 +18,7 @@ contract EmptyPlugin is IPRBProxyPlugin {
     function getMethods() external pure returns (bytes4[] memory) {}
 }
 
-contract ProxyTest is Test {
+contract ProxyTest is TestBase {
     PRBProxyRegistry public registry;
     EmptyPlugin public emptyPlugin;
     ERC165Plugin public erc165Plugin;
@@ -29,7 +29,8 @@ contract ProxyTest is Test {
         return computeCreate2Address(salt, creationBytecodeHash, address(registry));
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         registry = new PRBProxyRegistry();
         emptyPlugin = new EmptyPlugin();
         erc165Plugin = new ERC165Plugin();

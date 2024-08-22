@@ -309,17 +309,7 @@ async function deployGearbox() {
     "lpETH " // symbol_
   );
 
-  // // Mint and deposit WETH to the PoolV3 contract
-  // const availableLiquidity = ethers.utils.parseEther('1000000'); // 1,000,000 WETH
-
-  // await mockWETH.mint(signer, availableLiquidity);
-  // await mockWETH.approve(PoolV3.address, availableLiquidity);
-  // await PoolV3.deposit(availableLiquidity, signer);
-
   console.log('Gearbox Contracts Deployed');
-
-  // await verifyOnTenderly('ERC20PresetMinterPauser', mockWETH.address);
-  // await storeContractDeployment(false, 'MockWETH', mockWETH.address, 'ERC20PresetMinterPauser');
   
   await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
   await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');

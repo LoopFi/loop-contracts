@@ -61,7 +61,7 @@ contract PoolActionTest is IntegrationTestBase {
         vm.stopPrank();
 
         // setup state variables to avoid stack too deep
-        weightedPoolIdArray.push(weightedPoolId); 
+        weightedPoolIdArray.push(weightedPoolId);
     }
 
     function test_transferAndJoin() public {
@@ -82,7 +82,7 @@ contract PoolActionTest is IntegrationTestBase {
             deadline,
             userPk
         );
-         
+
         permitParams = PermitParams({
             approvalType: ApprovalType.PERMIT2,
             approvalAmount: depositAmount,
@@ -114,24 +114,13 @@ contract PoolActionTest is IntegrationTestBase {
             protocol: Protocol.BALANCER,
             minOut: 0,
             recipient: user,
-            args: abi.encode(
-                poolId,
-                tokens,
-                tokensIn,
-                maxAmountsIn
-            )
+            args: abi.encode(poolId, tokens, tokensIn, maxAmountsIn)
         });
-
 
         vm.startPrank(user);
         userProxy.execute(
             address(poolAction),
-            abi.encodeWithSelector(
-                PoolAction.transferAndJoin.selector,
-                user,
-                permitParamsArray,
-                poolActionParams
-            )
+            abi.encodeWithSelector(PoolAction.transferAndJoin.selector, user, permitParamsArray, poolActionParams)
         );
     }
 
@@ -168,12 +157,7 @@ contract PoolActionTest is IntegrationTestBase {
             protocol: Protocol.BALANCER,
             minOut: 0,
             recipient: user,
-            args: abi.encode(
-                poolId,
-                tokens,
-                tokensIn,
-                maxAmountsIn
-            )
+            args: abi.encode(poolId, tokens, tokensIn, maxAmountsIn)
         });
 
         vm.startPrank(user);
@@ -184,16 +168,10 @@ contract PoolActionTest is IntegrationTestBase {
         targets[0] = address(poolAction);
 
         vm.startPrank(user);
-        userProxy.execute(
-            address(poolAction),
-            abi.encodeWithSelector(
-                PoolAction.join.selector,
-                poolActionParams
-            )
-        );
+        userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.join.selector, poolActionParams));
     }
-    
-    function getForkBlockNumber() internal virtual override(IntegrationTestBase) pure returns (uint256){
+
+    function getForkBlockNumber() internal pure virtual override(IntegrationTestBase) returns (uint256) {
         return 17870449; // Aug-08-2023 01:17:35 PM +UTC
     }
 }

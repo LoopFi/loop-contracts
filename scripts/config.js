@@ -105,7 +105,7 @@ module.exports = {
           "market": "0xC8eDd52D0502Aa8b4D5C77361D4B3D300e8fC81c",
           "twap": 180,
           "aggregator": "0x5c9C449BbC9a6075A2c061dF312a35fd1E05fF22",
-          "stalePeriod": 86400
+          "stalePeriod": 5184000
         }
       },
       "tokenPot": "0xf0bb20865277aBd641a307eCe5Ee04E79073416C",
@@ -127,7 +127,7 @@ module.exports = {
             "vaultAdmin": "deployer",
             "pauseAdmin": "deployer",
         },
-        "debtCeiling": toWad('10000000')
+        "debtCeiling": toWad('1')
       }
     },
   },

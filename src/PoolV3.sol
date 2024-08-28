@@ -410,16 +410,21 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _burn(owner, shares); // U:[LP-8,9]
 
         _updateBaseInterest({
-            expectedLiquidityDelta: -assetsSent.toInt256(),
-            availableLiquidityDelta: -assetsSent.toInt256(),
+            expectedLiquidityDelta: -amountToUser.toInt256(),
+            availableLiquidityDelta: -amountToUser.toInt256(),
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
         IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
-            unchecked {
-                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
-            }
+            uint256 fee = assetsSent - amountToUser;
+            _mint(treasury, fee);
+
+            _updateBaseInterest({
+                expectedLiquidityDelta: fee.toInt256(),
+                availableLiquidityDelta: fee.toInt256(),
+                checkOptimalBorrowing: false
+            }); // U:[LP-14B,14C,14D]
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
     }

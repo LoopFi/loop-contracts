@@ -621,7 +621,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             totalDebt
         );
 
-        pool.repayCreditAccount(debtData.debt, 0, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt, debtData.accruedInterest, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         token.safeTransfer(msg.sender, takeCollateral);
 

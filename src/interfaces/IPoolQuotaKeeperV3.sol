@@ -112,7 +112,7 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
 
     function quotedTokens() external view returns (address[] memory);
 
-    function addQuotaToken(address token) external;
+    function addQuotaToken(address token, uint16 rate) external;
 
     function updateRates() external;
 

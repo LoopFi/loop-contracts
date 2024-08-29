@@ -127,7 +127,7 @@ module.exports = {
             "vaultAdmin": "deployer",
             "pauseAdmin": "deployer",
         },
-        "debtCeiling": toWad('1')
+        "debtCeiling": toWad('100000000')
       }
     },
   },

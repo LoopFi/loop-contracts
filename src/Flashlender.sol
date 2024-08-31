@@ -59,7 +59,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
     /// @notice Returns the maximum borrowable amount for `token`
     /// @dev If `token` is not Stablecoin then 0 is returned
-    /// @param token Address of the token to borrow (has to be the address of Stablecoin)
+    /// @param token Address of the token to borrow (has to be the address of underlyingToken)
     /// @return max maximum borrowable amount [wad]
     function maxFlashLoan(address token) external view override returns (uint256 max) {
         if (token == address(underlyingToken)) {
@@ -68,7 +68,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     }
 
     /// @notice Returns the current borrow fee for borrowing `amount` of `token`
-    /// @dev If `token` is not Stablecoin then this method will revert
+    /// @dev If `token` is not underlyingToken then this method will revert
     /// @param token Address of the token to borrow (has to be the address of Stablecoin)
     /// @param *amount Amount to borrow [wad]
     /// @return fee to borrow `amount` of `token`
@@ -78,9 +78,9 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     }
 
     /// @notice Flashlender lends `token` to `receiver`
-    /// @dev Reverts if `Flashlender` gets reentered in the same transaction or if token is not Stablecoin
+    /// @dev Reverts if `Flashlender` gets reentered in the same transaction or if token is not the underlyingToken
     /// @param receiver Address of the receiver of the flash loan
-    /// @param token Address of the token to borrow (has to be the address of Stablecoin)
+    /// @param token Address of the token to borrow (has to be the address of underlyingToken)
     /// @param amount Amount of `token` to borrow [wad]
     /// @param data Arbitrary data structure, intended to contain user-defined parameters
     /// @return true if flash loan
@@ -101,7 +101,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         if (receiver.onFlashLoan(msg.sender, token, amount, fee, data) != CALLBACK_SUCCESS)
             revert Flash__flashLoan_callbackFailed();
 
-        // reverts if not enough Stablecoin have been send back
+        // reverts if not enough underlyingToken has been sent back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
         pool.repayCreditAccount(total - fee, fee, 0);
 
@@ -113,7 +113,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     /// @param receiver Address of the receiver of the flash loan [ICreditFlashBorrower]
     /// @param amount Amount of `token` to borrow [wad]
     /// @param data Arbitrary data structure, intended to contain user-defined parameters
-    /// @return true if flash loan
+    /// @return true if flash loan 
     function creditFlashLoan(
         ICreditFlashBorrower receiver,
         uint256 amount,
@@ -122,17 +122,16 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         uint256 fee = wmul(amount, protocolFee);
         uint256 total = amount + fee;
 
-        pool.lendCreditAccount(amount, address(receiver));
+        pool.lendCreditAccount(total, address(receiver));
 
-        emit CreditFlashLoan(address(receiver), amount, fee);
+        emit CreditFlashLoan(address(receiver), total, fee);
 
-        if (receiver.onCreditFlashLoan(msg.sender, amount, fee, data) != CALLBACK_SUCCESS_CREDIT)
+        if (receiver.onCreditFlashLoan(msg.sender, total, fee, data) != CALLBACK_SUCCESS_CREDIT)
             revert Flash__creditFlashLoan_callbackFailed();
 
-        // reverts if not enough Stablecoin have been send back
+        // reverts if not enough underlyingToken has been sent back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
         pool.repayCreditAccount(total - fee, fee, 0);
-
         return true;
     }
 }

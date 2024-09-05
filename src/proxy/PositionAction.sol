@@ -348,10 +348,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address residualRecipient
     ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
+        // remove exact out swap type requirement, partial repayment txn will need to allow for exact in swaps
         if (leverParams.primarySwap.swapType != SwapType.EXACT_OUT || leverParams.primarySwap.recipient != self)
             revert PositionAction__decreaseLever_invalidPrimarySwap();
 
         // validate aux swap if it exists
+        // This check should be changed. Exact in aux swaps should be allowed for closing out the position
+        // aux swap amount for exact in should be overwritten by the contract by using the balance of after the exit + primary swap.
         if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
             revert PositionAction__decreaseLever_invalidAuxSwap();
 
@@ -361,6 +364,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
+        // i think the loan amount should be the MIN of primarySwap.amount and the total position debt
         uint loanAmount = leverParams.primarySwap.amount;
         flashlender.creditFlashLoan(
             ICreditFlashBorrower(self),
@@ -456,32 +460,30 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // withdraw collateral and handle any CDP specific actions
         uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
 
+        // There should be two logic branches here, one for exact out swaps and one for exact in swaps
+        // The exact in swaps for repaying partial debt should take the balance of the exit token (weETH) and overwrite the primarySwap amount so all existed weETH can be used to repay the loan and no dust is leftover.
         bytes memory swapData = _delegateCall(
             address(swapAction),
-            abi.encodeWithSelector(
-                swapAction.swap.selector,
-                leverParams.primarySwap
-            )
+            abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
         );
+
         uint256 swapAmountIn = abi.decode(swapData, (uint256));
 
         // swap collateral to stablecoin and calculate the amount leftover
+        // For exact out swaps, the residual amount is set by getting the balance of the swap in token (weETH) and overwrite the auxSwap amount in so the remaining weETH can be swapped to weth and sent to the recipient address.
         uint256 residualAmount = withdrawnCollateral - swapAmountIn;
 
         // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
         if (residualAmount > 0) {
-
             // perform swap from collateral to arbitrary token if necessary
             if (leverParams.auxSwap.assetIn != address(0)) {
                 _delegateCall(
                     address(swapAction),
-                    abi.encodeWithSelector(
-                        swapAction.swap.selector,
-                        leverParams.auxSwap
-                    )
+                    abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
                 );
             } else {
                 // otherwise just send the collateral to `residualRecipient`
+                // need to also check if there is any remaining token left over that was swapped out
                 IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
             }
         }
@@ -506,6 +508,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         PermitParams calldata permitParams
     ) internal returns (uint256) {
         uint256 amount = collateralParams.amount;
+        // add optional pool join so a user can join pool with collateral without needing to borrow debt or go through flash loan flow.
 
         if (collateralParams.auxSwap.assetIn != address(0)) {
             if (
@@ -530,7 +533,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param vault The CDP Vault
     /// @param collateralParams The collateral parameters
     /// @return The amount of collateral withdrawn [token.decimals()]
-    function _withdraw(address vault, address position, CollateralParams calldata collateralParams) internal returns (uint256) {
+    function _withdraw(
+        address vault,
+        address position,
+        CollateralParams calldata collateralParams
+    ) internal returns (uint256) {
+        // add optional pool exit so a user can exit from the pool without needing to use decrease lever flow that requires a repayment amount.
         uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
 
         // perform swap from collateral to arbitrary token

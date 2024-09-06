@@ -100,6 +100,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     error PositionAction__increaseLever_invalidAuxSwap();
     error PositionAction__decreaseLever_invalidPrimarySwap();
     error PositionAction__decreaseLever_invalidAuxSwap();
+    error PositionAction__decreaseLever_invalidClosePositionPrimarySwap();
     error PositionAction__decreaseLever_invalidResidualRecipient();
     error PositionAction__onFlashLoan__invalidSender();
     error PositionAction__onFlashLoan__invalidInitiator();
@@ -343,28 +344,36 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param residualRecipient Optional parameter that must be provided if an `auxSwap` *is not* provided
     /// This parameter is the address to send the residual collateral to
     function decreaseLever(
-        LeverParams calldata leverParams,
+        LeverParams memory leverParams,
         uint256 subCollateral,
         address residualRecipient
     ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
-        if (leverParams.primarySwap.swapType != SwapType.EXACT_OUT || leverParams.primarySwap.recipient != self)
+        // remove exact out swap type requirement, partial repayment txn will need to allow for exact in swaps
+        if ( leverParams.primarySwap.recipient != self)
             revert PositionAction__decreaseLever_invalidPrimarySwap();
 
-        // validate aux swap if it exists
-        if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
+        // This check should be changed. Exact in aux swaps should be allowed for closing out the position
+        // aux swap amount for exact in should be overwritten by the contract by using the balance of after the exit + primary swap.
+        if (leverParams.auxSwap.assetIn != address(0))
             revert PositionAction__decreaseLever_invalidAuxSwap();
 
         /// validate residual recipient is provided if no aux swap is provided
         if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0))
             revert PositionAction__decreaseLever_invalidResidualRecipient();
 
+        // cap the amount of debt to the total debt of the position
+        uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+        leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
+        if (totalDebt == leverParams.primarySwap.amount && leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
+            revert PositionAction__decreaseLever_invalidClosePositionPrimarySwap();
+        }
+ 
         // take out credit flash loan
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
-        uint loanAmount = leverParams.primarySwap.amount;
         flashlender.creditFlashLoan(
             ICreditFlashBorrower(self),
-            loanAmount,
+            leverParams.primarySwap.amount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
@@ -455,6 +464,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         // withdraw collateral and handle any CDP specific actions
         uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
+        uint256 underlyingBalance = underlyingToken.balanceOf(address(this));
+        
+        uint256 residualAmount;
+
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
+            leverParams.primarySwap.amount = withdrawnCollateral;
+        }
 
         bytes memory swapData = _delegateCall(
             address(swapAction),
@@ -463,16 +479,16 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 leverParams.primarySwap
             )
         );
-        uint256 swapAmountIn = abi.decode(swapData, (uint256));
 
-        // swap collateral to stablecoin and calculate the amount leftover
-        uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+        uint256 collateralBalance =  IERC20(ICDPVault(leverParams.vault).token()).balanceOf(address(this));
+        // todo update swap params
+        // update residual amount
 
         // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
         if (residualAmount > 0) {
-
             // perform swap from collateral to arbitrary token if necessary
             if (leverParams.auxSwap.assetIn != address(0)) {
+                leverParams.auxSwap.amount = residualAmount;
                 _delegateCall(
                     address(swapAction),
                     abi.encodeWithSelector(

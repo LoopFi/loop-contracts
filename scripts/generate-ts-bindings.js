@@ -41,6 +41,8 @@ async function main() {
     { name: 'StakingLPEth', path: '../out/StakingLPEth.sol/StakingLPEth.json'},
     { name: 'Treasury', path: '../out/Treasury.sol/Treasury.json'},
     { name: 'RewardManager', path: '../out/RewardManager.sol/RewardManager.json'},
+    { name: 'LinearInterestRateModelV3', path: '../out/LinearInterestRateModelV3.sol/LinearInterestRateModelV3.json'},
+    { name: 'PendleMarket', path: '../out/PendleMarket.sol/PendleMarket.json'},
   ];
 
   const abis = {};

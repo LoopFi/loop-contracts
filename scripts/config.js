@@ -131,6 +131,14 @@ module.exports = {
       }
     },
   },
+  "LinearInterestRateModelV3": {
+    "U_1": 8500, // U_1
+    "U_2": 9500, // U_2
+    "R_base": 1000, // R_base
+    "R_slope1": 2000, // R_slope1
+    "R_slope2": 3000, // R_slope2
+    "R_slope3": 4000, // R_slope3
+  },  
   "Tokenomics":{
     "MultiFeeDistribution": {
       "lockZap": "0x0000000000000000000000000000000000000123",

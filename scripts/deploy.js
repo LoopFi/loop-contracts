@@ -198,7 +198,7 @@ async function deployCore() {
 
   const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "sLP-ETH");
   console.log('StakingLPEth deployed to:', stakingLpEth.address);
-  const lockLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "LockLPEth", "lLP-ETH");
+  const lockLpEth = await deployContract('LockingLPEth', 'StakingLPEth', false, pool.address, "LockLPEth", "lLP-ETH");
   console.log('LockLPEth deployed to:', lockLpEth.address);
 
   const treasuryReplaceParams = {
@@ -308,12 +308,12 @@ async function deployGearbox() {
     'LinearInterestRateModelV3',
     'LinearInterestRateModelV3',
     false, // not a vault
-    8500, // U_1
-    9500, // U_2
-    1000, // R_base
-    2000, // R_slope1
-    3000, // R_slope2
-    4000, // R_slope3
+    CONFIG.LinearInterestRateModelV3.U_1, // U_1
+    CONFIG.LinearInterestRateModelV3.U_2, // U_2
+    CONFIG.LinearInterestRateModelV3.R_base, // R_base
+    CONFIG.LinearInterestRateModelV3.R_slope1, // R_slope1
+    CONFIG.LinearInterestRateModelV3.R_slope2, // R_slope2
+    CONFIG.LinearInterestRateModelV3.R_slope3, // R_slope3
     false // _isBorrowingMoreU2Forbidden
   );
 

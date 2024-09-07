@@ -487,6 +487,20 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
             );
 
+            uint256 swapAmountOut = abi.decode(swapData, (uint256));
+            uint256 residualAmount = swapAmountOut - subDebt;
+
+            // sub collateral and debt
+            if (residualAmount > 0) {
+                ICDPVault(leverParams.vault).modifyCollateralAndDebt(
+                    leverParams.position,
+                    address(this),
+                    address(this),
+                    0,
+                    toInt256(residualAmount)
+                );
+            }
+
             underlyingToken.forceApprove(address(flashlender), subDebt);
         } else {
             uint256 subDebt = leverParams.primarySwap.amount;

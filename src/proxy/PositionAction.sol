@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
@@ -367,25 +368,30 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address residualRecipient
     ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
-        if ( leverParams.primarySwap.recipient != self)
-            revert PositionAction__decreaseLever_invalidPrimarySwap();
+        if (leverParams.primarySwap.recipient != self) revert PositionAction__decreaseLever_invalidPrimarySwap();
 
-/*         // validate aux swap if it exists
+        /*         // validate aux swap if it exists
         if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
             revert PositionAction__decreaseLever_invalidAuxSwap(); */
 
         /// validate residual recipient is provided if no aux swap is provided
-        if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0))
-            revert PositionAction__decreaseLever_invalidResidualRecipient();
 
+        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
+
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
+            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
+        } else if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0)) {
+            revert PositionAction__decreaseLever_invalidResidualRecipient();
+        }
 
         // take out credit flash loan
-        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
         flashlender.creditFlashLoan(
             ICreditFlashBorrower(self),
-            leverParams.primarySwap.amount,,
+            leverParams.primarySwap.amount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
+
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
     }
 
@@ -480,41 +486,19 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 address(swapAction),
                 abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
             );
-            uint256 swapAmountOut = abi.decode(swapData, (uint256));
 
-            // swap collateral to stablecoin and calculate the amount leftover
-            uint256 residualAmount = withdrawnCollateral - swapAmountIn;
-
-            // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
-            if (residualAmount > 0) {
-                // perform swap from collateral to arbitrary token if necessary
-                if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
-                    leverParams.auxSwap.amount = residualAmount;
-                    _delegateCall(
-                        address(swapAction),
-                        abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
-                    );
-                } else {
-                    // otherwise just send the collateral to `residualRecipient`
-                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
-                }
-            }
-
-            underlyingToken.forceApprove(address(flashlender), totalDebt);
-
+            underlyingToken.forceApprove(address(flashlender), subDebt);
         } else {
-            // cap the amount of debt to the total debt of the position
-            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
-            leverParams.primarySwap.amount = totalDebt;
+            uint256 subDebt = leverParams.primarySwap.amount;
 
-            underlyingToken.forceApprove(address(leverParams.vault), totalDebt);
+            underlyingToken.forceApprove(address(leverParams.vault), subDebt);
             // sub collateral and debt
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
                 address(this),
                 0,
-                -toInt256(totalDebt)
+                -toInt256(subDebt)
             );
 
             // withdraw collateral and handle any CDP specific actions
@@ -544,9 +528,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 }
             }
 
-            underlyingToken.forceApprove(address(flashlender), totalDebt);
+            underlyingToken.forceApprove(address(flashlender), subDebt);
         }
-
 
         return CALLBACK_SUCCESS_CREDIT;
     }
@@ -627,8 +610,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
             // handle exit swap
-            if (creditParams.auxSwap.assetIn != address(underlyingToken))
+            if (creditParams.auxSwap.assetIn != address(underlyingToken)) {
                 revert PositionAction__borrow_InvalidAuxSwap();
+            }
             _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, creditParams.auxSwap));
         }
     }

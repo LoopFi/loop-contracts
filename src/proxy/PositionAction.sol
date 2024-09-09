@@ -370,19 +370,16 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // validate the primary swap
         if (leverParams.primarySwap.recipient != self) revert PositionAction__decreaseLever_invalidPrimarySwap();
 
-        /*         // validate aux swap if it exists
-        if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
-            revert PositionAction__decreaseLever_invalidAuxSwap(); */
-
-        /// validate residual recipient is provided if no aux swap is provided
-
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
             uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
             leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
-        } else if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0)) {
-            revert PositionAction__decreaseLever_invalidResidualRecipient();
+
+            // residual recipient is required if the primary swap is an exact out swap
+            if (residualRecipient == address(0)) {
+                revert PositionAction__decreaseLever_invalidResidualRecipient();
+            }
         }
 
         // take out credit flash loan
@@ -465,21 +462,22 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             (LeverParams, uint256, address)
         );
 
+        uint256 subDebt = leverParams.primarySwap.amount;
+
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        // sub collateral and debt
+        ICDPVault(leverParams.vault).modifyCollateralAndDebt(
+            leverParams.position,
+            address(this),
+            address(this),
+            0,
+            -toInt256(subDebt)
+        );
+        
+        // withdraw collateral and handle any CDP specific actions
+        uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
+
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
-            uint256 subDebt = leverParams.primarySwap.amount;
-
-            underlyingToken.forceApprove(address(leverParams.vault), subDebt);
-            // sub collateral and debt
-            ICDPVault(leverParams.vault).modifyCollateralAndDebt(
-                leverParams.position,
-                address(this),
-                address(this),
-                0,
-                -toInt256(subDebt)
-            );
-
-            // withdraw collateral and handle any CDP specific actions
-            uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
             leverParams.primarySwap.amount = withdrawnCollateral;
 
             bytes memory swapData = _delegateCall(
@@ -497,27 +495,10 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                     address(this),
                     address(this),
                     0,
-                    toInt256(residualAmount)
+                    -toInt256(residualAmount)
                 );
             }
-
-            underlyingToken.forceApprove(address(flashlender), subDebt);
         } else {
-            uint256 subDebt = leverParams.primarySwap.amount;
-
-            underlyingToken.forceApprove(address(leverParams.vault), subDebt);
-            // sub collateral and debt
-            ICDPVault(leverParams.vault).modifyCollateralAndDebt(
-                leverParams.position,
-                address(this),
-                address(this),
-                0,
-                -toInt256(subDebt)
-            );
-
-            // withdraw collateral and handle any CDP specific actions
-            uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
-
             bytes memory swapData = _delegateCall(
                 address(swapAction),
                 abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
@@ -541,10 +522,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                     IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
                 }
             }
-
-            underlyingToken.forceApprove(address(flashlender), subDebt);
         }
 
+        underlyingToken.forceApprove(address(flashlender), subDebt);
         return CALLBACK_SUCCESS_CREDIT;
     }
 

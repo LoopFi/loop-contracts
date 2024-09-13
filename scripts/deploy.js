@@ -196,9 +196,9 @@ async function deployCore() {
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
 
-  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "sLP-ETH");
+  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "slpETH");
   console.log('StakingLPEth deployed to:', stakingLpEth.address);
-  const lockLpEth = await deployContract('LockingLPEth', 'StakingLPEth', false, pool.address, "LockLPEth", "lLP-ETH");
+  const lockLpEth = await deployContract('StakingLPEth', 'LockingLPEth', false, pool.address, "LockLPEth", "llpETH");
   console.log('LockLPEth deployed to:', lockLpEth.address);
 
   const treasuryReplaceParams = {
@@ -477,7 +477,16 @@ async function deployVaults() {
     console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
 
     // deploy reward manager
-    const rewardManager = await deployContract("RewardManager", "RewardManager", false, cdpVault.address, tokenAddress, prbProxyRegistry.address);
+    
+    const rewardManager = await deployContract(
+      "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "RewardManager",
+      false,
+      cdpVault.address,
+      tokenAddress,
+      prbProxyRegistry.address
+    );
+
     console.log('Deployed RewardManager for', vaultName, 'at', rewardManager.address);
 
     await cdpVault["setParameter(bytes32,address)"](toBytes32("rewardManager"), rewardManager.address);

@@ -212,6 +212,9 @@ function updateLeverJoin(
                 assetsIn[assetIndex] = upfrontAmount;
             } else {
                 skipIndex = skipIndex || assets[i] == poolToken;
+                if (assets[i] == poolToken) {
+                    maxAmountsIn[i] = 0;
+                }
             }
             unchecked {
                 i++;

@@ -12,6 +12,7 @@ import {IPermission} from "../../interfaces/IPermission.sol";
 
 import {CDPVault} from "../../CDPVault.sol";
 import {Flashlender} from "../../Flashlender.sol";
+import {WAD, wdiv} from "../../utils/Math.sol";
 
 abstract contract TestReceiver is FlashLoanReceiverBase {
     constructor(address flash) FlashLoanReceiverBase(flash) {
@@ -327,6 +328,12 @@ contract FlashlenderTest is TestBase {
         uint256 maxAvailable = underlyingToken.balanceOf(address(liquidityPool));
         assertEq(flashlender.maxFlashLoan(address(underlyingToken)), maxAvailable);
         assertEq(flashlender.maxFlashLoan(addr), 0);
+
+        uint256 maxAvailableOne = wdiv(maxAvailable, WAD + 1e16);
+        uint256 maxAvailableFive = wdiv(maxAvailable, WAD + 5e16);
+
+        assertEq(flashlenderOne.maxFlashLoan(address(underlyingToken)), maxAvailableOne);
+        assertEq(flashlenderFive.maxFlashLoan(address(underlyingToken)), maxAvailableFive);
     }
 
     function test_flash_fee() public {

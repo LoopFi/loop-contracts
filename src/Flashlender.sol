@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "./interfaces/IFlashlender.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "./interfaces/IPoolV3.sol";
 import {wmul} from "./utils/Math.sol";
 
 /// @title Flashlender
@@ -24,6 +24,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     IPoolV3 public immutable pool;
     /// @notice The flash loan fee, where WAD is 100%
     uint256 public immutable protocolFee;
+    /// @notice The underlying token
     IERC20 public immutable underlyingToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -103,7 +104,8 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
         // reverts if not enough Stablecoin have been send back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
-        pool.repayCreditAccount(total - fee, fee, 0);
+        pool.repayCreditAccount(total - fee, 0, 0);
+        pool.mintProfit(fee);
 
         return true;
     }
@@ -131,7 +133,8 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
 
         // reverts if not enough Stablecoin have been send back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
-        pool.repayCreditAccount(total - fee, fee, 0);
+        pool.repayCreditAccount(total - fee, 0, 0);
+        pool.mintProfit(fee);
 
         return true;
     }

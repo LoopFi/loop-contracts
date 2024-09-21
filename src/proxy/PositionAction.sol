@@ -490,6 +490,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
             // sub collateral and debt
             if (residualAmount > 0) {
+                underlyingToken.forceApprove(address(leverParams.vault), residualAmount);
                 ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                     leverParams.position,
                     address(this),

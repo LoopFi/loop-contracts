@@ -522,7 +522,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 spotPrice_ = spotPrice();
         uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
         if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
-        
+
         // Ensure that there's no bad debt
         if (calcTotalDebt(debtData) > wmul(position.collateral, spotPrice_)) revert CDPVault__BadDebt();
 
@@ -699,14 +699,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             } else {
                 // If amount is not enough to repay interest, then send all to the stakers and update index
                 profit += amountToRepay; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex =
                     (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
                     (INDEX_PRECISION *
                         cumulativeIndexNow -
-                        (INDEX_PRECISION * profit * cumulativeIndexLastUpdate) /
+                        (INDEX_PRECISION * amountToRepay * cumulativeIndexLastUpdate) /
                         debt); // U:[CL-3]
+
+                amountToRepay = 0; // U:[CL-3]
             }
         } else {
             newCumulativeIndex = cumulativeIndexLastUpdate;

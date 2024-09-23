@@ -32,7 +32,7 @@ The `CDPVault` utilizes `PoolV3` for liquidity management. The liquidity pool fa
 
 ### 2. PoolV3
 
-`PoolV3` is a Gearbox protocol contract that provides a liquidity pool for the `CDPVault`. It handles the aggregation of funds, debt management, and distribution of interest among liquidity providers.
+`PoolV3` is a contract that provides a liquidity pool for the `CDPVault`. It handles the aggregation of funds, debt management, and distribution of interest among liquidity providers.
 
 **Key Functions:**
 - `deposit(uint256 assets, address receiver)`: Allows underlying asset deposits into the pool.
@@ -50,4 +50,26 @@ The `StakingLPEth` contract allows `lpETH` holders to stake their tokens and ear
 
 ### 5. FlashLender
 
-The `FlashLender` contract enables leveraging positions and executing flash loans for rapid liquidity operations within the protocol.
+The `FlashLender` contract enables leveraging positions and executing flash loans.
+
+## Auxiliary Contracts
+
+The Loop protocol provides a set of auxiliary contracts to enhance user experience and flexibility. These contracts work in conjunction with the core contracts, enabling complex interactions and optimizations.
+
+### Action Contracts
+
+Action contracts facilitate the bundling of multiple transactions into a single contract interaction, allowing users to efficiently manage their positions and leverage within the protocol.
+
+- **PoolAction:** Facilitates interactions with the pool, such as deposits and withdrawals.
+- **PositionAction:** Bundles transactions related to the `CDPVault`, allowing users to leverage positions by performing multiple actions in a single transaction.
+- **Swap and Transfer Actions:** Provide wrappers over swapping and transferring functionalities, enabling users to perform these actions seamlessly within the protocol.
+
+### Oracle Contracts
+
+The protocol uses robust and trustworthy price feeds powered by Chainlink. These Oracle contracts ensure reliable and accurate asset pricing, which is critical for maintaining the integrity of the system.
+
+- **Price Feeds:** The Oracle contracts fetch asset prices using Chainlink, providing secure and decentralized data feeds for the protocol.
+
+---
+
+This structure covers the core and auxiliary contracts, offering an in-depth view of the protocol’s architecture. Feel free to add more details or modify sections as needed!

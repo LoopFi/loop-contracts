@@ -2,6 +2,10 @@
 
 **Loop** is a decentralized finance (DeFi) platform designed to optimize yield distribution among participants through innovative lending, borrowing, and staking mechanisms.
 
+This is a flow diagram of the Loop DeFi system:
+
+![Loop DeFi Diagram](assets/diagram.png)
+
 ## Overview
 
 The platform's core concept revolves around leveraging ETH-based yields, utilizing receipt tokens, and staking mechanisms to align incentives between various actors:

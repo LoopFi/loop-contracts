@@ -69,7 +69,3 @@ Action contracts facilitate the bundling of multiple transactions into a single 
 The protocol uses robust and trustworthy price feeds powered by Chainlink. These Oracle contracts ensure reliable and accurate asset pricing, which is critical for maintaining the integrity of the system.
 
 - **Price Feeds:** The Oracle contracts fetch asset prices using Chainlink, providing secure and decentralized data feeds for the protocol.
-
----
-
-This structure covers the core and auxiliary contracts, offering an in-depth view of the protocol’s architecture. Feel free to add more details or modify sections as needed!

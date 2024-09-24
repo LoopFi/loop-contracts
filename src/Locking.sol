@@ -51,15 +51,18 @@ contract Locking is Ownable {
     }
 
     function withdraw() external {
-        require(deposits[msg.sender].cooldownAmount > 0, "No tokens in cooldown");
+        uint256 _amount;
         if (cooldownPeriod > 0) {
+            require(deposits[msg.sender].cooldownAmount > 0, "No tokens in cooldown");
             require(
                 block.timestamp >= deposits[msg.sender].cooldownStart + cooldownPeriod,
                 "Cooldown period has not passed"
             );
+            _amount = deposits[msg.sender].cooldownAmount;
+        } else {
+            _amount = deposits[msg.sender].amount;
         }
 
-        uint256 _amount = deposits[msg.sender].cooldownAmount;
         deposits[msg.sender].amount -= _amount;
         deposits[msg.sender].cooldownAmount = 0;
         deposits[msg.sender].cooldownStart = 0;

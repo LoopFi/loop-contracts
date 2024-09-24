@@ -160,4 +160,39 @@ contract LockingTest is Test {
         assertEq(depositContract.getBalance(user), 0);
         assertEq(token.balanceOf(user), 1000 ether);
     }
+
+    // add test to check that if a user tries to withdraw with coolDownPeriod == 0, it will succeed
+    function testWithdrawZeroCooldownPeriod() public {
+        vm.startPrank(user);
+        token.approve(address(depositContract), 500 ether);
+        depositContract.deposit(500 ether);
+        depositContract.initiateCooldown(500 ether);
+        vm.stopPrank();
+        // Set cooldown period to zero
+        depositContract.setCooldownPeriod(0);
+
+        vm.prank(user);
+        depositContract.withdraw();
+
+        assertEq(depositContract.getBalance(user), 0);
+        assertEq(token.balanceOf(user), 1000 ether);
+    }
+
+    // add test to allow user withdraw if he has a cooldown but then the cooldown period is set to zero
+    function testWithdrawZeroCooldownPeriodAfterCooldown() public {
+        vm.startPrank(user);
+        token.approve(address(depositContract), 500 ether);
+        depositContract.deposit(500 ether);
+        depositContract.initiateCooldown(500 ether);
+        vm.stopPrank();
+
+        // Set cooldown period to zero
+        depositContract.setCooldownPeriod(0);
+
+        vm.prank(user);
+        depositContract.withdraw();
+
+        assertEq(depositContract.getBalance(user), 0);
+        assertEq(token.balanceOf(user), 1000 ether);
+    }
 }

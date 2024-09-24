@@ -16,6 +16,19 @@ function convertBigNumberToString(value) {
   return value;
 }
 
+function replaceParams(obj, replacements) {
+  if (Array.isArray(obj)) {
+      return obj.map(v => replacements[v] !== undefined ? replacements[v] : v);
+  } else if (typeof obj === 'object' && obj !== null) {
+      return Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [k, replaceParams(v, replacements)])
+      );
+  } else {
+      return replacements[obj] !== undefined ? replacements[obj] : obj;
+  }
+}
+
+
 async function getSignerAddress() {
   return (await (await ethers.getSigners())[0].getAddress());
 }
@@ -178,7 +191,27 @@ async function deployCore() {
 
   await deployContract('MockOracle');
 
-  const pool = await deployGearbox();
+  const {PoolV3: pool, AddressProviderV3: addressProviderV3} = await deployGearbox();
+
+  console.log('PoolV3 deployed to:', pool.address);
+  console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
+
+  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "slpETH");
+  console.log('StakingLPEth deployed to:', stakingLpEth.address);
+  const lockLpEth = await deployContract('StakingLPEth', 'LockingLPEth', false, pool.address, "LockLPEth", "llpETH");
+  console.log('LockLPEth deployed to:', lockLpEth.address);
+
+  const treasuryReplaceParams = {
+    'deployer': signer,
+    'stakingLpEth': stakingLpEth.address
+  };
+
+  const { payees, shares, admin } = replaceParams(CONFIG.Core.Treasury.constructorArguments, treasuryReplaceParams);
+  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
+  console.log('Treasury deployed to:', treasury.address);
+
+  await addressProviderV3.setAddress(toBytes32('TREASURY'), treasury.address, false);
+  await pool.setTreasury(treasury.address);
 
   // Deploy Vault Registry
   const vaultRegistry = await deployContract('VaultRegistry');
@@ -190,8 +223,9 @@ async function deployCore() {
   await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
   console.log('Set credit manager debt limit for flashlender to max');
 
-  await deployContract('PRBProxyRegistry');
-  storeEnvMetadata({PRBProxyRegistry: CONFIG.Core.PRBProxyRegistry});
+  const proxyRegistry = await deployContract('PRBProxyRegistry');
+  console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
+  // storeEnvMetadata({PRBProxyRegistry: CONFIG.Core.PRBProxyRegistry});
 
   const swapAction = await deployContract(
    'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
@@ -274,23 +308,22 @@ async function deployGearbox() {
     'LinearInterestRateModelV3',
     'LinearInterestRateModelV3',
     false, // not a vault
-    8500, // U_1
-    9500, // U_2
-    1000, // R_base
-    2000, // R_slope1
-    3000, // R_slope2
-    4000, // R_slope3
+    CONFIG.LinearInterestRateModelV3.U_1, // U_1
+    CONFIG.LinearInterestRateModelV3.U_2, // U_2
+    CONFIG.LinearInterestRateModelV3.R_base, // R_base
+    CONFIG.LinearInterestRateModelV3.R_slope1, // R_slope1
+    CONFIG.LinearInterestRateModelV3.R_slope2, // R_slope2
+    CONFIG.LinearInterestRateModelV3.R_slope3, // R_slope3
     false // _isBorrowingMoreU2Forbidden
   );
 
   // Deploy ACL contract
   const ACL = await deployContract('ACL', 'ACL', false);
-  const underlierAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+  const underlierAddress = CONFIG.Pools.LiquidityPoolWETH.underlier;
 
   // Deploy AddressProviderV3 contract and set addresses
   const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
   await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), underlierAddress, false);
-  await AddressProviderV3.setAddress(toBytes32('TREASURY'), CONFIG.Core.Gearbox.treasury, false);
 
   // Deploy ContractsRegister and set its address in AddressProviderV3
   const ContractsRegister = await deployContract('ContractsRegister', 'ContractsRegister', false, AddressProviderV3.address);
@@ -305,21 +338,11 @@ async function deployGearbox() {
     underlierAddress, // underlyingToken_
     LinearInterestRateModelV3.address, // interestRateModel_
     CONFIG.Core.Gearbox.initialGlobalDebtCeiling, // Debt ceiling
-    "Loop Liquidity Pool", // name_
-    "lpETH " // symbol_
+    CONFIG.Pools.LiquidityPoolWETH.name, // name_
+    CONFIG.Pools.LiquidityPoolWETH.symbol // symbol_
   );
 
-  // // Mint and deposit WETH to the PoolV3 contract
-  // const availableLiquidity = ethers.utils.parseEther('1000000'); // 1,000,000 WETH
-
-  // await mockWETH.mint(signer, availableLiquidity);
-  // await mockWETH.approve(PoolV3.address, availableLiquidity);
-  // await PoolV3.deposit(availableLiquidity, signer);
-
   console.log('Gearbox Contracts Deployed');
-
-  // await verifyOnTenderly('ERC20PresetMinterPauser', mockWETH.address);
-  // await storeContractDeployment(false, 'MockWETH', mockWETH.address, 'ERC20PresetMinterPauser');
   
   await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
   await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
@@ -336,7 +359,7 @@ async function deployGearbox() {
   await verifyOnTenderly('PoolV3', PoolV3.address);
   await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
 
-  return PoolV3;
+  return { PoolV3, AddressProviderV3 };
 }
 
 
@@ -386,6 +409,7 @@ async function deployVaults() {
   const {
     MockOracle: oracle,
     PoolV3: pool,
+    PRBProxyRegistry: prbProxyRegistry,
     ...contracts
   } = await loadDeployedContracts();
   
@@ -451,6 +475,22 @@ async function deployVaults() {
     console.log('------------------------------------');
 
     console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
+
+    // deploy reward manager
+    
+    const rewardManager = await deployContract(
+      "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "RewardManager",
+      false,
+      cdpVault.address,
+      tokenAddress,
+      prbProxyRegistry.address
+    );
+
+    console.log('Deployed RewardManager for', vaultName, 'at', rewardManager.address);
+
+    await cdpVault["setParameter(bytes32,address)"](toBytes32("rewardManager"), rewardManager.address);
+    console.log('Set reward manager for', vaultName, 'to', rewardManager.address);
 
     // if (config.oracle)
     // await oracle.updateSpot(tokenAddress, config.oracle.defaultPrice);
@@ -625,6 +665,7 @@ async function registerVaults() {
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     console.log(`${name}: ${vault.address}`);
     await vaultRegistry.addVault(vault.address);
+
     console.log('Added', name, 'to vault registry');
   }
 }
@@ -632,6 +673,10 @@ async function registerVaults() {
 async function deployRadiant() {
   console.log('Deploying Radiant Contracts...');
   const signer = await getSignerAddress();
+
+  const {
+    Treasury: treasury,
+  } = await loadDeployedContracts();
   
   // Deploy the RadiantDeployHelper contract and get the addresses of the LoopToken, PriceProvider, and LP Token
   [
@@ -682,7 +727,7 @@ async function deployRadiant() {
   await eligibilityDataProvider.setChefIncentivesController(incentivesController.address);
   console.log('Set incentives controller for eligibility data provider');
 
-  await setupMultiFeeDistribution(multiFeeDistribution, incentivesController, CONFIG.Tokenomics.MultiFeeDistribution.treasury, lpTokenAddress);
+  await setupMultiFeeDistribution(multiFeeDistribution, incentivesController, treasury.address, lpTokenAddress);
 
   await registerRewards(loopToken, incentivesController, CONFIG.Tokenomics.IncentivesController.rewardAmount);
 
@@ -706,8 +751,8 @@ async function logVaults() {
 }
 
 async function createPositions() {
-  const { CDM: cdm, PositionAction20: positionAction } = await loadDeployedContracts();
-  const prbProxyRegistry = await attachContract('PRBProxyRegistry', CONFIG.Core.PRBProxyRegistry);
+  const { CDM: cdm, PositionAction20: positionAction, PRBProxyRegistry: proxyRegistry } = await loadDeployedContracts();
+  const prbProxyRegistry = await attachContract('PRBProxyRegistry', proxyRegistry.address);
 
   const signer = await getSignerAddress();
   const proxy = await deployPRBProxy(prbProxyRegistry);

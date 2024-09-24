@@ -43,7 +43,7 @@ contract CreditCreator {
 }
 
 contract TestBase is Test {
-    address public treasury;
+    address public mockTreasury;
 
     AddressProviderV3 public addressProvider;
     ACL public acl;
@@ -85,7 +85,7 @@ contract TestBase is Test {
         vm.warp(currentTimestamp);
         _;
     }
-    
+
     function setUp() public virtual {
         dealManager = new PatchedDeal();
         setCurrentTimestamp(block.timestamp);
@@ -101,7 +101,7 @@ contract TestBase is Test {
     }
 
     function createAccounts() internal virtual {
-        treasury = vm.addr(uint256(keccak256("treasury")));
+        mockTreasury = vm.addr(uint256(keccak256("treasury")));
     }
 
     function createAssets() internal virtual {
@@ -113,7 +113,7 @@ contract TestBase is Test {
         acl = new ACL();
         addressProvider = new AddressProviderV3(address(acl));
         addressProvider.setAddress(AP_WETH_TOKEN, address(mockWETH), false);
-        addressProvider.setAddress(AP_TREASURY, treasury, false);
+        addressProvider.setAddress(AP_TREASURY, mockTreasury, false);
         contractsRegister = new ContractsRegister(address(addressProvider));
         addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), false);
     }
@@ -176,6 +176,7 @@ contract TestBase is Test {
             name_: "Loop Liquidity Pool",
             symbol_: "lpETH "
         });
+        liquidityPool.setTreasury(mockTreasury);
 
         underlyingToken = mockWETH;
 
@@ -187,7 +188,6 @@ contract TestBase is Test {
         flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
         liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
         vaultRegistry = new VaultRegistry();
-
     }
 
     function createCDPVault(
@@ -299,17 +299,16 @@ contract TestBase is Test {
             });
     }
 
-
     function getContracts() public view returns (address[] memory contracts) {
         contracts = new address[](5);
-        contracts[0] = address(treasury);
+        contracts[0] = address(mockTreasury);
         contracts[1] = address(addressProvider);
         contracts[2] = address(liquidityPool);
         contracts[3] = address(acl);
         contracts[4] = address(mockWETH);
     }
 
-    function deal(address token_, address to, uint256 amount) virtual override internal {
+    function deal(address token_, address to, uint256 amount) internal virtual override {
         if (usePatchedDeal) {
             uint256 chainId = block.chainid;
             vm.chainId(1);

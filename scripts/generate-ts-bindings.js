@@ -38,6 +38,11 @@ async function main() {
     { name: 'MockVoter', path: '../out/MockVoter.sol/MockVoter.json'},
     { name: 'GaugeV3', path: '../out/GaugeV3.sol/GaugeV3.json'},
     { name: 'PoolQuotaKeeperV3', path: '../out/PoolQuotaKeeperV3.sol/PoolQuotaKeeperV3.json'},
+    { name: 'StakingLPEth', path: '../out/StakingLPEth.sol/StakingLPEth.json'},
+    { name: 'Treasury', path: '../out/Treasury.sol/Treasury.json'},
+    { name: 'RewardManager', path: '../out/RewardManager.sol/RewardManager.json'},
+    { name: 'LinearInterestRateModelV3', path: '../out/LinearInterestRateModelV3.sol/LinearInterestRateModelV3.json'},
+    { name: 'PendleMarket', path: '../out/PendleMarket.sol/PendleMarket.json'},
   ];
 
   const abis = {};

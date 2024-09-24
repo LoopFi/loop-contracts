@@ -909,7 +909,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // trigger PositionAction__decreaseLever_invalidAuxSwap
         leverParams.auxSwap.swapType = SwapType.EXACT_OUT;
-        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidAuxSwap.selector);
+        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidResidualRecipient.selector);
         vm.prank(user);
         userProxy.execute(
             address(positionAction),

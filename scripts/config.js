@@ -23,7 +23,6 @@ module.exports = {
       },
       "initialDebtCeiling": toWad('100000000'),
     },
-    "PRBProxyRegistry": "0x584009E9eDe26e212182c9745F5c000191296a78",
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -41,7 +40,26 @@ module.exports = {
     },
     "Gearbox": {
       "initialGlobalDebtCeiling": toWad('100000000'),
-      "treasury": "0x0000000000000000000000000000000000000123"
+    },
+    "Treasury": {
+      "constructorArguments": {
+        "payees":[
+          "deployer",
+          "stakingLpEth"
+        ],
+        "shares":[
+          20,
+          80
+        ],
+        "admin": "deployer"
+      }
+    },
+  },
+  "Pools": {
+    "LiquidityPoolWETH": {
+      "name": "Loop Liquidity Pool - WETH",
+      "symbol": "lpETH",
+      "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" //WETH
     }
   },
   "Vendors": {
@@ -87,7 +105,7 @@ module.exports = {
           "market": "0xC8eDd52D0502Aa8b4D5C77361D4B3D300e8fC81c",
           "twap": 180,
           "aggregator": "0x5c9C449BbC9a6075A2c061dF312a35fd1E05fF22",
-          "stalePeriod": 86400
+          "stalePeriod": 5184000
         }
       },
       "tokenPot": "0xf0bb20865277aBd641a307eCe5Ee04E79073416C",
@@ -101,7 +119,7 @@ module.exports = {
           "protocolFee": toWad('0.01'),
         },
         "configs": {
-            "debtFloor": toWad('1000'),
+            "debtFloor": toWad('1'),
             "liquidationRatio": toWad('1.05'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
@@ -109,10 +127,18 @@ module.exports = {
             "vaultAdmin": "deployer",
             "pauseAdmin": "deployer",
         },
-        "debtCeiling": toWad('10000000')
+        "debtCeiling": toWad('100000000')
       }
     },
   },
+  "LinearInterestRateModelV3": {
+    "U_1": 8500, // U_1
+    "U_2": 9500, // U_2
+    "R_base": 1000, // R_base
+    "R_slope1": 2000, // R_slope1
+    "R_slope2": 3000, // R_slope2
+    "R_slope3": 4000, // R_slope3
+  },  
   "Tokenomics":{
     "MultiFeeDistribution": {
       "lockZap": "0x0000000000000000000000000000000000000123",

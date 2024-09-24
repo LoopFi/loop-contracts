@@ -42,12 +42,7 @@ contract TestImmediatePaybackReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256 fee_,
-        bytes calldata
-    ) external override returns (bytes32) {
+    function onCreditFlashLoan(address, uint256, uint256 fee_, bytes calldata) external override returns (bytes32) {
         _mintFee(fee_);
         return CALLBACK_SUCCESS_CREDIT;
     }
@@ -122,12 +117,7 @@ contract TestDEXTradeReceiver is TestReceiver {
         return CALLBACK_SUCCESS;
     }
 
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external override pure returns (bytes32) {
+    function onCreditFlashLoan(address, uint256, uint256, bytes calldata) external pure override returns (bytes32) {
         return CALLBACK_SUCCESS_CREDIT;
     }
 }
@@ -149,12 +139,7 @@ contract TestBadReturn is TestReceiver {
 
         return BAD_HASH;
     }
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256 fee_,
-        bytes calldata
-    ) external override returns (bytes32) {
+    function onCreditFlashLoan(address, uint256, uint256 fee_, bytes calldata) external override returns (bytes32) {
         _mintFee(fee_);
         return BAD_HASH;
     }
@@ -174,12 +159,7 @@ contract TestNoFeePaybackReceiver is TestReceiver {
         approvePayback(amount_);
         return CALLBACK_SUCCESS;
     }
-    function onCreditFlashLoan(
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external override pure returns (bytes32) {
+    function onCreditFlashLoan(address, uint256, uint256, bytes calldata) external pure override returns (bytes32) {
         return CALLBACK_SUCCESS_CREDIT;
     }
 }

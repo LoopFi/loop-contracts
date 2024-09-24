@@ -97,13 +97,16 @@ contract PoolAction is TransferAction {
                         ++i;
                     }
                 }
-            } else if(poolActionParams.protocol == Protocol.PENDLE) {
-                (, , TokenInput memory input,) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
-                
+            } else if (poolActionParams.protocol == Protocol.PENDLE) {
+                (, , TokenInput memory input, ) = abi.decode(
+                    poolActionParams.args,
+                    (address, ApproxParams, TokenInput, LimitOrderData)
+                );
+
                 if (input.tokenIn != address(0)) {
                     _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
                 }
-            } else  revert PoolAction__transferAndJoin_unsupportedProtocol();
+            } else revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
         join(poolActionParams);
@@ -114,7 +117,7 @@ contract PoolAction is TransferAction {
     function join(PoolActionParams memory poolActionParams) public payable {
         if (poolActionParams.protocol == Protocol.BALANCER) {
             _balancerJoin(poolActionParams);
-        } else if(poolActionParams.protocol == Protocol.PENDLE) {
+        } else if (poolActionParams.protocol == Protocol.PENDLE) {
             _pendleJoin(poolActionParams);
         } else {
             revert PoolAction__join_unsupportedProtocol();
@@ -154,7 +157,7 @@ contract PoolAction is TransferAction {
 
     /// @notice Perform a join using the Pendle protocol
     /// @param poolActionParams The parameters for the join
-    /// @dev For more information regarding the Pendle join function check Pendle 
+    /// @dev For more information regarding the Pendle join function check Pendle
     /// documentation
     function _pendleJoin(PoolActionParams memory poolActionParams) internal {
         (
@@ -162,14 +165,20 @@ contract PoolAction is TransferAction {
             ApproxParams memory guessPtReceivedFromSy,
             TokenInput memory input,
             LimitOrderData memory limit
-        ) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput , LimitOrderData));
-        
-        
-        if (input.tokenIn != address(0)) {
-                IERC20(input.tokenIn ).forceApprove(address(pendleRouter),input.netTokenIn);
-            }
+        ) = abi.decode(poolActionParams.args, (address, ApproxParams, TokenInput, LimitOrderData));
 
-        pendleRouter.addLiquiditySingleToken{value: msg.value}(poolActionParams.recipient, market, poolActionParams.minOut, guessPtReceivedFromSy, input, limit);
+        if (input.tokenIn != address(0)) {
+            IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
+        }
+
+        pendleRouter.addLiquiditySingleToken{value: msg.value}(
+            poolActionParams.recipient,
+            market,
+            poolActionParams.minOut,
+            guessPtReceivedFromSy,
+            input,
+            limit
+        );
     }
 
     /// @notice Helper function to update the join parameters for a levered position
@@ -231,11 +240,9 @@ contract PoolAction is TransferAction {
     function exit(PoolActionParams memory poolActionParams) public returns (uint256 retAmount) {
         if (poolActionParams.protocol == Protocol.BALANCER) {
             retAmount = _balancerExit(poolActionParams);
-        } else if(poolActionParams.protocol == Protocol.PENDLE) {
+        } else if (poolActionParams.protocol == Protocol.PENDLE) {
             retAmount = _pendleExit(poolActionParams);
-        } else
-            revert PoolAction__exit_unsupportedProtocol();
-        
+        } else revert PoolAction__exit_unsupportedProtocol();
     }
 
     function _balancerExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
@@ -274,20 +281,20 @@ contract PoolAction is TransferAction {
 
         return IERC20(assets[outIndex]).balanceOf(address(poolActionParams.recipient));
     }
-    
-    function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount){
-        (
-        address market, uint256 netLpIn, address tokenOut
-        ) = abi.decode(poolActionParams.args, (address,uint256, address));
-            
+
+    function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
+        (address market, uint256 netLpIn, address tokenOut) = abi.decode(
+            poolActionParams.args,
+            (address, uint256, address)
+        );
+
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
-        if(poolActionParams.recipient != address(this)){
+        if (poolActionParams.recipient != address(this)) {
             IPMarket(market).transferFrom(poolActionParams.recipient, market, netLpIn);
         } else {
             IPMarket(market).transfer(market, netLpIn);
         }
-
 
         uint256 netSyToRedeem;
 
@@ -303,5 +310,5 @@ contract PoolAction is TransferAction {
         }
 
         return SY.redeem(poolActionParams.recipient, netSyToRedeem, tokenOut, poolActionParams.minOut, true);
-     }
+    }
 }

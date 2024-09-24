@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import {TestBase, ERC20PresetMinterPauser} from "../TestBase.sol";
 
 import {console} from "forge-std/console.sol";
-import {StakingLPEth} from "src/StakingLPEth.sol";
+import {StakingLPEth} from "../../StakingLPEth.sol";
 
 contract StakingLPEthTest is TestBase {
     address user1 = address(0x23);

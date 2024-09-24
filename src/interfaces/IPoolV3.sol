@@ -133,4 +133,6 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit) external;
 
     function setWithdrawFee(uint256 newWithdrawFee) external;
+
+    function mintProfit(uint256 amount) external;
 }

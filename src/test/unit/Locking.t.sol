@@ -109,7 +109,7 @@ contract LockingTest is Test {
         vm.stopPrank();
     }
 
-    function testPartialCooldown() public {
+    function testCooldownCalledTwice() public {
         vm.startPrank(user);
         token.approve(address(depositContract), 1000 ether);
         depositContract.deposit(1000 ether);
@@ -122,8 +122,8 @@ contract LockingTest is Test {
         depositContract.withdraw();
         vm.stopPrank();
 
-        assertEq(depositContract.getBalance(user), 0);
-        assertEq(token.balanceOf(user), 1000 ether);
+        assertEq(depositContract.getBalance(user), 500 ether);
+        assertEq(token.balanceOf(user), 500 ether);
     }
 
     function testCooldownReset() public {
@@ -140,7 +140,7 @@ contract LockingTest is Test {
 
         (uint256 amount, uint256 cooldownStart, uint256 cooldownAmount) = depositContract.deposits(user);
         assertEq(amount, 1000 ether, "Amount should be 1000");
-        assertEq(cooldownAmount, 1000 ether, "Cooldown amount should be 1000");
+        assertEq(cooldownAmount, 500 ether, "Cooldown amount should be 500");
         assertTrue(cooldownStart > 0, "Cooldown start should be set");
     }
 

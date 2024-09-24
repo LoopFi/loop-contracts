@@ -45,7 +45,7 @@ contract Locking is Ownable {
     function initiateCooldown(uint256 _amount) external {
         require(deposits[msg.sender].amount >= _amount, "Insufficient balance to set cooldown amount");
         deposits[msg.sender].cooldownStart = block.timestamp;
-        deposits[msg.sender].cooldownAmount += _amount;
+        deposits[msg.sender].cooldownAmount = _amount;
 
         emit CooldownInitiated(msg.sender, block.timestamp, _amount);
     }

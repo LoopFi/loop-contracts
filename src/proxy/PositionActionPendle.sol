@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
 
 import {PositionAction, LeverParams} from "./PositionAction.sol";
+import {PoolActionParams, Protocol} from "./PoolAction.sol";
 
 /// @title PositionActionPendle
 /// @notice Pendle LP implementation of PositionAction base contract
@@ -54,10 +55,32 @@ contract PositionActionPendle is PositionAction {
     function _onWithdraw(
         address vault,
         address position,
-        address /*dst*/,
+        address dst,
         uint256 amount
     ) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(address(position), amount);
+        uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
+        address collateralToken = address(ICDPVault(vault).token());
+
+        if (dst != collateralToken && dst != address(0)) {
+            PoolActionParams memory poolActionParams = PoolActionParams({
+                protocol: Protocol.PENDLE,        
+                minOut: 0,                   
+                recipient: address(this),     
+                args: abi.encode(
+                    collateralToken,          
+                    collateralWithdrawn,       
+                    dst                        
+                )
+            });
+
+            bytes memory exitData = _delegateCall(
+                address(poolAction),
+                abi.encodeWithSelector(poolAction.exit.selector, poolActionParams)
+            );
+
+            collateralWithdrawn = abi.decode(exitData, (uint256));
+        }
+        return collateralWithdrawn;
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.19;
+import {IAsset} from "src/vendor/IAsset.sol";
 
 enum SwapKind {
     GIVEN_IN,
@@ -311,4 +312,30 @@ interface IVault {
      * @dev Returns a Pool's contract address and specialization setting.
      */
     function getPool(bytes32 poolId) external view returns (address, PoolSpecialization);
+    /**
+     * @dev Performs a set of user balance operations, which involve Internal Balance (deposit, withdraw or transfer)
+     * and plain ERC20 transfers using the Vault's allowance. This last feature is particularly useful for relayers, as
+     * it lets integrators reuse a user's Vault allowance.
+     *
+     * For each operation, if the caller is not `sender`, it must be an authorized relayer for them.
+     */
+    function manageUserBalance(UserBalanceOp[] memory ops) external payable;
+
+    /**
+     * @dev Data for `manageUserBalance` operations, which include the possibility for ETH to be sent and received
+     without manual WETH wrapping or unwrapping.
+     */
+    struct UserBalanceOp {
+        UserBalanceOpKind kind;
+        IAsset asset;
+        uint256 amount;
+        address sender;
+        address payable recipient;
+    }
+    enum UserBalanceOpKind {
+        DEPOSIT_INTERNAL,
+        WITHDRAW_INTERNAL,
+        TRANSFER_INTERNAL,
+        TRANSFER_EXTERNAL
+    }
 }

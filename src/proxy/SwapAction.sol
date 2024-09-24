@@ -392,8 +392,15 @@ contract SwapAction is TransferAction {
     function getSwapToken(SwapParams calldata swapParams) public pure returns (address token) {
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (, address[] memory primarySwapPath) = abi.decode(swapParams.args, (bytes32[], address[]));
-            // the last token in the path is the token that will be swapped into
-            token = primarySwapPath[primarySwapPath.length - 1];
+            
+            if (swapParams.swapType == SwapType.EXACT_OUT){ 
+                // For EXACT_OUT, the token that will be swapped into is the first token in the path
+                token = primarySwapPath[0];
+            } else {
+                // For EXACT_IN, the token that will be swapped into is the last token in the path
+                token = primarySwapPath[primarySwapPath.length - 1];
+            }
+
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             token = decodeLastToken(swapParams.args);
         } else {

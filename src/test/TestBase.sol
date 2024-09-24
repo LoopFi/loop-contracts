@@ -185,7 +185,7 @@ contract TestBase is Test {
         mockWETH.approve(address(liquidityPool), availableLiquidity);
         liquidityPool.deposit(availableLiquidity, address(this));
 
-        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0.01 ether);
         liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
         vaultRegistry = new VaultRegistry();
     }

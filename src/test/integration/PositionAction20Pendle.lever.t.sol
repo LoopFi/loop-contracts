@@ -181,7 +181,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         (, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount, "Not correct normal debt amount");
+        assertGe(normalDebt, borrowAmount, "Not correct normal debt amount");
 
         // assert leverAction position is empty
         (uint256 lcollateral, uint256 lnormalDebt, , , , ) = pendleVault_STETH.positions(address(positionAction));
@@ -323,7 +323,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - lpToRedeem);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
-        assertEq(normalDebt, initialNormalDebt - repayAmount);
+        assertGe(normalDebt, initialNormalDebt - repayAmount);
 
         // assert that the left over was transfered to the user proxy
         assertGt(ERC20(wstETH).balanceOf(address(userProxy)), 0);

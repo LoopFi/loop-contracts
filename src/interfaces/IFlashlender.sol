@@ -87,12 +87,15 @@ interface IFlashlender is IERC3156FlashLender, ICreditFlashLender {
 
     function flashFee(address token, uint256 amount) external view override returns (uint256);
 
+    function protocolFee() external view returns (uint256);
+
     function flashLoan(
         IERC3156FlashBorrower receiver,
         address token,
         uint256 amount,
         bytes calldata data
     ) external returns (bool);
+
     function creditFlashLoan(
         ICreditFlashBorrower receiver,
         uint256 amount,

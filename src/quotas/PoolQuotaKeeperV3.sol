@@ -159,7 +159,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Adds a new quota token
     /// @param token Address of the token
     function addQuotaToken(
-        address token
+        address token,
+        uint16 rate
     )
         external
         override
@@ -172,7 +173,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         // The rate will be set during a general epoch update in the gauge
         quotaTokensSet.add(token); // U:[PQK-5]
         totalQuotaParams[token].cumulativeIndexLU = 1; // U:[PQK-5]
-
+        totalQuotaParams[token].rate = rate;
         emit AddQuotaToken(token); // U:[PQK-5]
     }
 

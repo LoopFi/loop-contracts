@@ -256,6 +256,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: tokenInput.netTokenIn,
             limit: 0,
             recipient: user,
+            residualRecipient: user,
             deadline: 0,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
@@ -279,6 +280,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: ERC20(market).balanceOf(user),
             limit: 0,
             recipient: user,
+            residualRecipient: user,
             deadline: 0,
             args: abi.encode(market, lpIn, weETH)
         });
@@ -319,6 +321,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: tokenInput.netTokenIn,
             limit: 0,
             recipient: user,
+            residualRecipient: user,
             deadline: 0,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
@@ -342,6 +345,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: ERC20(market).balanceOf(user),
             limit: 0,
             recipient: user,
+            residualRecipient: user,
             deadline: 0,
             args: abi.encode(market, lpIn, weETH)
         });
@@ -383,6 +387,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: tokenInput.netTokenIn,
             limit: 0,
             recipient: user,
+            residualRecipient: user,
             deadline: 0,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });

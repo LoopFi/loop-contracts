@@ -169,7 +169,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     error CDPVault__BadDebt();
     error CDPVault__repayAmountNotEnough();
     error CDPVault__tooHighRepayAmount();
-
+    error CDPVault__recoverERC20_invalidToken();
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -805,5 +805,19 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {
         DebtData memory debtData = _calcDebt(positions[position]);
         return (debtData.debt, debtData.accruedInterest, debtData.cumulativeQuotaInterest);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              RECOVERY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Recovers ERC20 tokens from the vault
+    /// @param tokenAddress Address of the token to recover
+    /// @param to Address to recover the token to
+    /// @param tokenAmount Amount of the token to recover
+    /// @dev The token to recover cannot be the same as the collateral token
+    function recoverERC20(address tokenAddress, address to, uint256 tokenAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (tokenAddress == address(token)) revert CDPVault__recoverERC20_invalidToken();
+        IERC20(tokenAddress).safeTransfer(to, tokenAmount);
     }
 }

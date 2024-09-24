@@ -541,16 +541,16 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         }
 
         if (profit > 0) {
-            _mint(treasury, convertToShares(profit)); // U:[LP-14B]
+            _mint(treasury, _convertToShares(profit)); // U:[LP-14B]
         } else if (loss > 0) {
             address treasury_ = treasury;
             uint256 sharesInTreasury = balanceOf(treasury_);
-            uint256 sharesToBurn = convertToShares(loss);
+            uint256 sharesToBurn = _convertToShares(loss);
             if (sharesToBurn > sharesInTreasury) {
                 unchecked {
                     emit IncurUncoveredLoss({
                         creditManager: msg.sender,
-                        loss: convertToAssets(sharesToBurn - sharesInTreasury)
+                        loss: _convertToAssets(sharesToBurn - sharesInTreasury)
                     }); // U:[LP-14D]
                 }
                 sharesToBurn = sharesInTreasury;

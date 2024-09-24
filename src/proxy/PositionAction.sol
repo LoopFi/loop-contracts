@@ -623,7 +623,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         PermitParams calldata permitParams
     ) internal {
         // transfer arbitrary token and swap to underlying token
-        uint256 amount;
+        uint256 amount = creditParams.amount;
         if (creditParams.auxSwap.assetIn != address(0)) {
             if (creditParams.auxSwap.recipient != address(this)) revert PositionAction__repay_InvalidAuxSwap();
 
@@ -641,13 +641,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
         }
 
-        underlyingToken.forceApprove(address(vault), creditParams.amount);
+        underlyingToken.forceApprove(address(vault), amount);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            -toInt256(creditParams.amount)
+            -toInt256(amount)
         );
     }
 

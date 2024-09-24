@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Locking {
+contract Locking is Ownable {
     using SafeERC20 for IERC20;
 
-    address public owner;
     uint256 public cooldownPeriod;
     IERC20 public token;
 
@@ -24,13 +24,7 @@ contract Locking {
     event CooldownPeriodSet(uint256 cooldownPeriod);
     event CooldownInitiated(address indexed user, uint256 timestamp, uint256 amount);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only the owner can perform this action");
-        _;
-    }
-
     constructor(address _token) {
-        owner = msg.sender;
         token = IERC20(_token);
     }
 

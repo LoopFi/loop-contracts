@@ -87,7 +87,7 @@ contract LockingTest is Test {
 
     function testSetCooldownPeriodNotOwner() public {
         vm.startPrank(user);
-        vm.expectRevert("Only the owner can perform this action");
+        vm.expectRevert("Ownable: caller is not the owner");
         depositContract.setCooldownPeriod(2 days);
         vm.stopPrank();
     }

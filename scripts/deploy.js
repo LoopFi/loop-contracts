@@ -504,6 +504,8 @@ async function deployVaults() {
         description: config.description,
         artifactName: 'CDPVault',
         collateralType: config.collateralType,
+        lrt: config.lrt,
+        lrtName: config.lrtName,
         pool: pool.address,
         oracle: oracle.address,
         token: tokenAddress,

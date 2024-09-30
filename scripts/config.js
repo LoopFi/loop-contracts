@@ -134,12 +134,12 @@ module.exports = {
     },
   },
   "LinearInterestRateModelV3": {
-    "U_1": 8500, // U_1
-    "U_2": 9500, // U_2
-    "R_base": 1000, // R_base
+    "U_1": 7000, // U_1
+    "U_2": 9000, // U_2
+    "R_base": 0, // R_base
     "R_slope1": 2000, // R_slope1
-    "R_slope2": 3000, // R_slope2
-    "R_slope3": 4000, // R_slope3
+    "R_slope2": 2500, // R_slope2
+    "R_slope3": 60000, // R_slope3
   },  
   "Tokenomics":{
     "MultiFeeDistribution": {

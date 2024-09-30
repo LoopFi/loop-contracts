@@ -44,7 +44,6 @@ contract PositionAction4626 is PositionAction {
         address src,
         uint256 amount
     ) internal override returns (uint256) {
-    function _onDeposit(address vault, address position, address src, uint256 amount) internal override returns (uint256) {
         address collateral = address(ICDPVault(vault).token());
 
         // if the src is not the collateralToken, we need to deposit the underlying into the ERC4626 vault

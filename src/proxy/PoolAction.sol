@@ -114,7 +114,7 @@ contract PoolAction is TransferAction {
 
     /// @notice Perform a join using the specified protocol
     /// @param poolActionParams The parameters for the join
-    function join(PoolActionParams memory poolActionParams) public payable {
+    function join(PoolActionParams memory poolActionParams) public {
         if (poolActionParams.protocol == Protocol.BALANCER) {
             _balancerJoin(poolActionParams);
         } else if (poolActionParams.protocol == Protocol.PENDLE) {
@@ -171,7 +171,7 @@ contract PoolAction is TransferAction {
             IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
         }
 
-        pendleRouter.addLiquiditySingleToken{value: msg.value}(
+        pendleRouter.addLiquiditySingleToken(
             poolActionParams.recipient,
             market,
             poolActionParams.minOut,

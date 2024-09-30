@@ -546,7 +546,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         }
 
         if (profit > 0) {
-            _mint(treasury, convertToShares(profit)); // U:[LP-14B]
+            _mint(treasury, _convertToShares(profit)); // U:[LP-14B]
         }
         if (loss > 0) {
             address treasury_ = treasury;

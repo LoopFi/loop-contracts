@@ -494,7 +494,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // build decrease lever params
         uint256 amountOut = 5_000 ether;
         uint256 maxAmountIn = 5_100 ether;
-        uint256 initialTreasuryBalance = liquidityPool.balanceOf(address(treasury));
+        uint256 initialTreasuryBalance = liquidityPool.balanceOf(address(mockTreasury));
         uint256 flashloanFee = flashlender.flashFee(address(underlyingToken), amountOut);
 
         address[] memory assets = new address[](2);
@@ -535,7 +535,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         );
 
         (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
-        uint256 finalTreasuryBalance = liquidityPool.balanceOf(address(treasury));
+        uint256 finalTreasuryBalance = liquidityPool.balanceOf(address(mockTreasury));
 
         // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);

@@ -431,7 +431,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     function onCreditFlashLoan(
         address /*initiator*/,
         uint256 /*amount*/,
-        uint256 /*fee*/,
+        uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
@@ -442,8 +442,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         ) = abi.decode(data,(LeverParams, uint256, address));
 
         uint256 subDebt = leverParams.primarySwap.amount;
-
-        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee);
         // sub collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
@@ -486,8 +485,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
         }
 
-        underlyingToken.forceApprove(address(flashlender), subDebt);
-
+        underlyingToken.forceApprove(address(flashlender), subDebt + fee);
         return CALLBACK_SUCCESS_CREDIT;
     }
 

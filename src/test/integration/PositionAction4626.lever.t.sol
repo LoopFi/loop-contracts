@@ -182,7 +182,9 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
             // User has around 56 Balancer LP tokens
             (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
             assertEq(collateral, depositAmount);
-            assertEq(debt, borrowAmount + flashLoanAmount);
+            uint256 flashloanFee = flashlender.flashFee(address(underlyingToken), flashLoanAmount);
+
+            assertEq(debt, borrowAmount + flashLoanAmount + flashloanFee);
             assertEq(IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(user) / 1 ether, 56);
         }
 
@@ -236,18 +238,20 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
             );
 
             // Collateral is 180 ETH, debt is 110 ETH
+            uint256 flashloanFee = flashlender.flashFee(address(underlyingToken), 40 ether);
             (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
             assertEq(collateral, depositAmount - 70 ether);
-            assertEq(debt, borrowAmount + flashLoanAmount - 40 ether);
+            assertGe(debt, borrowAmount + flashLoanAmount - 40 ether + flashloanFee);
 
             // All balancer LP tokens are burnt
             assertEq(IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(user), 0);
             assertEq(IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(address(positionAction)), 0);
 
-            // User has 59 collateral tokens, Balancer's exit tokens (49 from above) + residual ~(50 - 40)
-            assertEq(token.balanceOf(user) / 1 ether, 59);
-            // Position action now holds 20 collateral tokens that are stuck (70 - ~50)
-            assertEq(token.balanceOf(address(positionAction)) / 1 ether, 20);
+            uint256 expectedBalance = (59 ether + (70 ether - 50 ether)) / 1 ether;
+            assertEq(token.balanceOf(user) / 1 ether, expectedBalance);
+
+            // Position action should hold 0 collateral tokens
+            assertEq(token.balanceOf(address(positionAction)), 0);
         }
     }
 

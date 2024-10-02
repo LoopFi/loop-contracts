@@ -148,7 +148,7 @@ contract PositionAction4626 is PositionAction {
                 abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );
 
-            tokenOut = abi.decode(exitData, (uint256));
+            tokenOut = IERC20(IERC4626(leverParams.collateralToken).asset()).balanceOf(address(this));
         }
     }
 }

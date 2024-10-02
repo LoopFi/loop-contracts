@@ -261,6 +261,10 @@ function updateLeverJoin(
 
         if (bptAmount != 0) IERC20(bpt).forceApprove(address(balancerVault), bptAmount);
 
+        uint256 tmpOutIndex = outIndex;
+        for (uint256 i = 0; i <= tmpOutIndex; i++) if (assets[i] == bpt) tmpOutIndex++;
+        uint256 balanceBefore = IERC20(assets[tmpOutIndex]).balanceOf(poolActionParams.recipient);
+
         balancerVault.exitPool(
             poolId,
             address(this),
@@ -273,17 +277,7 @@ function updateLeverJoin(
             })
         );
 
-        for (uint256 i = 0; i <= outIndex; ) {
-            if (assets[i] == bpt) {
-                outIndex++;
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return IERC20(assets[outIndex]).balanceOf(address(poolActionParams.recipient));
+        return IERC20(assets[tmpOutIndex]).balanceOf(poolActionParams.recipient) - balanceBefore;
     }
 
     function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {

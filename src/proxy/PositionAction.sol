@@ -465,7 +465,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         );
 
         uint256 subDebt = leverParams.primarySwap.amount;
-        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee);
         // sub collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
@@ -526,7 +526,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
         }
 
-        underlyingToken.forceApprove(address(flashlender), subDebt);
+        underlyingToken.forceApprove(address(flashlender), subDebt + fee);
         return CALLBACK_SUCCESS_CREDIT;
     }
 

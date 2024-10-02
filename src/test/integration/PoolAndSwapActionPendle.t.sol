@@ -215,7 +215,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             limit: 0,
             recipient: user,
             residualRecipient: user,
-            deadline: 0,
+            deadline: block.timestamp,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
 
@@ -239,7 +239,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             limit: 0,
             recipient: user,
             residualRecipient: user,
-            deadline: 0,
+            deadline: block.timestamp,
             args: abi.encode(market, lpIn, weETH)
         });
 
@@ -281,7 +281,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             limit: 0,
             recipient: user,
             residualRecipient: user,
-            deadline: 0,
+            deadline: block.timestamp,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
 

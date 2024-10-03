@@ -5,7 +5,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "./interfaces/IFlashlender.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
-import {wmul} from "./utils/Math.sol";
+import {wmul, wdiv, WAD} from "./utils/Math.sol";
 
 /// @title Flashlender
 /// @notice `Flashlender` enables flashlender minting / borrowing of Stablecoin and internal Credit
@@ -63,7 +63,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     /// @return max maximum borrowable amount [wad]
     function maxFlashLoan(address token) external view override returns (uint256 max) {
         if (token == address(underlyingToken)) {
-            max = pool.creditManagerBorrowable(address(this));
+            max = wdiv(pool.creditManagerBorrowable(address(this)), WAD + protocolFee);
         }
     }
 

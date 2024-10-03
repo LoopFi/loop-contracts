@@ -39,6 +39,7 @@ struct SwapParams {
     uint256 amount; // Exact amount in or exact amount out depending on swapType
     uint256 limit; // Min amount out or max amount in depending on swapType
     address recipient;
+    address residualRecipient; // Address to send any residual tokens to
     uint256 deadline;
     /// @dev `args` can be used for protocol specific parameters
     /// For Balancer, it is the `poolIds` and `assetPath`
@@ -139,9 +140,13 @@ contract SwapAction is TransferAction {
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_OUT) {
             retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
         } else revert SwapAction__swap_notSupported();
-        // Transfer any remaining tokens to the recipient
+        // Transfer any remaining tokens to the residualRecipient or recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
-            IERC20(swapParams.assetIn).safeTransfer(swapParams.recipient, swapParams.limit - retAmount);
+            if (swapParams.residualRecipient != address(0)) {
+                IERC20(swapParams.assetIn).safeTransfer(swapParams.residualRecipient, swapParams.limit - retAmount);
+            } else {
+                IERC20(swapParams.assetIn).safeTransfer(swapParams.recipient, swapParams.limit - retAmount);
+            }
         }
     }
 

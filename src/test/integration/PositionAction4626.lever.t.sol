@@ -160,6 +160,7 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
                             amount: flashLoanAmount,
                             limit: 0,
                             recipient: address(positionAction),
+                            residualRecipient: user,
                             deadline: block.timestamp,
                             args: abi.encode(weightedPoolIdArray, assets)
                         }),
@@ -222,6 +223,7 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
                             amount: 40 ether,
                             limit: 50 ether,
                             recipient: address(positionAction),
+                            residualRecipient: user,
                             deadline: block.timestamp,
                             args: abi.encode(weightedPoolIdArray, assets)
                         }),

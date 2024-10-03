@@ -315,7 +315,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         position.collateral = add(position.collateral, deltaCollateral);
         position.debt = newDebt; // U:[CM-10,11]
         position.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10,11]
-        position.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
+        position.lastDebtUpdate = block.timestamp; // U:[CM-10,11]
 
         // position either has no debt or more debt than the debt floor
         if (position.debt != 0 && position.debt < uint256(vaultConfig.debtFloor))

@@ -105,7 +105,10 @@ contract SwapAction is TransferAction {
     /// @notice Perform a swap using the protocol and swap-type specified in `swapParams`
     /// @param swapParams The parameters for the swap
     /// @return retAmount Amount of tokens taken or received from the swap
-    function swap(SwapParams memory swapParams) public payable returns (uint256 retAmount) {
+    function swap(SwapParams memory swapParams) public returns (uint256 retAmount) {
+        if (block.timestamp > swapParams.deadline) {
+            _revertBytes("SwapAction: swap deadline passed");
+        }
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(
                 swapParams.args,
@@ -329,32 +332,37 @@ contract SwapAction is TransferAction {
     /// @param recipient Address to send the swapped tokens to
     /// @param minOut Minimum amount of LP tokens to receive
     /// @param data The parameters for joinng the pool
-    /// @dev For more information regarding the Pendle join function check Pendle 
+    /// @dev For more information regarding the Pendle join function check Pendle
     /// documentation
-    function pendleJoin(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 netLpOut){
+    function pendleJoin(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 netLpOut) {
         (
             address market,
             ApproxParams memory guessPtReceivedFromSy,
             TokenInput memory input,
             LimitOrderData memory limit
-        ) = abi.decode(data, (address, ApproxParams, TokenInput , LimitOrderData));
-        
-        if (input.tokenIn != address(0)) {
-                input.netTokenIn = IERC20(input.tokenIn).balanceOf(address(this));
-                IERC20(input.tokenIn).forceApprove(address(pendleRouter),input.netTokenIn);
-            }
+        ) = abi.decode(data, (address, ApproxParams, TokenInput, LimitOrderData));
 
-        (netLpOut,,) = pendleRouter.addLiquiditySingleToken{value: msg.value}(recipient, market, minOut, guessPtReceivedFromSy, input, limit);
+        if (input.tokenIn != address(0)) {
+            input.netTokenIn = IERC20(input.tokenIn).balanceOf(address(this));
+            IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
+        }
+
+        (netLpOut, , ) = pendleRouter.addLiquiditySingleToken(
+            recipient,
+            market,
+            minOut,
+            guessPtReceivedFromSy,
+            input,
+            limit
+        );
     }
 
-    function pendleExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 retAmount){
-        (
-        address market, uint256 netLpIn, address tokenOut
-        ) = abi.decode(data, (address,uint256, address));
-            
+    function pendleExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 retAmount) {
+        (address market, uint256 netLpIn, address tokenOut) = abi.decode(data, (address, uint256, address));
+
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
-        if(recipient != address(this)){
+        if (recipient != address(this)) {
             IPMarket(market).transferFrom(recipient, market, netLpIn);
         } else {
             IPMarket(market).transfer(market, netLpIn);
@@ -374,7 +382,7 @@ contract SwapAction is TransferAction {
         }
 
         return SY.redeem(recipient, netSyToRedeem, tokenOut, minOut, true);
-     }
+    }
 
     /// @notice Helper function that decodes the swap params and returns the token that will be swapped into
     /// @param swapParams The parameters for the swap

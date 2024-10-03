@@ -220,7 +220,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param to Address of the user to attribute the collateral to
     /// @param amount Amount of tokens to deposit [tokenScale]
     /// @return tokenAmount Amount of collateral deposited [wad]
-    function deposit(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
+    function deposit(address to, uint256 amount) external returns (uint256 tokenAmount) {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = toInt256(tokenAmount);
         modifyCollateralAndDebt({
@@ -236,7 +236,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param to Address of the user to withdraw tokens to
     /// @param amount Amount of tokens to withdraw [tokenScale]
     /// @return tokenAmount Amount of tokens withdrawn [wad]
-    function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
+    function withdraw(address to, uint256 amount) external returns (uint256 tokenAmount) {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
@@ -379,6 +379,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             // msg.sender has the permission of the creditor to use their credit to repay the debt
             (deltaDebt < 0 && !hasPermission(creditor, msg.sender))
         ) revert CDPVault__modifyCollateralAndDebt_noPermission();
+
+        // if the vault is paused allow only debt decreases
+        if (deltaDebt > 0 || deltaCollateral != 0){
+            _requireNotPaused();
+        }
 
         Position memory position = positions[owner];
         DebtData memory debtData = _calcDebt(position);

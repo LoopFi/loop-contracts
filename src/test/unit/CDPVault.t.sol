@@ -154,6 +154,19 @@ contract CDPVaultTest is TestBase {
         assertEq(collateral, 100 ether);
     }
 
+    function test_deposit_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.deposit(position, 100 ether);
+    }
+
     function test_borrow() public {
         CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
         createGaugeAndSetGauge(address(vault));
@@ -164,6 +177,76 @@ contract CDPVaultTest is TestBase {
         vault.borrow(address(this), position, 50 ether);
         uint256 credit = credit(address(this));
         assertEq(credit, 50 ether);
+    }
+
+    function test_borrow_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.borrow(address(this), position, 50 ether);
+    }
+
+    function test_repay() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
+
+        mockWETH.approve(address(vault), 80 ether);
+        vault.repay(address(this), position, 80 ether);
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(position);
+        assertEq(collateral, 100 ether);
+        assertEq(debt, 0 ether);
+    }
+
+    function test_repay_doesNotRevertWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
+
+        mockWETH.approve(address(vault), 80 ether);
+        vault.pause();
+        vault.repay(address(this), position, 80 ether);
+    }
+
+    function test_withdraw() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.withdraw(position, 50 ether);
+        (uint256 collateral, , , , , ) = vault.positions(position);
+        assertEq(collateral, 50 ether);
+    }
+
+    function test_withdraw_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.withdraw(position, 50 ether);
     }
 
     function test_modifyCollateralAndDebt_depositCollateralAndDrawDebt() public {
@@ -213,6 +296,8 @@ contract CDPVaultTest is TestBase {
         mockWETH.approve(address(vault), 80 ether);
         vault.modifyCollateralAndDebt(position, address(this), address(this), -100 ether, -80 ether);
     }
+
+
 
     function test_modifyCollateralAndDebt_revertsOnUnsafePosition() public {
         CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);

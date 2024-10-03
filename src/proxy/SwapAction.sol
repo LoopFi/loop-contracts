@@ -141,7 +141,7 @@ contract SwapAction is TransferAction {
             retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
         } else revert SwapAction__swap_notSupported();
         // Transfer any remaining tokens to the residualRecipient or recipient
-        if (swapParams.swapType == SwapType.EXACT_OUT) {
+        if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
             if (swapParams.residualRecipient != address(0)) {
                 IERC20(swapParams.assetIn).safeTransfer(swapParams.residualRecipient, swapParams.limit - retAmount);
             } else {

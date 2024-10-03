@@ -187,49 +187,53 @@ contract PoolAction is TransferAction {
     /// @param joinToken The token to join with
     /// @param flashLoanAmount The amount of the flash loan
     /// @param upfrontAmount The amount of the upfront token
-    function updateLeverJoin(
-        PoolActionParams memory poolActionParams,
-        address joinToken,
-        address upFrontToken,
-        uint256 flashLoanAmount,
-        uint256 upfrontAmount,
-        address poolToken
-    ) external pure returns (PoolActionParams memory outParams) {
-        outParams = poolActionParams;
+function updateLeverJoin(
+    PoolActionParams memory poolActionParams,
+    address joinToken,
+    address upFrontToken,
+    uint256 flashLoanAmount,
+    uint256 upfrontAmount
+) external view returns (PoolActionParams memory outParams) {
+    outParams = poolActionParams;
 
-        if (poolActionParams.protocol == Protocol.BALANCER) {
-            (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
-                .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
+    if (poolActionParams.protocol == Protocol.BALANCER) {
+        (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
+            .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
 
-            uint256 len = assets.length;
-            // the offset is needed because of the BPT token that needs to be skipped from the join
-            bool skipIndex = false;
-            uint256 joinAmount = flashLoanAmount;
-            if (upFrontToken == joinToken) {
-                joinAmount += upfrontAmount;
-            }
+        (address poolToken, ) = balancerVault.getPool(poolId);
 
-            // update the join parameters with the new amounts
-            for (uint256 i = 0; i < len; ) {
-                uint256 assetIndex = i - (skipIndex ? 1 : 0);
-                if (assets[i] == joinToken) {
-                    maxAmountsIn[i] = joinAmount;
-                    assetsIn[assetIndex] = joinAmount;
-                } else if (assets[i] == upFrontToken && assets[i] != poolToken) {
-                    maxAmountsIn[i] = upfrontAmount;
-                    assetsIn[assetIndex] = upfrontAmount;
-                } else {
-                    skipIndex = skipIndex || assets[i] == poolToken;
-                }
-                unchecked {
-                    i++;
-                }
-            }
-
-            // update the join parameters
-            outParams.args = abi.encode(poolId, assets, assetsIn, maxAmountsIn);
+        uint256 len = assets.length;
+        // the offset is needed because of the BPT token that needs to be skipped from the join
+        bool skipIndex = false;
+        uint256 joinAmount = flashLoanAmount;
+        if (upFrontToken == joinToken) {
+            joinAmount += upfrontAmount;
         }
+
+        // update the join parameters with the new amounts
+        for (uint256 i = 0; i < len; ) {
+            uint256 assetIndex = i - (skipIndex ? 1 : 0);
+            if (assets[i] == joinToken) {
+                maxAmountsIn[i] = joinAmount;
+                assetsIn[assetIndex] = joinAmount;
+            } else if (assets[i] == upFrontToken && assets[i] != poolToken) {
+                maxAmountsIn[i] = upfrontAmount;
+                assetsIn[assetIndex] = upfrontAmount;
+            } else {
+                skipIndex = skipIndex || assets[i] == poolToken;
+                if (assets[i] == poolToken) {
+                    maxAmountsIn[i] = 0;
+                }
+            }
+            unchecked {
+                i++;
+            }
+        }
+
+        // update the join parameters
+        outParams.args = abi.encode(poolId, assets, assetsIn, maxAmountsIn);
     }
+}
 
     /*//////////////////////////////////////////////////////////////
                              EXIT VARIANTS
@@ -257,6 +261,10 @@ contract PoolAction is TransferAction {
 
         if (bptAmount != 0) IERC20(bpt).forceApprove(address(balancerVault), bptAmount);
 
+        uint256 tmpOutIndex = outIndex;
+        for (uint256 i = 0; i <= tmpOutIndex; i++) if (assets[i] == bpt) tmpOutIndex++;
+        uint256 balanceBefore = IERC20(assets[tmpOutIndex]).balanceOf(poolActionParams.recipient);
+
         balancerVault.exitPool(
             poolId,
             address(this),
@@ -269,17 +277,7 @@ contract PoolAction is TransferAction {
             })
         );
 
-        for (uint256 i = 0; i <= outIndex; ) {
-            if (assets[i] == bpt) {
-                outIndex++;
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return IERC20(assets[outIndex]).balanceOf(address(poolActionParams.recipient));
+        return IERC20(assets[tmpOutIndex]).balanceOf(poolActionParams.recipient) - balanceBefore;
     }
 
     function _pendleExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {

@@ -697,7 +697,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         //poolQuotaKeeperOnly // U:[LP-2C]
         creditManagerOnly
     {
-        _setQuotaRevenue(uint256(quotaRevenue().toInt256() + quotaRevenueDelta)); // U:[LP-19]
+        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256());
     }
 
     /// @notice Sets new quota revenue value

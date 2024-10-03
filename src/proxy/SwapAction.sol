@@ -106,6 +106,9 @@ contract SwapAction is TransferAction {
     /// @param swapParams The parameters for the swap
     /// @return retAmount Amount of tokens taken or received from the swap
     function swap(SwapParams memory swapParams) public returns (uint256 retAmount) {
+        if (block.timestamp > swapParams.deadline) {
+            _revertBytes("SwapAction: swap deadline passed");
+        }
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(
                 swapParams.args,

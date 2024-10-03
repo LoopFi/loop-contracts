@@ -703,14 +703,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             } else {
                 // If amount is not enough to repay interest, then send all to the stakers and update index
                 profit += amountToRepay; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex =
                     (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
                     (INDEX_PRECISION *
                         cumulativeIndexNow -
-                        (INDEX_PRECISION * profit * cumulativeIndexLastUpdate) /
+                        (INDEX_PRECISION * amountToRepay * cumulativeIndexLastUpdate) /
                         debt); // U:[CL-3]
+
+                amountToRepay = 0; // U:[CL-3]
             }
         } else {
             newCumulativeIndex = cumulativeIndexLastUpdate;

@@ -105,7 +105,7 @@ contract SwapAction is TransferAction {
     /// @notice Perform a swap using the protocol and swap-type specified in `swapParams`
     /// @param swapParams The parameters for the swap
     /// @return retAmount Amount of tokens taken or received from the swap
-    function swap(SwapParams memory swapParams) public payable returns (uint256 retAmount) {
+    function swap(SwapParams memory swapParams) public returns (uint256 retAmount) {
         if (block.timestamp > swapParams.deadline) {
             _revertBytes("SwapAction: swap deadline passed");
         }
@@ -347,7 +347,7 @@ contract SwapAction is TransferAction {
             IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
         }
 
-        (netLpOut, , ) = pendleRouter.addLiquiditySingleToken{value: msg.value}(
+        (netLpOut, , ) = pendleRouter.addLiquiditySingleToken(
             recipient,
             market,
             minOut,

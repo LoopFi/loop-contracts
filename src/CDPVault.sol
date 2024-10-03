@@ -522,7 +522,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 spotPrice_ = spotPrice();
         uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
         if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
-        
+
         // Ensure that there's no bad debt
         if (calcTotalDebt(debtData) > wmul(position.collateral, spotPrice_)) revert CDPVault__BadDebt();
 
@@ -606,6 +606,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         takeCollateral = position.collateral;
         repayAmount = wmul(takeCollateral, discountedPrice);
         uint256 loss = calcTotalDebt(debtData) - repayAmount;
+        uint256 profit;
+        if (repayAmount > debtData.debt) {
+            profit = repayAmount - debtData.debt;
+        }
 
         // transfer the repay amount from the liquidator to the vault
         poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
@@ -622,7 +626,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             totalDebt
         );
 
-        pool.repayCreditAccount(debtData.debt, 0, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         token.safeTransfer(msg.sender, takeCollateral);
 

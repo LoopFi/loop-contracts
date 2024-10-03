@@ -44,6 +44,10 @@ module.exports = {
     tenderly: {
       url: process.env.TENDERLY_FORK_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    },
+    arbitrum: {
+      url: process.env.ARBITRUM_RPC,
+      accounts: [process.env.ARB_DEPLOYER_PRIVATE_KEY]
     }
   }
 };

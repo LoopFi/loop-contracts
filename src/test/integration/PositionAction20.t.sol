@@ -135,6 +135,7 @@ contract PositionAction20Test is IntegrationTestBase {
                 amount: depositAmount, // amount to swap in
                 limit: amountOutMin, // min amount of collateral token to receive
                 recipient: address(userProxy),
+                residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
             })
@@ -256,6 +257,7 @@ contract PositionAction20Test is IntegrationTestBase {
                 amount: depositAmount, // amount to swap in
                 limit: amountInMax, // min amount of collateral token to receive
                 recipient: address(userProxy),
+                residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
             })
@@ -310,6 +312,7 @@ contract PositionAction20Test is IntegrationTestBase {
                 amount: depositAmount, // amount to swap in
                 limit: amountOutMin, // min amount of collateral token to receive
                 recipient: address(userProxy),
+                residualRecipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
             })
@@ -393,6 +396,7 @@ contract PositionAction20Test is IntegrationTestBase {
                     amount: initialDeposit,
                     limit: ((initialDeposit / 1e12) * 99) / 100,
                     recipient: address(user),
+                    residualRecipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
                 })

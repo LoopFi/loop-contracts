@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPermission} from "../interfaces/IPermission.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
 import {toInt256, wmul, min} from "../utils/Math.sol";
@@ -449,7 +449,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     function onCreditFlashLoan(
         address /*initiator*/,
         uint256 /*amount*/,
-        uint256 /*fee*/,
+        uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
@@ -459,8 +459,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         );
 
         uint256 subDebt = leverParams.primarySwap.amount;
-
-        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee);
         // sub collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
@@ -496,8 +495,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
         }
 
-        underlyingToken.forceApprove(address(flashlender), subDebt);
-
+        underlyingToken.forceApprove(address(flashlender), subDebt + fee);
         return CALLBACK_SUCCESS_CREDIT;
     }
 
@@ -594,7 +592,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         PermitParams calldata permitParams
     ) internal {
         // transfer arbitrary token and swap to underlying token
-        uint256 amount;
+        uint256 amount = creditParams.amount;
         if (creditParams.auxSwap.assetIn != address(0)) {
             if (creditParams.auxSwap.recipient != address(this)) revert PositionAction__repay_InvalidAuxSwap();
 
@@ -612,13 +610,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
         }
 
-        underlyingToken.forceApprove(address(vault), creditParams.amount);
+        underlyingToken.forceApprove(address(vault), amount);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            -toInt256(creditParams.amount)
+            -toInt256(amount)
         );
     }
 

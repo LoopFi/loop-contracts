@@ -154,6 +154,19 @@ contract CDPVaultTest is TestBase {
         assertEq(collateral, 100 ether);
     }
 
+    function test_deposit_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.deposit(position, 100 ether);
+    }
+
     function test_borrow() public {
         CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
         createGaugeAndSetGauge(address(vault));
@@ -164,6 +177,76 @@ contract CDPVaultTest is TestBase {
         vault.borrow(address(this), position, 50 ether);
         uint256 credit = credit(address(this));
         assertEq(credit, 50 ether);
+    }
+
+    function test_borrow_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 10 ether, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.borrow(address(this), position, 50 ether);
+    }
+
+    function test_repay() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
+
+        mockWETH.approve(address(vault), 80 ether);
+        vault.repay(address(this), position, 80 ether);
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(position);
+        assertEq(collateral, 100 ether);
+        assertEq(debt, 0 ether);
+    }
+
+    function test_repay_doesNotRevertWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.modifyCollateralAndDebt(position, address(this), address(this), 100 ether, 80 ether);
+
+        mockWETH.approve(address(vault), 80 ether);
+        vault.pause();
+        vault.repay(address(this), position, 80 ether);
+    }
+
+    function test_withdraw() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.withdraw(position, 50 ether);
+        (uint256 collateral, , , , , ) = vault.positions(position);
+        assertEq(collateral, 50 ether);
+    }
+
+    function test_withdraw_revertsWhenPaused() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1.0 ether, 0);
+        createGaugeAndSetGauge(address(vault));
+
+        token.mint(address(this), 100 ether);
+        token.approve(address(vault), 100 ether);
+        address position = address(new PositionOwner(vault));
+        vault.deposit(position, 100 ether);
+        vault.pause();
+
+        vm.expectRevert("Pausable: paused");
+        vault.withdraw(position, 50 ether);
     }
 
     function test_modifyCollateralAndDebt_depositCollateralAndDrawDebt() public {
@@ -813,7 +896,7 @@ contract CDPVaultTest is TestBase {
         createGaugeAndSetGauge(address(vault));
 
         // create position
-        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        _modifyCollateralAndDebt(vault, 100 ether, 70 ether);
 
         // liquidate position
         address position = address(this);
@@ -827,12 +910,35 @@ contract CDPVaultTest is TestBase {
         uint256 collateralReceived = wdiv(repayAmount, wmul(vault.spotPrice(), uint256(95 * 10 ** 16)));
 
         uint256 virtualDebtAfter = virtualDebt(vault, position);
-        assertEq(virtualDebtAfter, 80 ether - repayAmount); // debt - repayAmount
-        assertEq(creditBefore - creditAfter, 80 ether - repayAmount);
-        assertEq(creditAfter, repayAmount); // creditBefore - repayAmount
+        assertEq(virtualDebtAfter, 70 ether - repayAmount); // debt - repayAmount
+        assertEq(creditBefore - creditAfter, repayAmount);
+        assertEq(creditAfter, creditBefore - repayAmount); // creditBefore - repayAmount
         (uint256 collateral, uint256 debtAfter, , , , ) = vault.positions(position);
         assertEq(collateral, 100 ether - collateralReceived);
-        assertEq(debtAfter, 40 ether);
+        assertEq(debtAfter, 30 ether);
+    }
+
+    function test_liquidate_partial_Fails_if_Bad_Debt() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 0.95 ether);
+        createGaugeAndSetGauge(address(vault));
+
+        // create position
+        _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+
+        // liquidate position in Bad Debt with partial repayment fails
+        address position = address(this);
+        uint256 repayAmount = 40 ether;
+        _updateSpot(0.80 ether);
+        mockWETH.approve(address(vault), repayAmount);
+        uint256 creditBefore = credit(address(this));
+        uint256 virtualDebtBefore = virtualDebt(vault, position);
+        vm.expectRevert(CDPVault.CDPVault__repayAmountNotEnough.selector);
+        vault.liquidatePositionBadDebt(position, repayAmount);
+
+        uint256 creditAfter = credit(address(this));
+        uint256 virtualDebtAfter = virtualDebt(vault, position);
+        assertEq(virtualDebtAfter, virtualDebtBefore); // debt didn't change
+        assertEq(creditBefore, creditAfter);
     }
 
     function test_deposit_collateral_decimals() public {
@@ -1018,137 +1124,31 @@ contract CDPVaultTest is TestBase {
         assertEq(vault.totalDebt(), 0, "totalDebt");
     }
 
-    // function test_liquidate_full_1() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
+    function test_recoverERC20() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
+        createGaugeAndSetGauge(address(vault));
 
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
+        ERC20PresetMinterPauser mockERC20 = new ERC20PresetMinterPauser("Mock Token", "MTKN");
+        mockERC20.mint(address(vault), 100 ether);
+        assertEq(mockERC20.balanceOf(address(this)), 0);
+        vault.recoverERC20(address(mockERC20), address(this), 100 ether);
+        assertEq(mockERC20.balanceOf(address(this)), 100 ether);
+    }
 
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 80 ether;
-    //     _updateSpot(0.80 ether);
-    //     vault.liquidatePosition(position, repayAmount);
+    function test_recoverERC20_revertOnInvalidToken() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
+        createGaugeAndSetGauge(address(vault));
+        vm.expectRevert(CDPVault.CDPVault__recoverERC20_invalidToken.selector);
+        vault.recoverERC20(address(token), address(this), 100 ether);
+    }
 
-    //     assertEq(debt(address(vault)), 0 ether);
-
-    //     assertEq(vault.cash(address(this)), 100 ether);
-    //     assertEq(credit(address(this)), 0); // creditBefore - repayAmount
-
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 0);
-    //     assertEq(normalDebt, 0);
-    // }
-
-    // // Case 2: Entire debt is repaid and bad debt has accrued
-    // function test_liquidate_full_2() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
-
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
-
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 80 ether;
-    //     _updateSpot(0.1 ether);
-    //     vault.liquidatePosition(position, repayAmount);
-
-    //     assertEq(debt(address(vault)), 70 ether); // debt - collateralValue (since no discount)
-    //     assertEq(vault.cash(address(this)), 100 ether); // all collateral
-
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 0);
-    //     assertEq(normalDebt, 0);
-    // }
-
-    // // Case 3: Entire debt is repaid and bad debt has accrued - with discount
-    // function test_liquidate_full_3() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         0,
-    //         1.25 ether,
-    //         1 ether,
-    //         0.95 ether,
-    //         WAD
-    //     );
-
-    //     // create position
-    //     _depositCollateral(vault, 100 ether);
-    //     _modifyCollateralAndDebt(vault, 100 ether, 80 ether);
-
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 80 ether;
-    //     _updateSpot(0.5 ether);
-    //     vault.liquidatePosition(position, repayAmount);
-
-    //     assertEq(debt(address(vault)), 80 ether - 47.5 ether); // debt - discounted collateral value
-
-    //     assertEq(vault.cash(address(this)), 100 ether); // collateral received
-    //     assertEq(credit(address(this)), 80 ether - 47.5 ether); // creditBefore - discounted collateral value
-
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 0);
-    //     assertEq(normalDebt, 0);
-    // }
-
-    // // Case 4: Entire debt is repaid and debt floor is not met - reverts
-    // function test_liquidate_full_4() public {
-    //     CDPVault vault = createCDPVault(
-    //         token,
-    //         150 ether,
-    //         10 ether,
-    //         1.5 ether,
-    //         1 ether,
-    //         1 ether,
-    //         WAD
-    //     );
-
-    //     // create position
-    //     _depositCollateral(vault, 15 ether);
-    //     _modifyCollateralAndDebt(vault, 15 ether, 10 ether);
-
-    //     // liquidate position
-    //     address position = address(this);
-    //     uint256 repayAmount = 10 ether - 1;
-    //     _updateSpot(1.0 ether - 1);
-
-    //     vm.expectRevert(CDPVault.CDPVault__modifyPosition_debtFloor.selector);
-    //     vault.liquidatePosition(position, repayAmount);
-
-    //     assertEq(debt(address(vault)), 10 ether);
-    //     assertEq(credit(address(this)), 10 ether); // credit before
-    //     assertEq(vault.cash(address(this)), 0); // still used as collateral since not liquidated
-
-    //     (uint256 collateral, uint256 normalDebt, , , ) = vault.positions(
-    //         position
-    //     );
-    //     assertEq(collateral, 15 ether);
-    //     assertEq(normalDebt, 10 ether);
-    // }
+    function test_recoverERC20_revertIfNotAuthorized() public {
+        CDPVault vault = createCDPVault(token, 150 ether, 0, 1.25 ether, 1 ether, 1 ether);
+        createGaugeAndSetGauge(address(vault));
+        vm.prank(address(0x123));
+        vm.expectRevert(
+            "AccessControl: account 0x0000000000000000000000000000000000000123 is missing role 0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
+        vault.recoverERC20(address(token), address(this), 100 ether);
+    }
 }

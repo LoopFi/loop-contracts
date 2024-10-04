@@ -39,6 +39,7 @@ struct SwapParams {
     uint256 amount; // Exact amount in or exact amount out depending on swapType
     uint256 limit; // Min amount out or max amount in depending on swapType
     address recipient;
+    address residualRecipient; // Address to send any residual tokens to
     uint256 deadline;
     /// @dev `args` can be used for protocol specific parameters
     /// For Balancer, it is the `poolIds` and `assetPath`
@@ -94,7 +95,7 @@ contract SwapAction is TransferAction {
         address from,
         PermitParams calldata permitParams,
         SwapParams calldata swapParams
-    ) external returns (uint256) {
+    ) external payable returns (uint256) {
         if (from != address(this)) {
             uint256 amount = swapParams.swapType == SwapType.EXACT_IN ? swapParams.amount : swapParams.limit;
             _transferFrom(swapParams.assetIn, from, address(this), amount, permitParams);
@@ -105,7 +106,10 @@ contract SwapAction is TransferAction {
     /// @notice Perform a swap using the protocol and swap-type specified in `swapParams`
     /// @param swapParams The parameters for the swap
     /// @return retAmount Amount of tokens taken or received from the swap
-    function swap(SwapParams memory swapParams) public payable returns (uint256 retAmount) {
+    function swap(SwapParams memory swapParams) public returns (uint256 retAmount) {
+        if (block.timestamp > swapParams.deadline) {
+            _revertBytes("SwapAction: swap deadline passed");
+        }
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (bytes32[] memory poolIds, address[] memory assetPath) = abi.decode(
                 swapParams.args,
@@ -136,9 +140,13 @@ contract SwapAction is TransferAction {
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_OUT) {
             retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
         } else revert SwapAction__swap_notSupported();
-        // Transfer any remaining tokens to the recipient
+        // Transfer any remaining tokens to the residualRecipient or recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
-            IERC20(swapParams.assetIn).safeTransfer(swapParams.recipient, swapParams.limit - retAmount);
+            if (swapParams.residualRecipient != address(0)) {
+                IERC20(swapParams.assetIn).safeTransfer(swapParams.residualRecipient, swapParams.limit - retAmount);
+            } else {
+                IERC20(swapParams.assetIn).safeTransfer(swapParams.recipient, swapParams.limit - retAmount);
+            }
         }
     }
 
@@ -344,7 +352,7 @@ contract SwapAction is TransferAction {
             IERC20(input.tokenIn).forceApprove(address(pendleRouter), input.netTokenIn);
         }
 
-        (netLpOut, , ) = pendleRouter.addLiquiditySingleToken{value: msg.value}(
+        (netLpOut, , ) = pendleRouter.addLiquiditySingleToken(
             recipient,
             market,
             minOut,
@@ -387,8 +395,15 @@ contract SwapAction is TransferAction {
     function getSwapToken(SwapParams calldata swapParams) public pure returns (address token) {
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (, address[] memory primarySwapPath) = abi.decode(swapParams.args, (bytes32[], address[]));
-            // the last token in the path is the token that will be swapped into
-            token = primarySwapPath[primarySwapPath.length - 1];
+            
+            if (swapParams.swapType == SwapType.EXACT_OUT){ 
+                // For EXACT_OUT, the token that will be swapped into is the first token in the path
+                token = primarySwapPath[0];
+            } else {
+                // For EXACT_IN, the token that will be swapped into is the last token in the path
+                token = primarySwapPath[primarySwapPath.length - 1];
+            }
+
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             token = decodeLastToken(swapParams.args);
         } else {

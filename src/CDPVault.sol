@@ -157,7 +157,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     error CDPVault__BadDebt();
     error CDPVault__repayAmountNotEnough();
     error CDPVault__tooHighRepayAmount();
-
+    error CDPVault__recoverERC20_invalidToken();
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -221,7 +221,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param to Address of the user to attribute the collateral to
     /// @param amount Amount of tokens to deposit [tokenScale]
     /// @return tokenAmount Amount of collateral deposited [wad]
-    function deposit(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
+    function deposit(address to, uint256 amount) external returns (uint256 tokenAmount) {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = toInt256(tokenAmount);
         modifyCollateralAndDebt({
@@ -237,7 +237,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param to Address of the user to withdraw tokens to
     /// @param amount Amount of tokens to withdraw [tokenScale]
     /// @return tokenAmount Amount of tokens withdrawn [wad]
-    function withdraw(address to, uint256 amount) external whenNotPaused returns (uint256 tokenAmount) {
+    function withdraw(address to, uint256 amount) external returns (uint256 tokenAmount) {
         tokenAmount = wdiv(amount, tokenScale);
         int256 deltaCollateral = -toInt256(tokenAmount);
         modifyCollateralAndDebt({
@@ -316,7 +316,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         position.collateral = add(position.collateral, deltaCollateral);
         position.debt = newDebt; // U:[CM-10,11]
         position.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10,11]
-        position.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
+        position.lastDebtUpdate = block.timestamp; // U:[CM-10,11]
 
         // position either has no debt or more debt than the debt floor
         if (position.debt != 0 && position.debt < uint256(vaultConfig.debtFloor))
@@ -380,6 +380,11 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             // msg.sender has the permission of the creditor to use their credit to repay the debt
             (deltaDebt < 0 && !hasPermission(creditor, msg.sender))
         ) revert CDPVault__modifyCollateralAndDebt_noPermission();
+
+        // if the vault is paused allow only debt decreases
+        if (deltaDebt > 0 || deltaCollateral != 0){
+            _requireNotPaused();
+        }
 
         Position memory position = positions[owner];
         DebtData memory debtData = _calcDebt(position);
@@ -523,8 +528,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 spotPrice_ = spotPrice();
         uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
         if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
-        // Enusure that there's no bad debt
-        if (calcTotalDebt(debtData) > wmul(position.collateral, spotPrice_)) revert CDPVault__BadDebt();
+        
+        // Ensure that there's no bad debt
+        if (calcTotalDebt(debtData) > wmul(position.collateral, discountedPrice)) revert CDPVault__BadDebt();
 
         // compute collateral to take, debt to repay and penalty to pay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);
@@ -606,6 +612,10 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         takeCollateral = position.collateral;
         repayAmount = wmul(takeCollateral, discountedPrice);
         uint256 loss = calcTotalDebt(debtData) - repayAmount;
+        uint256 profit;
+        if (repayAmount > debtData.debt) {
+            profit = repayAmount - debtData.debt;
+        }
 
         // transfer the repay amount from the liquidator to the vault
         poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
@@ -622,7 +632,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             totalDebt
         );
 
-        pool.repayCreditAccount(debtData.debt, 0, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt, profit, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         token.safeTransfer(msg.sender, takeCollateral);
 
@@ -699,14 +709,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             } else {
                 // If amount is not enough to repay interest, then send all to the stakers and update index
                 profit += amountToRepay; // U:[CL-3]
-                amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex =
                     (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate) /
                     (INDEX_PRECISION *
                         cumulativeIndexNow -
-                        (INDEX_PRECISION * profit * cumulativeIndexLastUpdate) /
+                        (INDEX_PRECISION * amountToRepay * cumulativeIndexLastUpdate) /
                         debt); // U:[CL-3]
+
+                amountToRepay = 0; // U:[CL-3]
             }
         } else {
             newCumulativeIndex = cumulativeIndexLastUpdate;
@@ -759,5 +770,19 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     ) external view returns (uint256 debt, uint256 accruedInterest, uint256 cumulativeQuotaInterest) {
         DebtData memory debtData = _calcDebt(positions[position]);
         return (debtData.debt, debtData.accruedInterest, debtData.cumulativeQuotaInterest);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              RECOVERY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Recovers ERC20 tokens from the vault
+    /// @param tokenAddress Address of the token to recover
+    /// @param to Address to recover the token to
+    /// @param tokenAmount Amount of the token to recover
+    /// @dev The token to recover cannot be the same as the collateral token
+    function recoverERC20(address tokenAddress, address to, uint256 tokenAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (tokenAddress == address(token)) revert CDPVault__recoverERC20_invalidToken();
+        IERC20(tokenAddress).safeTransfer(to, tokenAmount);
     }
 }

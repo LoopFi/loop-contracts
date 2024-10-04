@@ -138,6 +138,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 amount: borrowAmount,
                 limit: 0,
                 recipient: address(positionAction),
+                residualRecipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(pendlePoolIdArrayIn, assets)
             }),
@@ -228,6 +229,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 amount: borrowAmount,
                 limit: 0,
                 recipient: address(positionAction),
+                residualRecipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(pendlePoolIdArrayIn, assets)
             }),
@@ -285,6 +287,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
                 amount: repayAmount, // exact amount of stablecoin to receive
                 limit: lpToRedeem, // exact amount of PENDLE LP to redeem
                 recipient: address(positionAction),
+                residualRecipient: address(positionAction),
                 deadline: block.timestamp + 100,
                 args: abi.encode(pendlePoolIdArrayOut, assets)
             }),

@@ -12,6 +12,7 @@ import {IPermission} from "../../interfaces/IPermission.sol";
 
 import {CDPVault} from "../../CDPVault.sol";
 import {Flashlender} from "../../Flashlender.sol";
+import {WAD, wdiv} from "../../utils/Math.sol";
 
 abstract contract TestReceiver is FlashLoanReceiverBase {
     constructor(address flash) FlashLoanReceiverBase(flash) {
@@ -42,8 +43,14 @@ contract TestImmediatePaybackReceiver is TestReceiver {
 
         return CALLBACK_SUCCESS;
     }
-    function onCreditFlashLoan(address, uint256, uint256 fee_, bytes calldata) external override returns (bytes32) {
+    function onCreditFlashLoan(
+        address,
+        uint256 amount_,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
         _mintFee(fee_);
+        approvePayback(amount_ + fee_);
         return CALLBACK_SUCCESS_CREDIT;
     }
 }
@@ -159,7 +166,13 @@ contract TestNoFeePaybackReceiver is TestReceiver {
         approvePayback(amount_);
         return CALLBACK_SUCCESS;
     }
-    function onCreditFlashLoan(address, uint256, uint256, bytes calldata) external pure override returns (bytes32) {
+    function onCreditFlashLoan(
+        address,
+        uint256 amount_,
+        uint256 fee_,
+        bytes calldata
+    ) external override returns (bytes32) {
+        approvePayback(amount_ + fee_);
         return CALLBACK_SUCCESS_CREDIT;
     }
 }
@@ -289,6 +302,10 @@ contract FlashlenderTest is TestBase {
         assertEq(virtualDebt(vault, address(immediatePaybackReceiverFive)), 0);
         assertEq(newShares - currentShares, expectedFee); // expect that the treasury received the fees
         assertEq(virtualDebt(vault, address(flashlenderFive)), 0);
+
+        assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
+        flashlenderFive.creditFlashLoan(immediatePaybackReceiverFive, flashLoanAmount + expectedFee, "");
+        assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
     }
 
     function test_mint_reentrancy2() public {
@@ -307,6 +324,12 @@ contract FlashlenderTest is TestBase {
         uint256 maxAvailable = underlyingToken.balanceOf(address(liquidityPool));
         assertEq(flashlender.maxFlashLoan(address(underlyingToken)), maxAvailable);
         assertEq(flashlender.maxFlashLoan(addr), 0);
+
+        uint256 maxAvailableOne = wdiv(maxAvailable, WAD + 1e16);
+        uint256 maxAvailableFive = wdiv(maxAvailable, WAD + 5e16);
+
+        assertEq(flashlenderOne.maxFlashLoan(address(underlyingToken)), maxAvailableOne);
+        assertEq(flashlenderFive.maxFlashLoan(address(underlyingToken)), maxAvailableFive);
     }
 
     function test_flash_fee() public {

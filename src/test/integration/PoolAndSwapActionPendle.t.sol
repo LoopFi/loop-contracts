@@ -33,9 +33,11 @@ import {IUniswapV3Router, decodeLastToken, UniswapV3Router_decodeLastToken_inval
 import {IVault as IBalancerVault} from "../../vendor/IBalancerVault.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 import {SwapData, SwapType as SwapTypePendle} from "pendle/router/swap-aggregator/IPSwapAggregator.sol";
+
 interface IWETH {
     function deposit() external payable;
 }
+
 contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     using SafeERC20 for ERC20;
 
@@ -89,51 +91,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         // ERC20(wstETH).approve(address(permit2), type(uint256).max);
         // ERC20(bbaweth).approve(address(permit2), type(uint256).max);
         // vm.stopPrank();
-    }
-
-    function test_join_and_exit_Pendle_Ether() public {
-        PoolActionParams memory poolActionParams;
-
-        ApproxParams memory approxParams;
-        TokenInput memory tokenInput;
-        LimitOrderData memory limitOrderData;
-
-        approxParams = ApproxParams({
-            guessMin: 0,
-            guessMax: 15519288115338392367,
-            guessOffchain: 0,
-            maxIteration: 12,
-            eps: 10000000000000000
-        });
-
-        tokenInput.netTokenIn = 5 ether;
-
-        poolActionParams = PoolActionParams({
-            protocol: Protocol.PENDLE,
-            minOut: 0,
-            recipient: user,
-            args: abi.encode(market, approxParams, tokenInput, limitOrderData)
-        });
-
-        vm.startPrank(user);
-
-        userProxy.execute{value: 5 ether}(
-            address(poolAction),
-            abi.encodeWithSelector(PoolAction.join.selector, poolActionParams)
-        );
-
-        assertGt(ERC20(market).balanceOf(poolActionParams.recipient), 0, "failed to join");
-        assertEq(ERC20(weETH).balanceOf(poolActionParams.recipient), 0, "invalid weETH balance");
-
-        poolActionParams.args = abi.encode(market, ERC20(market).balanceOf(poolActionParams.recipient), weETH);
-
-        ERC20(market).approve(address(userProxy), type(uint256).max);
-
-        userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.exit.selector, poolActionParams));
-
-        assertEq(ERC20(market).balanceOf(poolActionParams.recipient), 0, "failed to redeem");
-        assertGt(ERC20(weETH).balanceOf(poolActionParams.recipient), 0, "failed to redeem");
-        assertEq(user.balance, 5 ether, "invalid user balance");
     }
 
     function test_join_with_WETH_and_exit_Pendle() public {
@@ -229,66 +186,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         assertEq(ERC20(weETH).balanceOf(poolActionParams.recipient), 0, "invalid weETH balance");
     }
 
-    function test_swap_Pendle_In_And_Out_Ether() public {
-        SwapParams memory swapParams;
-        // PermitParams memory permitParams;
-
-        ApproxParams memory approxParams;
-        TokenInput memory tokenInput;
-        LimitOrderData memory limitOrderData;
-
-        approxParams = ApproxParams({
-            guessMin: 0,
-            guessMax: 15519288115338392367,
-            guessOffchain: 0,
-            maxIteration: 12,
-            eps: 10000000000000000
-        });
-
-        tokenInput.netTokenIn = 5 ether;
-
-        swapParams = SwapParams({
-            swapProtocol: SwapProtocol.PENDLE_IN,
-            swapType: SwapType.EXACT_IN,
-            assetIn: address(0),
-            amount: tokenInput.netTokenIn,
-            limit: 0,
-            recipient: user,
-            deadline: 0,
-            args: abi.encode(market, approxParams, tokenInput, limitOrderData)
-        });
-
-        vm.startPrank(user);
-
-        userProxy.execute{value: 5 ether}(
-            address(swapAction),
-            abi.encodeWithSelector(SwapAction.swap.selector, swapParams)
-        );
-
-        assertEq(ERC20(weETH).balanceOf(swapParams.recipient), 0, "failed to swap/join");
-        assertEq(user.balance, 5 ether, "invalid user balance");
-
-        uint256 lpIn = ERC20(market).balanceOf(user);
-
-        swapParams = SwapParams({
-            swapProtocol: SwapProtocol.PENDLE_OUT,
-            swapType: SwapType.EXACT_IN,
-            assetIn: market,
-            amount: ERC20(market).balanceOf(user),
-            limit: 0,
-            recipient: user,
-            deadline: 0,
-            args: abi.encode(market, lpIn, weETH)
-        });
-
-        ERC20(market).approve(address(userProxy), type(uint256).max);
-
-        userProxy.execute(address(swapAction), abi.encodeWithSelector(SwapAction.swap.selector, swapParams));
-
-        assertEq(ERC20(market).balanceOf(swapParams.recipient), 0, "failed to swap/redeem");
-        assertGt(ERC20(weETH).balanceOf(swapParams.recipient), 0, "failed to swap/redeem");
-    }
-
     function test_swap_Pendle_In_And_Out_WETH() public {
         SwapParams memory swapParams;
 
@@ -317,7 +214,8 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: tokenInput.netTokenIn,
             limit: 0,
             recipient: user,
-            deadline: 0,
+            residualRecipient: user,
+            deadline: block.timestamp,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
 
@@ -340,7 +238,8 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: ERC20(market).balanceOf(user),
             limit: 0,
             recipient: user,
-            deadline: 0,
+            residualRecipient: user,
+            deadline: block.timestamp,
             args: abi.encode(market, lpIn, weETH)
         });
 
@@ -381,7 +280,8 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             amount: tokenInput.netTokenIn,
             limit: 0,
             recipient: user,
-            deadline: 0,
+            residualRecipient: user,
+            deadline: block.timestamp,
             args: abi.encode(market, approxParams, tokenInput, limitOrderData)
         });
 

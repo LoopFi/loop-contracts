@@ -101,7 +101,7 @@ module.exports = {
           "protocolFee": toWad('0.01'),
         },
         "configs": {
-            "debtFloor": toWad('1000'),
+            "debtFloor": toWad('1'),
             "liquidationRatio": toWad('1.05'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),

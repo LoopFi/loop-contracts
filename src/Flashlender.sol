@@ -19,7 +19,6 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
     bytes32 public constant CALLBACK_SUCCESS_CREDIT = keccak256("CreditFlashBorrower.onCreditFlashLoan");
 
-
     /// @notice The Pool contract
     IPoolV3 public immutable pool;
     /// @notice The flash loan fee, where WAD is 100%

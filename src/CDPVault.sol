@@ -11,9 +11,10 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {WAD, toInt256, toUint64, max, min, add, sub, wmul, wdiv, wmulUp, abs} from "./utils/Math.sol";
 import {Permission} from "./utils/Permission.sol";
 import {Pause, PAUSER_ROLE} from "./utils/Pause.sol";
+import {IPoolV3} from "./interfaces/IPoolV3.sol";
 
 import {IChefIncentivesController} from "./reward/interfaces/IChefIncentivesController.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
 import {QuotasLogic} from "@gearbox-protocol/core-v3/contracts/libraries/QuotasLogic.sol";

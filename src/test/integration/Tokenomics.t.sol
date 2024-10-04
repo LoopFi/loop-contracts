@@ -215,7 +215,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
         setOraclePrice(2400 ether);
 
-        treasury = vm.addr(uint256(keccak256("treasury")));
+        mockTreasury = vm.addr(uint256(keccak256("mockTreasury")));
         lockZap = vm.addr(uint256(keccak256("lockZap")));
         dao = vm.addr(uint256(keccak256("dao")));
 
@@ -296,7 +296,7 @@ contract TokenomicsTest is IntegrationTestBase {
         vm.label(address(loopToken), "loopToken");
         vm.label(lockZap, "lockZap");
         vm.label(dao, "dao");
-        vm.label(treasury, "treasury");
+        vm.label(mockTreasury, "mockTreasury");
         vm.label(address(lpToken), "stakingToken");
     }
 
@@ -314,7 +314,7 @@ contract TokenomicsTest is IntegrationTestBase {
         rewardMultipliers[3] = 25;
 
         multiFeeDistribution.setLockTypeInfo(lockDurations, rewardMultipliers);
-        multiFeeDistribution.setAddresses(IChefIncentivesController(address(incentivesController)), treasury);
+        multiFeeDistribution.setAddresses(IChefIncentivesController(address(incentivesController)), mockTreasury);
         multiFeeDistribution.setLPToken(address(govWeightedPool));
 
         address[] memory minters = new address[](1);

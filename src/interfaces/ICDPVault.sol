@@ -10,7 +10,7 @@ import {IBuffer} from "./IBuffer.sol";
 import {IPause} from "./IPause.sol";
 import {IPermission} from "./IPermission.sol";
 import {IInterestRateModel} from "./IInterestRateModel.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "./IPoolV3.sol";
 
 // Deployment related structs
 struct CDPVaultConstants {

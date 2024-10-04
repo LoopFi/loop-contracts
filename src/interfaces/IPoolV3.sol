@@ -126,6 +126,8 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
 
     function setPoolQuotaKeeper(address newPoolQuotaKeeper) external;
 
+    function setTreasury(address treasury_) external;
+
     function setTotalDebtLimit(uint256 newLimit) external;
 
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit) external;

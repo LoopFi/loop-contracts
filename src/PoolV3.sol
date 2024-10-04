@@ -22,7 +22,7 @@ import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "@gearbox-prot
 import {ICreditManagerV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ICreditManagerV3.sol";
 import {ILinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "./interfaces/IPoolV3.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
@@ -68,7 +68,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     address public immutable override underlyingToken;
 
     /// @notice Protocol treasury address
-    address public immutable override treasury;
+    address public override treasury;
 
     /// @notice Interest rate model contract address
     address public override interestRateModel;
@@ -776,6 +776,11 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _setQuotaRevenue(newQuotaRevenue); // U:[LP-23D]
 
         emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
+    }
+
+    /// @notice Sets new treasury address, can only be called by configurator
+    function setTreasury(address treasury_) external configuratorOnly nonZeroAddress(treasury_) {
+        treasury = treasury_;
     }
 
     /// @notice Sets new total debt limit, can only be called by controller

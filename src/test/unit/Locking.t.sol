@@ -72,7 +72,7 @@ contract LockingTest is Test {
         depositContract.initiateCooldown(500 ether);
 
         // Attempt to withdraw before the cooldown period has passed
-        vm.expectRevert("Cooldown period has not passed");
+        vm.expectRevert(Locking.CooldownPeriodNotPassed.selector);
         depositContract.withdraw();
         vm.stopPrank();
     }
@@ -97,14 +97,18 @@ contract LockingTest is Test {
         token.approve(address(depositContract), 500 ether);
         depositContract.deposit(500 ether);
 
-        vm.expectRevert("Insufficient balance to set cooldown amount");
+        vm.expectRevert(Locking.InsufficientBalanceForCooldown.selector);
         depositContract.initiateCooldown(600 ether);
+        vm.stopPrank();
+
+        vm.expectRevert(Locking.AmountIsZero.selector);
+        depositContract.initiateCooldown(0);
         vm.stopPrank();
     }
 
     function testDepositZero() public {
         vm.startPrank(user);
-        vm.expectRevert("Must send some tokens to deposit");
+        vm.expectRevert(Locking.AmountIsZero.selector);
         depositContract.deposit(0);
         vm.stopPrank();
     }

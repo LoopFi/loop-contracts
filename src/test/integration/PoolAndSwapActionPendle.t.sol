@@ -74,7 +74,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         
         prbProxyRegistry = new PRBProxyRegistry();
         poolAction = new PoolAction(address(0), PENDLE_ROUTER);
-        swapAction = new SwapAction(IBalancerVault(address(0)),IUniswapV3Router(address(0)), IPActionAddRemoveLiqV3(PENDLE_ROUTER));
+        swapAction = new SwapAction(IBalancerVault(address(0)),IUniswapV3Router(address(0)), IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter);
         
         // setup user and userProxy
         userPk = 0x12341234;

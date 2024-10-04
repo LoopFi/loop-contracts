@@ -36,6 +36,7 @@ contract SwapActionTest is Test {
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address internal constant PENDLE_ROUTER= 0x00000000005BBB0EF59571E58418F9a4357b68A0;
+    address internal constant KYBER_ROUTER = 0x6131B5fae19EA4f9D964eAc0408E4408b66337b5;
 
     // Permit2
     ISignatureTransfer internal constant permit2 = ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
@@ -70,7 +71,7 @@ contract SwapActionTest is Test {
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 17055414); // 15/04/2023 20:43:00 UTC
 
-        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER));
+        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), KYBER_ROUTER);
 
         userPk = 0x12341234;
         user = vm.addr(userPk);

@@ -53,6 +53,9 @@ contract IntegrationTestBase is TestBase {
     // univ3
     IUniswapV3Router univ3Router = IUniswapV3Router(UNISWAP_V3);
 
+    // kyber
+    address kyberRouter = 0x6131B5fae19EA4f9D964eAc0408E4408b66337b5;
+
     // balancer parameters
     IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
     IComposableStablePoolFactory internal constant stablePoolFactory =
@@ -88,7 +91,7 @@ contract IntegrationTestBase is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER));
+        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter);
         poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
 
         // configure balancer pools

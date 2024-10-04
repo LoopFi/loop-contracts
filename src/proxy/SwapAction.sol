@@ -22,7 +22,8 @@ enum SwapProtocol {
     BALANCER,
     UNIV3,
     PENDLE_IN,
-    PENDLE_OUT
+    PENDLE_OUT,
+    KYBER
 }
 
 /// @notice The type of swap to perform
@@ -64,6 +65,8 @@ contract SwapAction is TransferAction {
     IUniswapV3Router public immutable uniRouter;
     /// @notice Pendle Router
     IPActionAddRemoveLiqV3 public immutable pendleRouter;
+    /// @notice Kyber MetaAggregationRouterV2
+    address public immutable kyberRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -75,10 +78,11 @@ contract SwapAction is TransferAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(IVault balancerVault_, IUniswapV3Router uniRouter_, IPActionAddRemoveLiqV3 pendleRouter_) {
+    constructor(IVault balancerVault_, IUniswapV3Router uniRouter_, IPActionAddRemoveLiqV3 pendleRouter_, address kyberRouter_) {
         balancerVault = balancerVault_;
         uniRouter = uniRouter_;
         pendleRouter = pendleRouter_;
+        kyberRouter = kyberRouter_;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -121,6 +125,8 @@ contract SwapAction is TransferAction {
                 swapParams.recipient,
                 swapParams.deadline
             );
+        } else if (swapParams.swapProtocol == SwapProtocol.KYBER && swapParams.swapType == SwapType.EXACT_IN) {
+            retAmount = kyberSwap(swapParams.assetIn, swapParams.amount, swapParams.args);
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             retAmount = uniV3Swap(
                 swapParams.swapType,
@@ -274,6 +280,19 @@ contract SwapAction is TransferAction {
                     deadline
                 )[pathLength]
             );
+    }
+
+    /// @notice Perform an swap using Kyber MetaAggregationRouterV2
+    /// @param assetIn Token to swap from
+    /// @param amountIn Amount of `assetIn` to swap
+    /// @param payload tx calldata to use when calling the one inch router, 
+    /// this calldata can be generated using the 1inch api
+    /// @return _ Amount of tokens received from the swap
+    function kyberSwap(address assetIn, uint256 amountIn, bytes memory payload) internal returns (uint256) {
+        IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);
+        (bool success, bytes memory result) = kyberRouter.call(payload);
+        if (!success) _revertBytes(result);
+        return abi.decode(result, (uint256));
     }
 
     /// @notice Perform a swap using uniswap v3 exactInput or exactOutput function

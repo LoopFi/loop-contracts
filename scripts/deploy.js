@@ -106,6 +106,7 @@ async function loadDeployedContracts() {
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
   const contracts = {};
   for (let [name, { address, artifactName }] of Object.entries({ ...deployment.core, ...deployment.vaults })) {
+    if (artifactName.includes('IWeightedPool')) continue;
     contracts[name] = (await ethers.getContractFactory(artifactName)).attach(address);
   }
   return contracts;

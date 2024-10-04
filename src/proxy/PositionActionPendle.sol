@@ -7,11 +7,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
 
 import {PositionAction, LeverParams} from "./PositionAction.sol";
+import {PoolActionParams, Protocol} from "./PoolAction.sol";
 
 /// @title PositionActionPendle
 /// @notice Pendle LP implementation of PositionAction base contract
 contract PositionActionPendle is PositionAction {
-
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -22,7 +22,12 @@ contract PositionActionPendle is PositionAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_ ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_) {}
+    constructor(
+        address flashlender_,
+        address swapAction_,
+        address poolAction_,
+        address vaultRegistry_
+    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION
@@ -32,7 +37,12 @@ contract PositionActionPendle is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address position, address /*src*/, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(
+        address vault,
+        address position,
+        address /*src*/,
+        uint256 amount
+    ) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
         return ICDPVault(vault).deposit(position, amount);
@@ -42,8 +52,35 @@ contract PositionActionPendle is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address position, address /*dst*/, uint256 amount) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(address(position), amount);
+    function _onWithdraw(
+        address vault,
+        address position,
+        address dst,
+        uint256 amount
+    ) internal override returns (uint256) {
+        uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
+        address collateralToken = address(ICDPVault(vault).token());
+
+        if (dst != collateralToken && dst != address(0)) {
+            PoolActionParams memory poolActionParams = PoolActionParams({
+                protocol: Protocol.PENDLE,        
+                minOut: 0,                   
+                recipient: address(this),     
+                args: abi.encode(
+                    collateralToken,          
+                    collateralWithdrawn,       
+                    dst                        
+                )
+            });
+
+            bytes memory exitData = _delegateCall(
+                address(poolAction),
+                abi.encodeWithSelector(poolAction.exit.selector, poolActionParams)
+            );
+
+            collateralWithdrawn = abi.decode(exitData, (uint256));
+        }
+        return collateralWithdrawn;
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault
@@ -59,9 +96,7 @@ contract PositionActionPendle is PositionAction {
         uint256 /*swapAmountOut*/
     ) internal override returns (uint256 addCollateralAmount) {
         if (leverParams.auxAction.args.length != 0) {
-            _delegateCall(
-                address(poolAction), abi.encodeWithSelector(poolAction.join.selector, leverParams.auxAction)
-            );
+            _delegateCall(address(poolAction), abi.encodeWithSelector(poolAction.join.selector, leverParams.auxAction));
         }
         addCollateralAmount = ICDPVault(leverParams.vault).token().balanceOf(address(this));
         IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
@@ -81,11 +116,11 @@ contract PositionActionPendle is PositionAction {
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(
-                address(poolAction), abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
+                address(poolAction),
+                abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );
 
             tokenOut = abi.decode(exitData, (uint256));
         }
     }
-
 }

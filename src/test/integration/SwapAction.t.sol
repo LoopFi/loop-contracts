@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {PRBProxyRegistry} from "prb-proxy/PRBProxyRegistry.sol";
+import {PRBProxyRegistry} from "../../prb-proxy/PRBProxyRegistry.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
 
 import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
@@ -142,6 +142,7 @@ contract SwapActionTest is Test {
             amount: amountIn,
             limit: amountOutMin,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: DAI_USDC_PATH
         });
@@ -194,6 +195,7 @@ contract SwapActionTest is Test {
             amount: amountIn,
             limit: amountOutMin,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: DAI_WETH_BOND_PATH
         });
@@ -246,6 +248,7 @@ contract SwapActionTest is Test {
             amount: amountOut,
             limit: amountInMax,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: DAI_USDC_PATH
         });
@@ -300,6 +303,7 @@ contract SwapActionTest is Test {
             amount: amountOut,
             limit: amountInMax,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: DAI_WETH_USDC_PATH
         });
@@ -361,6 +365,7 @@ contract SwapActionTest is Test {
             amount: amountIn,
             limit: amountOutMin,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -420,6 +425,7 @@ contract SwapActionTest is Test {
             amount: amountOut,
             limit: amountInMax,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -483,6 +489,7 @@ contract SwapActionTest is Test {
             amount: amountOut,
             limit: amountInMax,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -549,6 +556,7 @@ contract SwapActionTest is Test {
             amount: amountOut,
             limit: amountInMax,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -612,6 +620,7 @@ contract SwapActionTest is Test {
             amount: amountIn,
             limit: amountOutMin,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -675,6 +684,7 @@ contract SwapActionTest is Test {
             amount: amountIn,
             limit: amountOutMin,
             recipient: user,
+            residualRecipient: user,
             deadline: deadline,
             args: abi.encode(poolIds, assets)
         });
@@ -690,6 +700,61 @@ contract SwapActionTest is Test {
         // assert swap success
         assertEq(BAL.balanceOf(user), amountOut);
         assertGe(amountOut, amountOutMin);
+    }
+
+    function test_transferAndSwap_ToBob() public {
+        uint256 amountOut = 1_000 * 1e18; // amount out of DAI we expect
+        uint256 amountInMax = (amountOut * 102) / 100e12; // allow 2% slippage
+        deal(address(USDC), user, amountInMax);
+        address bob = makeAddr("bob");
+        // get permit signature
+        uint256 deadline = block.timestamp + 100;
+        (uint8 v, bytes32 r, bytes32 s) = PermitMaker.getPermitTransferFromSignature(
+            address(USDC),
+            address(userProxy),
+            amountInMax,
+            NONCE,
+            deadline,
+            userPk
+        );
+
+        PermitParams memory permitParams = PermitParams({
+            approvalType: ApprovalType.PERMIT,
+            approvalAmount: amountInMax,
+            nonce: NONCE,
+            deadline: deadline,
+            v: v,
+            r: r,
+            s: s
+        });
+
+        // construct swap params
+        SwapParams memory swapParams = SwapParams({
+            swapProtocol: SwapProtocol.UNIV3,
+            swapType: SwapType.EXACT_OUT,
+            assetIn: address(USDC),
+            amount: amountOut,
+            limit: amountInMax,
+            recipient: bob,
+            residualRecipient: user,
+            deadline: deadline,
+            args: DAI_USDC_PATH
+        });
+
+        // call transferAndSwap
+        vm.prank(user);
+        bytes memory response = userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(swapAction.transferAndSwap.selector, user, permitParams, swapParams)
+        );
+
+        uint256 amountIn = abi.decode(response, (uint256));
+
+        // assert swap success
+        assertEq(DAI.balanceOf(bob), amountOut);
+        assertLe(amountIn, amountInMax);
+        assertEq(USDC.balanceOf(user), amountInMax - amountIn);
+        assertEq(USDC.balanceOf(bob), 0);
     }
 }
 

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPermission} from "../interfaces/IPermission.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
 import {toInt256, wmul, min} from "../utils/Math.sol";
@@ -100,6 +101,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     error PositionAction__increaseLever_invalidAuxSwap();
     error PositionAction__decreaseLever_invalidPrimarySwap();
     error PositionAction__decreaseLever_invalidAuxSwap();
+    error PositionAction__decreaseLever_invalidClosePositionPrimarySwap();
     error PositionAction__decreaseLever_invalidResidualRecipient();
     error PositionAction__onFlashLoan__invalidSender();
     error PositionAction__onFlashLoan__invalidInitiator();
@@ -112,9 +114,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     //////////////////////////////////////////////////////////////*/
 
     constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_) {
-        if (flashlender_ == address(0) || swapAction_ == address(0) || poolAction_ == address(0) || vaultRegistry_ == address(0))
-            revert PositionAction__constructor_InvalidParam();
-        
+        if (
+            flashlender_ == address(0) ||
+            swapAction_ == address(0) ||
+            poolAction_ == address(0) ||
+            vaultRegistry_ == address(0)
+        ) revert PositionAction__constructor_InvalidParam();
+
         flashlender = IFlashlender(flashlender_);
         pool = flashlender.pool();
         vaultRegistry = IVaultRegistry(vaultRegistry_);
@@ -149,7 +155,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param src Token passed in by the caller
     /// @param amount The amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address position, address src, uint256 amount) internal virtual returns (uint256);
+    function _onDeposit(
+        address vault,
+        address position,
+        address src,
+        uint256 amount
+    ) internal virtual returns (uint256);
 
     /// @notice Hook to withdraw collateral from CDPVault, handles any CDP specific actions
     /// @param vault The CDP Vault
@@ -157,7 +168,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param dst Token the caller expects to receive
     /// @param amount The amount of collateral to deposit [wad]
     /// @return Amount of collateral (or dst) withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address position, address dst, uint256 amount) internal virtual returns (uint256);
+    function _onWithdraw(
+        address vault,
+        address position,
+        address dst,
+        uint256 amount
+    ) internal virtual returns (uint256);
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault, handles any CDP specific actions
     /// @param leverParams LeverParams struct
@@ -211,7 +227,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault position
     /// @param vault The CDP Vault
     /// @param creditParams The borrow parameters
-    function borrow(address position, address vault, CreditParams calldata creditParams) external onlyRegisteredVault(vault) onlyDelegatecall {
+    function borrow(
+        address position,
+        address vault,
+        CreditParams calldata creditParams
+    ) external onlyRegisteredVault(vault) onlyDelegatecall {
         _borrow(vault, position, creditParams);
     }
 
@@ -343,30 +363,32 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param residualRecipient Optional parameter that must be provided if an `auxSwap` *is not* provided
     /// This parameter is the address to send the residual collateral to
     function decreaseLever(
-        LeverParams calldata leverParams,
+        LeverParams memory leverParams,
         uint256 subCollateral,
         address residualRecipient
     ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
-        if (leverParams.primarySwap.swapType != SwapType.EXACT_OUT || leverParams.primarySwap.recipient != self)
-            revert PositionAction__decreaseLever_invalidPrimarySwap();
+        if (leverParams.primarySwap.recipient != self) revert PositionAction__decreaseLever_invalidPrimarySwap();
 
-        // validate aux swap if it exists
-        if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
-            revert PositionAction__decreaseLever_invalidAuxSwap();
+        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
 
-        /// validate residual recipient is provided if no aux swap is provided
-        if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0))
-            revert PositionAction__decreaseLever_invalidResidualRecipient();
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
+            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
+
+            // residual recipient is required if the primary swap is an exact out swap
+            if (residualRecipient == address(0)) {
+                revert PositionAction__decreaseLever_invalidResidualRecipient();
+            }
+        }
 
         // take out credit flash loan
-        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
-        uint loanAmount = leverParams.primarySwap.amount;
         flashlender.creditFlashLoan(
             ICreditFlashBorrower(self),
-            loanAmount,
+            leverParams.primarySwap.amount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
+
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
     }
 
@@ -431,19 +453,17 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     function onCreditFlashLoan(
         address /*initiator*/,
         uint256 /*amount*/,
-        uint256 /*fee*/,
+        uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
-        (
-            LeverParams memory leverParams,
-            uint256 subCollateral,
-            address residualRecipient
-        ) = abi.decode(data,(LeverParams, uint256, address));
+        (LeverParams memory leverParams, uint256 subCollateral, address residualRecipient) = abi.decode(
+            data,
+            (LeverParams, uint256, address)
+        );
 
         uint256 subDebt = leverParams.primarySwap.amount;
-
-        underlyingToken.forceApprove(address(leverParams.vault), subDebt);
+        underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee);
         // sub collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
@@ -452,42 +472,59 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             0,
             -toInt256(subDebt)
         );
-
+        
         // withdraw collateral and handle any CDP specific actions
         uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
 
-        bytes memory swapData = _delegateCall(
-            address(swapAction),
-            abi.encodeWithSelector(
-                swapAction.swap.selector,
-                leverParams.primarySwap
-            )
-        );
-        uint256 swapAmountIn = abi.decode(swapData, (uint256));
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
+            leverParams.primarySwap.amount = withdrawnCollateral;
 
-        // swap collateral to stablecoin and calculate the amount leftover
-        uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+            bytes memory swapData = _delegateCall(
+                address(swapAction),
+                abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
+            );
 
-        // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
-        if (residualAmount > 0) {
+            uint256 swapAmountOut = abi.decode(swapData, (uint256));
+            uint256 residualAmount = swapAmountOut - subDebt;
 
-            // perform swap from collateral to arbitrary token if necessary
-            if (leverParams.auxSwap.assetIn != address(0)) {
-                _delegateCall(
-                    address(swapAction),
-                    abi.encodeWithSelector(
-                        swapAction.swap.selector,
-                        leverParams.auxSwap
-                    )
+            // sub collateral and debt
+            if (residualAmount > 0) {
+                underlyingToken.forceApprove(address(leverParams.vault), residualAmount);
+                ICDPVault(leverParams.vault).modifyCollateralAndDebt(
+                    leverParams.position,
+                    address(this),
+                    address(this),
+                    0,
+                    -toInt256(residualAmount)
                 );
-            } else {
-                // otherwise just send the collateral to `residualRecipient`
-                IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+            }
+        } else {
+            bytes memory swapData = _delegateCall(
+                address(swapAction),
+                abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
+            );
+            uint256 swapAmountIn = abi.decode(swapData, (uint256));
+
+            // swap collateral to stablecoin and calculate the amount leftover
+            uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+
+            // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
+            if (residualAmount > 0) {
+                // perform swap from collateral to arbitrary token if necessary
+                if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
+                    leverParams.auxSwap.amount = residualAmount;
+                    _delegateCall(
+                        address(swapAction),
+                        abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
+                    );
+                } else {
+                    // otherwise just send the collateral to `residualRecipient`
+                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+                }
             }
         }
 
-        underlyingToken.forceApprove(address(flashlender), subDebt);
-
+        underlyingToken.forceApprove(address(flashlender), subDebt + fee);
         return CALLBACK_SUCCESS_CREDIT;
     }
 
@@ -530,14 +567,20 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param vault The CDP Vault
     /// @param collateralParams The collateral parameters
     /// @return The amount of collateral withdrawn [token.decimals()]
-    function _withdraw(address vault, address position, CollateralParams calldata collateralParams) internal returns (uint256) {
+    function _withdraw(
+        address vault,
+        address position,
+        CollateralParams calldata collateralParams
+    ) internal returns (uint256) {
         uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
+            SwapParams memory auxSwap = collateralParams.auxSwap;
+            auxSwap.amount = collateral;
             _delegateCall(
                 address(swapAction),
-                abi.encodeWithSelector(swapAction.swap.selector, collateralParams.auxSwap)
+                abi.encodeWithSelector(swapAction.swap.selector, auxSwap)
             );
         } else {
             // otherwise just send the collateral to `collateralizer`
@@ -551,13 +594,21 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault
     /// @param creditParams The credit parameters
     function _borrow(address vault, address position, CreditParams calldata creditParams) internal {
-        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, toInt256(creditParams.amount));
+        ICDPVault(vault).modifyCollateralAndDebt(
+            position,
+            address(this),
+            address(this),
+            0,
+            toInt256(creditParams.amount)
+        );
         if (creditParams.auxSwap.assetIn == address(0)) {
             underlyingToken.forceApprove(address(this), creditParams.amount);
             underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
             // handle exit swap
-            if (creditParams.auxSwap.assetIn != address(underlyingToken)) revert PositionAction__borrow_InvalidAuxSwap();
+            if (creditParams.auxSwap.assetIn != address(underlyingToken)) {
+                revert PositionAction__borrow_InvalidAuxSwap();
+            }
             _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, creditParams.auxSwap));
         }
     }
@@ -566,9 +617,14 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param vault The CDP Vault
     /// @param creditParams The credit parameters
     /// @param permitParams The permit parameters
-    function _repay(address vault, address position, CreditParams calldata creditParams, PermitParams calldata permitParams) internal {
+    function _repay(
+        address vault,
+        address position,
+        CreditParams calldata creditParams,
+        PermitParams calldata permitParams
+    ) internal {
         // transfer arbitrary token and swap to underlying token
-        uint256 amount;
+        uint256 amount = creditParams.amount;
         if (creditParams.auxSwap.assetIn != address(0)) {
             if (creditParams.auxSwap.recipient != address(this)) revert PositionAction__repay_InvalidAuxSwap();
 
@@ -576,17 +632,23 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         } else {
             if (creditParams.creditor != address(this)) {
                 // transfer directly from creditor
-                _transferFrom(address(underlyingToken), creditParams.creditor, address(this), creditParams.amount, permitParams);
+                _transferFrom(
+                    address(underlyingToken),
+                    creditParams.creditor,
+                    address(this),
+                    creditParams.amount,
+                    permitParams
+                );
             }
         }
 
-        underlyingToken.forceApprove(address(vault), creditParams.amount);
+        underlyingToken.forceApprove(address(vault), amount);
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            -toInt256(creditParams.amount)
+            -toInt256(amount)
         );
     }
 

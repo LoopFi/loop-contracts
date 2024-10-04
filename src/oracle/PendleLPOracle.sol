@@ -32,7 +32,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     uint32 public immutable twapWindow;
     /// @notice Pendle Pt Oracle
     IPPtOracle public immutable ptOracle;
-    
+
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -53,7 +53,13 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
 
-    constructor(address ptOracle_, address market_, uint32 twap_, AggregatorV3Interface aggregator_, uint256 stalePeriod_) initializer {
+    constructor(
+        address ptOracle_,
+        address market_,
+        uint32 twap_,
+        AggregatorV3Interface aggregator_,
+        uint256 stalePeriod_
+    ) initializer {
         aggregator = aggregator_;
         stalePeriod = stalePeriod_;
         aggregatorScale = 10 ** uint256(aggregator.decimals());
@@ -81,8 +87,8 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal override virtual onlyRole(MANAGER_ROLE){
-        if(_getStatus()) revert PendleLPOracle__authorizeUpgrade_validStatus();
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
+        if (_getStatus()) revert PendleLPOracle__authorizeUpgrade_validStatus();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -92,7 +98,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @param /*token*/ Token address, ignored for this oracle
     /// @dev The status is valid if the price is validated and not stale
-    function getStatus(address /*token*/) public override virtual view returns (bool status){
+    function getStatus(address /*token*/) public view virtual override returns (bool status) {
         return _getStatus();
     }
 
@@ -115,9 +121,13 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @return price Asset price [WAD]
     function _fetchAndValidate() internal view returns (bool isValid, uint256 price) {
         try AggregatorV3Interface(aggregator).latestRoundData() returns (
-            uint80 roundId, int256 answer, uint256 /*startedAt*/, uint256 updatedAt, uint80 answeredInRound
+            uint80,
+            int256 answer,
+            uint256 /*startedAt*/,
+            uint256 updatedAt,
+            uint80
         ) {
-            isValid = (answer > 0 && answeredInRound >= roundId && block.timestamp - updatedAt <= stalePeriod);
+            isValid = (answer > 0 && block.timestamp - updatedAt <= stalePeriod);
             return (isValid, wdiv(uint256(answer), aggregatorScale));
         } catch {
             // return the default values (false, 0) on failure
@@ -127,9 +137,9 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @notice Returns the status of the oracle
     /// @return status Whether the oracle is valid
     /// @dev The status is valid if the price is validated and not stale
-    function _getStatus() private view returns (bool status){
-        (status,) = _fetchAndValidate();
-        if(status) return _validatePtOracle();
+    function _getStatus() private view returns (bool status) {
+        (status, ) = _fetchAndValidate();
+        if (status) return _validatePtOracle();
     }
 
     /// @notice Validates the PT oracle
@@ -140,11 +150,9 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
             uint16,
             bool oldestObservationSatisfied
         ) {
-            if(!increaseCardinalityRequired && oldestObservationSatisfied) return true; 
-        } 
-        catch {
+            if (!increaseCardinalityRequired && oldestObservationSatisfied) return true;
+        } catch {
             // return default value on failure
         }
-       
     }
 }

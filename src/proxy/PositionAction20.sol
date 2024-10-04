@@ -24,7 +24,7 @@ contract PositionAction20 is PositionAction {
     constructor(
         address flashlender_,
         address swapAction_,
-        address poolAction_, 
+        address poolAction_,
         address vaultRegistry_
     ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_) {}
 
@@ -36,7 +36,12 @@ contract PositionAction20 is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address position, address /*src*/, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(
+        address vault,
+        address position,
+        address /*src*/,
+        uint256 amount
+    ) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
         return ICDPVault(vault).deposit(position, amount);
@@ -47,7 +52,12 @@ contract PositionAction20 is PositionAction {
     /// @param position Address of the position
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address position, address /*dst*/, uint256 amount) internal override returns (uint256) {
+    function _onWithdraw(
+        address vault,
+        address position,
+        address /*dst*/,
+        uint256 amount
+    ) internal override returns (uint256) {
         return ICDPVault(vault).withdraw(position, amount);
     }
 

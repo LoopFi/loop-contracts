@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
@@ -100,6 +101,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     error PositionAction__increaseLever_invalidAuxSwap();
     error PositionAction__decreaseLever_invalidPrimarySwap();
     error PositionAction__decreaseLever_invalidAuxSwap();
+    error PositionAction__decreaseLever_invalidClosePositionPrimarySwap();
     error PositionAction__decreaseLever_invalidResidualRecipient();
     error PositionAction__onFlashLoan__invalidSender();
     error PositionAction__onFlashLoan__invalidInitiator();
@@ -361,30 +363,32 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param residualRecipient Optional parameter that must be provided if an `auxSwap` *is not* provided
     /// This parameter is the address to send the residual collateral to
     function decreaseLever(
-        LeverParams calldata leverParams,
+        LeverParams memory leverParams,
         uint256 subCollateral,
         address residualRecipient
     ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
-        if (leverParams.primarySwap.swapType != SwapType.EXACT_OUT || leverParams.primarySwap.recipient != self)
-            revert PositionAction__decreaseLever_invalidPrimarySwap();
+        if (leverParams.primarySwap.recipient != self) revert PositionAction__decreaseLever_invalidPrimarySwap();
 
-        // validate aux swap if it exists
-        if (leverParams.auxSwap.assetIn != address(0) && (leverParams.auxSwap.swapType != SwapType.EXACT_IN))
-            revert PositionAction__decreaseLever_invalidAuxSwap();
+        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
 
-        /// validate residual recipient is provided if no aux swap is provided
-        if (leverParams.auxSwap.assetIn == address(0) && residualRecipient == address(0))
-            revert PositionAction__decreaseLever_invalidResidualRecipient();
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
+            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
+
+            // residual recipient is required if the primary swap is an exact out swap
+            if (residualRecipient == address(0)) {
+                revert PositionAction__decreaseLever_invalidResidualRecipient();
+            }
+        }
 
         // take out credit flash loan
-        IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
-        uint loanAmount = leverParams.primarySwap.amount;
         flashlender.creditFlashLoan(
             ICreditFlashBorrower(self),
-            loanAmount,
+            leverParams.primarySwap.amount,
             abi.encode(leverParams, subCollateral, residualRecipient)
         );
+
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, false);
     }
 
@@ -469,35 +473,59 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             0,
             -toInt256(subDebt)
         );
-
+        
         // withdraw collateral and handle any CDP specific actions
         uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
 
-        bytes memory swapData = _delegateCall(
-            address(swapAction),
-            abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
-        );
-        uint256 swapAmountIn = abi.decode(swapData, (uint256));
+        if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
+            leverParams.primarySwap.amount = withdrawnCollateral;
 
-        // swap collateral to stablecoin and calculate the amount leftover
-        uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+            bytes memory swapData = _delegateCall(
+                address(swapAction),
+                abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
+            );
 
-        // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
-        if (residualAmount > 0) {
-            // perform swap from collateral to arbitrary token if necessary
-            if (leverParams.auxSwap.assetIn != address(0)) {
-                _delegateCall(
-                    address(swapAction),
-                    abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
+            uint256 swapAmountOut = abi.decode(swapData, (uint256));
+            uint256 residualAmount = swapAmountOut - subDebt;
+
+            // sub collateral and debt
+            if (residualAmount > 0) {
+                underlyingToken.forceApprove(address(leverParams.vault), residualAmount);
+                ICDPVault(leverParams.vault).modifyCollateralAndDebt(
+                    leverParams.position,
+                    address(this),
+                    address(this),
+                    0,
+                    -toInt256(residualAmount)
                 );
-            } else {
-                // otherwise just send the collateral to `residualRecipient`
-                IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+            }
+        } else {
+            bytes memory swapData = _delegateCall(
+                address(swapAction),
+                abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
+            );
+            uint256 swapAmountIn = abi.decode(swapData, (uint256));
+
+            // swap collateral to stablecoin and calculate the amount leftover
+            uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+
+            // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
+            if (residualAmount > 0) {
+                // perform swap from collateral to arbitrary token if necessary
+                if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
+                    leverParams.auxSwap.amount = residualAmount;
+                    _delegateCall(
+                        address(swapAction),
+                        abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
+                    );
+                } else {
+                    // otherwise just send the collateral to `residualRecipient`
+                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+                }
             }
         }
 
         underlyingToken.forceApprove(address(flashlender), subDebt);
-
         return CALLBACK_SUCCESS_CREDIT;
     }
 
@@ -549,9 +577,11 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
+            SwapParams memory auxSwap = collateralParams.auxSwap;
+            auxSwap.amount = collateral;
             _delegateCall(
                 address(swapAction),
-                abi.encodeWithSelector(swapAction.swap.selector, collateralParams.auxSwap)
+                abi.encodeWithSelector(swapAction.swap.selector, auxSwap)
             );
         } else {
             // otherwise just send the collateral to `collateralizer`
@@ -577,8 +607,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             underlyingToken.safeTransferFrom(address(this), creditParams.creditor, creditParams.amount);
         } else {
             // handle exit swap
-            if (creditParams.auxSwap.assetIn != address(underlyingToken))
+            if (creditParams.auxSwap.assetIn != address(underlyingToken)) {
                 revert PositionAction__borrow_InvalidAuxSwap();
+            }
             _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, creditParams.auxSwap));
         }
     }

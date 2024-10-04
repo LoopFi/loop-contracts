@@ -1,8 +1,10 @@
 const hre = require('hardhat');
 const fs = require('fs');
 const path = require('path');
-
+const axios = require('axios');
 const CONFIG = require('./config.js');
+const { BigNumber } = require('ethers');
+const { BalancerSDK, Network, PoolType } = require('@balancer-labs/sdk');
 
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
@@ -104,6 +106,7 @@ async function loadDeployedContracts() {
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
   const contracts = {};
   for (let [name, { address, artifactName }] of Object.entries({ ...deployment.core, ...deployment.vaults })) {
+    if (artifactName.includes('IWeightedPool')) continue;
     contracts[name] = (await ethers.getContractFactory(artifactName)).attach(address);
   }
   return contracts;
@@ -196,9 +199,9 @@ async function deployCore() {
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
 
-  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "sLP-ETH");
+  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "slpETH");
   console.log('StakingLPEth deployed to:', stakingLpEth.address);
-  const lockLpEth = await deployContract('LockingLPEth', 'StakingLPEth', false, pool.address, "LockLPEth", "lLP-ETH");
+  const lockLpEth = await deployContract('StakingLPEth', 'LockingLPEth', false, pool.address, "LockLPEth", "llpETH");
   console.log('LockLPEth deployed to:', lockLpEth.address);
 
   const treasuryReplaceParams = {
@@ -291,6 +294,8 @@ async function deployGauge() {
   await gaugeV3.setFrozenEpoch(false);
   console.log('Set frozen epoch to false in GaugeV3');
 
+
+
   //await quotaKeeper.updateRates();
   
   console.log('Gauge and related configurations have been set.');
@@ -358,6 +363,116 @@ async function deployGearbox() {
   
   await verifyOnTenderly('PoolV3', PoolV3.address);
   await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
+
+  // Cheat WETH to deployer
+  const url = process.env.TENDERLY_FORK_URL;
+  const value = BigNumber.from(10).pow(18).mul(1000);
+  const signer = await getSignerAddress();
+  const WETH = `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
+  const reqData = {
+    jsonrpc: "2.0",
+    method: "tenderly_setErc20Balance",
+    params: [
+      WETH,
+      [signer],
+      value.toHexString()
+    ],
+    id: "1234"
+  };
+
+  try {
+    const response = await axios.post(url, reqData, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log('Tenderly response:', response.data);
+  } catch (error) {
+    console.error('Error sending POST request to Tenderly:', error);
+  }
+
+  // Approve WETH to PoolV3
+  let weth = await attachContract('ERC20', WETH);
+  await weth.approve(PoolV3.address, value.div(2));
+
+  console.log("approved weth")
+
+  await PoolV3.deposit(value.div(2), signer);
+
+  console.log("deposited weth")
+
+  const balancer = new BalancerSDK({
+    network: Network.MAINNET,
+    rpcUrl: process.env.MAINNET_RPC_URL,
+  });
+
+  const poolTokens = [WETH, PoolV3.address];
+  const amountsIn = [
+    value.div(2).toString(),
+    value.div(2).toString(),
+  ];
+
+  await weth.approve(balancer.contracts.vault.address, value.div(2));
+  await PoolV3.approve(balancer.contracts.vault.address, value.div(2));
+
+  console.log("approved balancer pool spend")
+
+  const weightedPoolFactory = balancer.pools.poolFactory.of(PoolType.Weighted);
+  const poolParameters = {
+    name: 'My-Test-Pool-Name',
+    symbol: 'My-Test-Pool-Symbol',
+    tokenAddresses: poolTokens,
+    normalizedWeights: [
+      toWad('0.5').toString(),
+      toWad('0.5').toString(),
+    ],
+    rateProviders: [ethers.constants.AddressZero, ethers.constants.AddressZero],
+    swapFeeEvm: toWad('0.01').toString(),
+    owner: signer,
+  };
+
+  const { to, data } = weightedPoolFactory.create(poolParameters);
+  const deployer = (await ethers.getSigners())[0]
+
+  const receipt = await (
+    await deployer.sendTransaction({
+      from: signer,
+      to,
+      data,
+    })
+  ).wait();
+
+  console.log('Pool created with receipt:', receipt);
+
+  const { poolAddress, poolId } =
+    await weightedPoolFactory.getPoolAddressAndIdWithReceipt(
+      deployer.provider,
+      receipt
+    );
+
+  const initJoinParams = weightedPoolFactory.buildInitJoin({
+    joiner: signer,
+    poolId,
+    poolAddress,
+    tokensIn: poolTokens,
+    amountsIn: [
+      toWad('500').toString(),
+      toWad('500').toString(),
+    ],
+  });
+  
+  await deployer.sendTransaction({
+    to: initJoinParams.to,
+    data: initJoinParams.data,
+  });
+
+  console.log('Joined pool');
+
+  const tokens = await balancer.contracts.vault.getPoolTokens(poolId);
+  console.log('Pool Tokens Addresses: ' + tokens.tokens);
+  console.log('Pool Tokens balances: ' + tokens.balances);
+
+  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
 
   return { PoolV3, AddressProviderV3 };
 }
@@ -477,7 +592,16 @@ async function deployVaults() {
     console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
 
     // deploy reward manager
-    const rewardManager = await deployContract("RewardManager", "RewardManager", false, cdpVault.address, tokenAddress, prbProxyRegistry.address);
+    
+    const rewardManager = await deployContract(
+      "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "RewardManager",
+      false,
+      cdpVault.address,
+      tokenAddress,
+      prbProxyRegistry.address
+    );
+
     console.log('Deployed RewardManager for', vaultName, 'at', rewardManager.address);
 
     await cdpVault["setParameter(bytes32,address)"](toBytes32("rewardManager"), rewardManager.address);
@@ -495,6 +619,8 @@ async function deployVaults() {
         description: config.description,
         artifactName: 'CDPVault',
         collateralType: config.collateralType,
+        lrt: config.lrt,
+        lrtName: config.lrtName,
         pool: pool.address,
         oracle: oracle.address,
         token: tokenAddress,

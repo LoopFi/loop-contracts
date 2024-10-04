@@ -106,6 +106,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 amount: borrowAmount,
                 limit: amountOutMin,
                 recipient: address(positionAction),
+                residualRecipient: address(0),
                 deadline: block.timestamp + 100,
                 args: abi.encode(weightedPoolIdArray, assets)
             }),
@@ -208,6 +209,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: borrowAmount, // amount of underlying to swap in
                     limit: amountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -269,6 +271,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: borrowAmount,
                     limit: amountOutMin,
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -336,6 +339,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: borrowAmount,
                     limit: amountOutMin,
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -406,6 +410,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: borrowAmount, // amount of stablecoin to swap in
                     limit: amountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -497,6 +502,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 amount: amountOut, // exact amount of stablecoin to receive
                 limit: maxAmountIn, // max amount of token to pay
                 recipient: address(positionAction),
+                residualRecipient: address(0),
                 deadline: block.timestamp + 100,
                 args: abi.encode(weightedPoolIdArray, assets)
             }),
@@ -570,6 +576,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 amount: amountOut,
                 limit: maxAmountIn,
                 recipient: address(positionAction),
+                residualRecipient: address(0),
                 deadline: block.timestamp + 100,
                 args: abi.encode(weightedPoolIdArray, assets)
             }),
@@ -640,6 +647,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 amount: amountOut,
                 limit: maxAmountIn,
                 recipient: address(positionAction),
+                residualRecipient: address(0),
                 deadline: block.timestamp + 100,
                 args: abi.encode(weightedPoolIdArray, assets)
             }),
@@ -704,6 +712,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: amountOut,
                     limit: maxAmountIn,
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -775,6 +784,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: borrowAmount,
                     limit: amountOutMin,
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -785,6 +795,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: upFrontUnderliers, // amount of USDC to swap in
                     limit: auxAmountOutMin, // min amount of token to receive
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, auxAssets)
                 }),
@@ -871,6 +882,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: amountOut, // exact amount of stablecoin to receive
                     limit: maxAmountIn, // max amount of token to pay
                     recipient: address(positionAction),
+                    residualRecipient: address(0),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),
@@ -881,6 +893,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: 0,
                     limit: 0,
                     recipient: address(user),
+                    residualRecipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, auxAssets)
                 }),
@@ -909,7 +922,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // trigger PositionAction__decreaseLever_invalidAuxSwap
         leverParams.auxSwap.swapType = SwapType.EXACT_OUT;
-        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidAuxSwap.selector);
+        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidResidualRecipient.selector);
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -977,6 +990,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                     amount: amountToLever, // amount of stablecoin to swap in
                     limit: amountToLeverLimit, // min amount of tokens to receive
                     recipient: address(positionAction),
+                    residualRecipient: address(msg.sender),
                     deadline: block.timestamp + 100,
                     args: abi.encode(weightedPoolIdArray, assets)
                 }),

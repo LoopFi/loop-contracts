@@ -7,7 +7,7 @@ pragma abicoder v1;
 // INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "@gearbox-protocol/core-v3/contracts/interfaces/IGaugeV3.sol";
 import {IGearStakingV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
-import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolQuotaKeeperV3} from "src/interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolV3.sol";
 
 // TRAITS
@@ -253,7 +253,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
         IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
         if (!quotaKeeper.isQuotedToken(token)) {
-            quotaKeeper.addQuotaToken({token: token}); // U:[GA-05]
+            quotaKeeper.addQuotaToken({token: token, rate: minRate}); // U:[GA-05]
         }
 
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]

@@ -38,7 +38,7 @@ contract PositionAction4626 is PositionAction {
     /// @param src Token passed in by the caller
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @return Amount of collateral deposited [wad]
-    function _onDeposit(address vault, address /*position*/, address src, uint256 amount) internal override returns (uint256) {
+    function _onDeposit(address vault, address position, address src, uint256 amount) internal override returns (uint256) {
         address collateral = address(ICDPVault(vault).token());
 
         // if the src is not the collateralToken, we need to deposit the underlying into the ERC4626 vault
@@ -49,7 +49,7 @@ contract PositionAction4626 is PositionAction {
         }
 
         IERC20(collateral).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(address(this), amount);
+        return ICDPVault(vault).deposit(position, amount);
     }
 
     /// @notice Withdraw collateral from the vault
@@ -58,7 +58,12 @@ contract PositionAction4626 is PositionAction {
     /// @param dst Token the caller expects to receive
     /// @param amount Amount of collateral to withdraw [wad]
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
-    function _onWithdraw(address vault, address /*position*/, address dst, uint256 amount) internal override returns (uint256) {
+    function _onWithdraw(
+        address vault,
+        address /*position*/,
+        address dst,
+        uint256 amount
+    ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(this), amount);
 
         // if collateral is not the dst token, we need to withdraw the underlying from the ERC4626 vault
@@ -108,8 +113,7 @@ contract PositionAction4626 is PositionAction {
                 joinToken,
                 joinUpfrontToken,
                 swapAmountOut,
-                upFrontAmount,
-                underlyingToken
+                upFrontAmount
             );
 
             _delegateCall(address(poolAction), abi.encodeWithSelector(poolAction.join.selector, poolActionParams));
@@ -126,7 +130,7 @@ contract PositionAction4626 is PositionAction {
 
         // deposit into the CDP vault
         IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
-        return ICDPVault(leverParams.vault).deposit(address(this), addCollateralAmount);
+        return addCollateralAmount;
     }
 
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault and the ERC4626 Vault
@@ -138,7 +142,7 @@ contract PositionAction4626 is PositionAction {
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
         // withdraw collateral from vault
-        uint256 withdrawnCollateral = ICDPVault(leverParams.vault).withdraw(address(this), subCollateral);
+        uint256 withdrawnCollateral = ICDPVault(leverParams.vault).withdraw(leverParams.position, subCollateral);
 
         // withdraw collateral from the ERC4626 vault and return underlying assets
         tokenOut = IERC4626(leverParams.collateralToken).redeem(withdrawnCollateral, address(this), address(this));
@@ -149,7 +153,7 @@ contract PositionAction4626 is PositionAction {
                 abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );
 
-            tokenOut = abi.decode(exitData, (uint256));
+            tokenOut = IERC20(IERC4626(leverParams.collateralToken).asset()).balanceOf(address(this));
         }
     }
 }

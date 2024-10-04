@@ -21,15 +21,33 @@ import {PositionAction20} from "../../proxy/PositionAction20.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
 import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {RewardManager} from "src/pendle-rewards/RewardManager.sol";
+import {console} from "forge-std/console.sol";
 
-contract PositionAction20PendleTest is IntegrationTestBase {
+interface IPendleMarketV3 {
+    function redeemRewards(address user) external returns (uint256[] memory rewardsOut);
+
+    function getRewardTokens() external view returns (address[] memory);
+
+    function balanceOf(address account) external view returns (uint256);
+
+    function userReward(address token, address user) external view returns (uint256 index, uint256 accrued);
+
+    function lastRewardBlock() external view returns (uint256);
+
+    function activeBalance(address user) external view returns (uint256);
+}
+
+contract RewardManagerPendleTest is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
     // user
     PRBProxy userProxy;
+    PRBProxy userProxy2;
     address user;
+    address user2;
     uint256 constant userPk = 0x12341234;
-
+    uint256 constant userPk2 = 0x12341235;
     // cdp vaults
     CDPVault pendleVault_STETH;
     CDPVault pendleVault_weETH;
@@ -45,6 +63,11 @@ contract PositionAction20PendleTest is IntegrationTestBase {
     address PENDLE_LP_ETHERFI = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
     address pendleOwner = 0x1FcCC097db89A86Bfc474A1028F93958295b1Fb7;
     address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee;
+
+    RewardManager rewardManager;
+    address pendleToken = 0x808507121B80c02388fAd14726482e061B8da827;
+    IPendleMarketV3 pendleStEth = IPendleMarketV3(address(PENDLE_LP_STETH));
+    address pendleHolder = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
 
     function setUp() public virtual override {
         usePatchedDeal = true;
@@ -75,6 +98,13 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         createGaugeAndSetGauge(address(pendleVault_STETH), address(PENDLE_LP_STETH));
         createGaugeAndSetGauge(address(pendleVault_weETH), address(PENDLE_LP_ETHERFI));
 
+        // RewardManager
+        rewardManager = new RewardManager(
+            address(pendleVault_STETH),
+            address(PENDLE_LP_STETH),
+            address(prbProxyRegistry)
+        );
+        pendleVault_STETH.setParameter("rewardManager", address(rewardManager));
         // configure oracle spot prices
         oracle.updateSpot(address(PENDLE_LP_STETH), 3500 ether);
         oracle.updateSpot(address(PENDLE_LP_ETHERFI), 3500 ether);
@@ -83,6 +113,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         user = vm.addr(0x12341234);
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
 
+        user2 = vm.addr(0x12341235);
+        userProxy2 = PRBProxy(payable(address(prbProxyRegistry.deployFor(user2))));
         // deploy position actions
         positionAction = new PositionAction20(
             address(flashlender),
@@ -104,38 +136,45 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         assertTrue(address(positionAction) != address(0));
     }
 
-    function test_deposit_Pendle_LP_stETH() public {
-        uint256 depositAmount = 100 ether;
+    function test_deposit_Pendle_LP_stETH_1_week_time_reward() public {
+        uint256 depositAmount = 997 ether;
 
-        vm.prank(pendleLP_STETH_Holder);
-        PENDLE_LP_STETH.transfer(user, depositAmount);
+        (uint256 index, uint256 accrued) = pendleStEth.userReward(pendleToken, address(pendleVault_STETH));
+        assertEq(index, 0);
+        assertEq(accrued, 0);
 
-        CollateralParams memory collateralParams = CollateralParams({
-            targetToken: address(PENDLE_LP_STETH),
-            amount: depositAmount,
-            collateralizer: address(user),
-            auxSwap: emptySwap
-        });
+        _deposit(userProxy, address(pendleVault_STETH), depositAmount);
 
-        vm.prank(user);
-        PENDLE_LP_STETH.approve(address(userProxy), depositAmount);
-
-        vm.prank(user);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.deposit.selector,
-                address(userProxy),
-                address(pendleVault_STETH),
-                collateralParams,
-                emptyPermitParams
-            )
-        );
+        (index, accrued) = pendleStEth.userReward(pendleToken, address(pendleVault_STETH));
+        assertGt(index, 0);
+        assertEq(accrued, 0);
 
         (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
 
         assertEq(collateral, depositAmount);
         assertEq(normalDebt, 0);
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.roll(block.number + 150);
+
+        uint256 index2;
+        (index2, accrued) = pendleStEth.userReward(pendleToken, address(pendleVault_STETH));
+        assertEq(index, index2);
+        assertEq(accrued, 0);
+
+        assertEq(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
+
+        pendleStEth.redeemRewards(address(pendleVault_STETH));
+
+        assertGt(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
+
+        pendleVault_STETH.getRewards(address(userProxy));
+        assertGt(ERC20(pendleToken).balanceOf(address(user)), 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
     }
 
     function test_deposit_from_proxy_collateralizer_PENDLE() public {
@@ -169,9 +208,34 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         assertEq(normalDebt, 0);
     }
 
+    function test_deposit_and_withdraw_from_user_PENDLE() public {
+        uint256 depositAmount = 100 ether;
+
+        vm.prank(pendleLP_STETH_Holder);
+        PENDLE_LP_STETH.transfer(address(this), depositAmount);
+
+        PENDLE_LP_STETH.approve(address(pendleVault_STETH), depositAmount);
+
+        pendleVault_STETH.modifyCollateralAndDebt(address(this), address(this), address(this), int(depositAmount), 0);
+
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(this));
+
+        assertEq(collateral, depositAmount);
+        assertEq(normalDebt, 0);
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.roll(block.number + 150);
+
+        pendleVault_STETH.modifyCollateralAndDebt(address(this), address(this), address(this), -int(depositAmount), 0);
+    }
+
     function test_withdraw_PENDLE() public {
         // deposit PENDLE_STETH to vault
-        uint256 initialDeposit = 1_000 ether;
+        uint256 initialDeposit = 997 ether;
         _deposit(userProxy, address(pendleVault_STETH), initialDeposit);
 
         // build withdraw params
@@ -182,6 +246,13 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             collateralizer: address(user),
             auxSwap: auxSwap
         });
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.roll(block.number + 150);
 
         vm.prank(user);
         userProxy.execute(
@@ -197,6 +268,109 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
+
+        _deposit(userProxy, address(pendleVault_STETH), initialDeposit);
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
+
+        vm.warp(block.timestamp + 10 days);
+        vm.roll(block.number + 800);
+
+        uint256 pendleBalanceBefore = ERC20(pendleToken).balanceOf(address(user));
+        assertGt(pendleBalanceBefore, 0);
+
+        vm.prank(user);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.withdraw.selector,
+                address(userProxy), // user proxy is the position
+                address(pendleVault_STETH),
+                collateralParams
+            )
+        );
+
+        assertGt(ERC20(pendleToken).balanceOf(address(user)), pendleBalanceBefore);
+        assertEq(ERC20(pendleToken).balanceOf(address(userProxy)), 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
+    }
+
+    function test_withdraw_PENDLE_2_users_simultaneously() public {
+        // deposit PENDLE_STETH to vault
+        uint256 initialDeposit = 997 ether;
+        _deposit(userProxy, address(pendleVault_STETH), initialDeposit);
+        _deposit(userProxy2, address(pendleVault_STETH), initialDeposit);
+        // build withdraw params
+        SwapParams memory auxSwap;
+        CollateralParams memory collateralParams = CollateralParams({
+            targetToken: address(PENDLE_LP_STETH),
+            amount: initialDeposit,
+            collateralizer: address(user),
+            auxSwap: auxSwap
+        });
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.roll(block.number + 150);
+
+        assertEq(ERC20(pendleToken).balanceOf(address(user)), 0);
+
+        vm.prank(user);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.withdraw.selector,
+                address(userProxy), // user proxy is the position
+                address(pendleVault_STETH),
+                collateralParams
+            )
+        );
+
+        (uint256 collateral, uint256 normalDebt, , , , ) = pendleVault_STETH.positions(address(userProxy));
+        assertEq(collateral, 0, "collateral not zero");
+        assertEq(normalDebt, 0, "debt not zero");
+
+        assertGt(ERC20(pendleToken).balanceOf(address(user)), 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(userProxy)), 0);
+
+        // Some pendle reward is left in the vault for other users
+        assertGt(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
+
+        // check reward
+        vm.prank(pendleHolder);
+        ERC20(pendleToken).transfer(address(pendleStEth), 0.0011 ether);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.roll(block.number + 150);
+
+        assertEq(ERC20(pendleToken).balanceOf(address(user2)), 0);
+
+        collateralParams.collateralizer = address(user2);
+        vm.prank(user2);
+        userProxy2.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.withdraw.selector,
+                address(userProxy2), // user proxy is the position
+                address(pendleVault_STETH),
+                collateralParams
+            )
+        );
+
+        uint256 pendleBalAfter = ERC20(pendleToken).balanceOf(address(user2));
+        assertGt(pendleBalAfter, 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(userProxy2)), 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
+
+        pendleVault_STETH.getRewards(address(userProxy2));
+        assertEq(ERC20(pendleToken).balanceOf(address(user2)), pendleBalAfter);
+        assertEq(ERC20(pendleToken).balanceOf(address(userProxy2)), 0);
+        assertEq(ERC20(pendleToken).balanceOf(address(pendleVault_STETH)), 0);
     }
 
     function test_borrow_PENDLE() public {
@@ -283,6 +457,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
         assertEq(debt, 0);
         assertEq(creditAmount, 0);
         assertEq(underlyingToken.balanceOf(user), 0);
+        assertEq(underlyingToken.balanceOf(address(userProxy)), 0);
     }
 
     function test_withdrawAndRepay_PENDLE() public {
@@ -463,7 +638,7 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             address(positionAction),
             abi.encodeWithSelector(
                 positionAction.deposit.selector,
-                address(userProxy), // user proxy is the position
+                address(proxy), // user proxy is the position
                 vault,
                 collateralParams,
                 emptyPermitParams

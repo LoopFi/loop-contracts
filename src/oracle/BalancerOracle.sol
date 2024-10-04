@@ -9,7 +9,7 @@ import {wdiv, WAD, wpow, wmul} from "../utils/Math.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
 import {IVault} from "../vendor/IBalancerVault.sol";
 import {IWeightedPool} from "../vendor/IWeightedPool.sol";
-
+import {VaultReentrancyLib} from "src/vendor/VaultReentrancyLib.sol";
 bytes32 constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
 contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
@@ -116,7 +116,7 @@ contract BalancerOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
         // update the safe price first
         safePrice = safePrice_ = currentPrice;
         lastUpdate = block.timestamp;
-
+        VaultReentrancyLib.ensureNotInVaultContext(balancerVault);
         uint256[] memory weights = IWeightedPool(pool).getNormalizedWeights();
         uint256 totalSupply = IWeightedPool(pool).totalSupply();
 

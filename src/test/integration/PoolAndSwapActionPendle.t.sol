@@ -6,7 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
-import {PRBProxyRegistry} from "src/prb-proxy/PRBProxyRegistry.sol";
+import {PRBProxyRegistry} from "../../prb-proxy/PRBProxyRegistry.sol";
 import {WAD} from "../../utils/Math.sol";
 
 import {IntegrationTestBase} from "./IntegrationTestBase.sol";

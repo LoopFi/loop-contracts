@@ -176,6 +176,7 @@ contract TestBase is Test {
             name_: "Loop Liquidity Pool",
             symbol_: "lpETH "
         });
+        liquidityPool.setTreasury(mockTreasury);
 
         underlyingToken = mockWETH;
 

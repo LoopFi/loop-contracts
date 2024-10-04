@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IPRBProxy, IPRBProxyRegistry} from "src/prb-proxy/interfaces/IPRBProxyRegistry.sol";
+import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
 import {console} from "forge-std/console.sol";
 
 interface IPendleMarketV3 {

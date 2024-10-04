@@ -168,11 +168,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         addressProvider = addressProvider_; // U:[LP-1B]
         underlyingToken = underlyingToken_; // U:[LP-1B]
 
-        treasury = IAddressProviderV3(addressProvider_).getAddressOrRevert({
-            key: AP_TREASURY,
-            _version: NO_VERSION_CONTROL
-        }); // U:[LP-1B]
-
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
         _baseInterestIndexLU = uint128(RAY); // U:[LP-1B]
 

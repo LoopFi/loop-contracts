@@ -468,7 +468,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(bobNormalDebt, 0);
     }
 
-    function test_decreaseLever_1() public {
+    function test_decreaseLever() public {
         // lever up first and record the current collateral and normalized debt
         _increaseLever(
             userProxy, // position
@@ -922,7 +922,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // trigger PositionAction__decreaseLever_invalidAuxSwap
         leverParams.auxSwap.swapType = SwapType.EXACT_OUT;
-        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidAuxSwap.selector);
+        vm.expectRevert(PositionAction.PositionAction__decreaseLever_invalidResidualRecipient.selector);
         vm.prank(user);
         userProxy.execute(
             address(positionAction),

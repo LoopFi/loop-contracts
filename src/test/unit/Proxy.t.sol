@@ -10,7 +10,7 @@ import {IPRBProxy} from "prb-proxy/interfaces/IPRBProxy.sol";
 import {IPRBProxyRegistry} from "prb-proxy/interfaces/IPRBProxyRegistry.sol";
 import {IPRBProxyPlugin} from "prb-proxy/interfaces/IPRBProxyPlugin.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
-import {PRBProxyRegistry} from "prb-proxy/PRBProxyRegistry.sol";
+import {PRBProxyRegistry} from "../../prb-proxy/PRBProxyRegistry.sol";
 
 import {ERC165Plugin} from "../../proxy/ERC165Plugin.sol";
 

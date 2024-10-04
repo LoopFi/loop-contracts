@@ -45,11 +45,12 @@ contract TestImmediatePaybackReceiver is TestReceiver {
     }
     function onCreditFlashLoan(
         address,
-        uint256,
+        uint256 amount_,
         uint256 fee_,
         bytes calldata
     ) external override returns (bytes32) {
         _mintFee(fee_);
+        approvePayback(amount_ + fee_);
         return CALLBACK_SUCCESS_CREDIT;
     }
 }
@@ -177,10 +178,11 @@ contract TestNoFeePaybackReceiver is TestReceiver {
     }
     function onCreditFlashLoan(
         address,
-        uint256,
-        uint256,
+        uint256 amount_,
+        uint256 fee_,
         bytes calldata
-    ) external override pure returns (bytes32) {
+    ) external override returns (bytes32) {
+        approvePayback(amount_ + fee_);
         return CALLBACK_SUCCESS_CREDIT;
     }
 }
@@ -310,6 +312,10 @@ contract FlashlenderTest is TestBase {
         assertEq(virtualDebt(vault, address(immediatePaybackReceiverFive)), 0);
         assertEq(newShares - currentShares, expectedFee); // expect that the treasury received the fees
         assertEq(virtualDebt(vault, address(flashlenderFive)), 0);
+
+        assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
+        flashlenderFive.creditFlashLoan(immediatePaybackReceiverFive, flashLoanAmount + expectedFee, "");
+        assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
     }
 
     function test_mint_reentrancy2() public {

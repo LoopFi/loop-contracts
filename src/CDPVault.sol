@@ -29,6 +29,16 @@ interface IPoolV3Loop is IPoolV3 {
     function addAvailable(address user, int256 amount) external;
 }
 
+interface IRewardManager {
+    function handleRewardsOnDeposit(address user, uint256 amount, int256 deltaCollateral) external;
+
+    function handleRewardsOnWithdraw(
+        address user,
+        uint256 amount,
+        int256 deltaCollateral
+    ) external returns (address[] memory, uint256[] memory, address to);
+}
+
 // Authenticated Roles
 bytes32 constant VAULT_CONFIG_ROLE = keccak256("VAULT_CONFIG_ROLE");
 bytes32 constant VAULT_UNWINDER_ROLE = keccak256("VAULT_UNWINDER_ROLE");
@@ -118,6 +128,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @notice Reward incentives controller
     IChefIncentivesController public rewardController;
 
+    /// @notice Reward manager
+    IRewardManager public rewardManager;
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -207,6 +219,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param data New address to set for the variable
     function setParameter(bytes32 parameter, address data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
         if (parameter == "rewardController") rewardController = IChefIncentivesController(data);
+        else if (parameter == "rewardManager") rewardManager = IRewardManager(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
         emit SetParameter(parameter, data);
     }
@@ -290,6 +303,34 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         return oracle.spot(address(token));
     }
 
+    function _handleTokenRewards(address owner, uint256 collateralAmountBefore, int256 deltaCollateral) internal {
+        if (deltaCollateral > 0) {
+            rewardManager.handleRewardsOnDeposit(owner, collateralAmountBefore, deltaCollateral);
+        } else if (deltaCollateral < 0) {
+            (address[] memory tokens, uint256[] memory rewardAmounts, address to) = rewardManager
+                .handleRewardsOnWithdraw(owner, collateralAmountBefore, deltaCollateral);
+
+            for (uint256 i = 0; i < tokens.length; i++) {
+                if (rewardAmounts[i] != 0) {
+                    IERC20(tokens[i]).safeTransfer(to, rewardAmounts[i]);
+                }
+            }
+        }
+    }
+
+    function getRewards(address owner) external {
+        if (address(rewardManager) != address(0)) {
+            (address[] memory tokens, uint256[] memory rewardAmounts, address to) = rewardManager
+                .handleRewardsOnWithdraw(owner, positions[owner].collateral, 0);
+
+            for (uint256 i = 0; i < tokens.length; i++) {
+                if (rewardAmounts[i] != 0) {
+                    IERC20(tokens[i]).safeTransfer(to, rewardAmounts[i]);
+                }
+            }
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                         POSITION ADMINISTRATION
     //////////////////////////////////////////////////////////////*/
@@ -311,6 +352,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 totalDebt_
     ) internal returns (Position memory) {
         uint256 currentDebt = position.debt;
+        uint256 collateralBefore = position.collateral;
+
         // update collateral and debt amounts by the deltas
         position.collateral = add(position.collateral, deltaCollateral);
         position.debt = newDebt; // U:[CM-10,11]
@@ -335,6 +378,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         if (address(rewardController) != address(0)) {
             rewardController.handleActionAfter(owner, position.debt, totalDebt_);
         }
+
+        if (address(rewardManager) != address(0)) _handleTokenRewards(owner, collateralBefore, deltaCollateral);
 
         emit ModifyPosition(owner, position.debt, position.collateral, totalDebt_);
 

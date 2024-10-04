@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {PRBProxyRegistry} from "prb-proxy/PRBProxyRegistry.sol";
+import {PRBProxyRegistry} from "src/prb-proxy/PRBProxyRegistry.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
 import {TestBase} from "../TestBase.sol";
 import {wmul, wdiv} from "../../utils/Math.sol";

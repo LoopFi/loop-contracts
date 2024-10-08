@@ -39,6 +39,12 @@ abstract contract TransferAction {
     address public constant permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error TransferAction__transferFrom_notEnoughAllowance();
+
+    /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -64,7 +70,8 @@ abstract contract TransferAction {
             );
         } else if (params.approvalType == ApprovalType.PERMIT) {
             // Consume a standard ERC20 permit message
-            IERC20Permit(token).safePermit(
+            uint256 nonceBefore = IERC20Permit(token).nonces(from);
+            try IERC20Permit(token).permit(
                 from,
                 to,
                 params.approvalAmount,
@@ -72,7 +79,20 @@ abstract contract TransferAction {
                 params.v,
                 params.r,
                 params.s
-            );
+            ){
+                uint256 nonceAfter = IERC20Permit(token).nonces(from);
+                // if the nonce is not incremented by 1, then the permit is invalid
+                // we can check the allowance to make sure the transfer will work
+                if (nonceAfter != nonceBefore + 1) {
+                    if(IERC20(token).allowance(from, to) < params.approvalAmount) 
+                        revert TransferAction__transferFrom_notEnoughAllowance();
+                }
+            }
+            catch{
+                // if the permit reverts, we can check the allowance to make sure the transfer will work
+                if(IERC20(token).allowance(from, to) < params.approvalAmount) 
+                    revert TransferAction__transferFrom_notEnoughAllowance();
+            }
             IERC20(token).safeTransferFrom(from, to, amount);
         } else {
             // No signature provided, just transfer tokens.

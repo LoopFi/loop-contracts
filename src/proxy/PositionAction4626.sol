@@ -148,7 +148,7 @@ contract PositionAction4626 is PositionAction {
         tokenOut = IERC4626(leverParams.collateralToken).redeem(withdrawnCollateral, address(this), address(this));
 
         if (leverParams.auxAction.args.length != 0) {
-            bytes memory exitData = _delegateCall(
+            _delegateCall(
                 address(poolAction),
                 abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );

@@ -270,16 +270,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         // Convert ETH to WETH
         WETH.deposit{value: msg.value}();
 
-        // Transfer WETH to the contract
-        if (!WETH.transfer(address(this), msg.value)) {
-            revert WethTransferFailed();
-        }
-
-
-        // Proceed with the original deposit flow using WETH
+        // Calculate the amount of underlying received after the fee
         uint256 assetsReceived = _amountMinusFee(msg.value); // U:[LP-6]
         shares = _convertToShares(assetsReceived); // U:[LP-6]
-        _deposit(receiver, msg.value, assetsReceived, shares); // U:[LP-6]
+
+        // The weth is already in the contract, so we can directly register the deposit 
+        _registerDeposit(receiver, msg.value, assetsReceived, shares); // U:[LP-6]
     }
 
     /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
@@ -412,6 +408,19 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), value: assetsSent}); // U:[LP-6,7]
 
+        _updateBaseInterest({
+            expectedLiquidityDelta: assetsReceived.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        }); // U:[LP-6,7]
+
+        _mint(receiver, shares); // U:[LP-6,7]
+        emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[LP-6,7]
+    }
+
+    /// @dev Same as `_deposit`, but for native ETH deposits
+    /// @dev The WETH is already in the contract, so we don't need to transfer it
+    function _registerDeposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
             availableLiquidityDelta: 0,

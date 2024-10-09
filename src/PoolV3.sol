@@ -59,6 +59,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     error PoolV3LockedException();
     error NoEthSent();
     error WethTransferFailed();
+    error WrongUnderlying();
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -265,6 +266,11 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     {
         if (msg.value == 0) {
             revert NoEthSent();
+        }
+
+        // Revert if the underlying token is not WETH
+        if (address(underlyingToken) != address(WETH)) {
+            revert WrongUnderlying();
         }
 
         // Convert ETH to WETH

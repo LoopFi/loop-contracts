@@ -293,8 +293,8 @@ contract SwapAction is TransferAction {
     /// @notice Perform an swap using Kyber MetaAggregationRouterV2
     /// @param assetIn Token to swap from
     /// @param amountIn Amount of `assetIn` to swap
-    /// @param payload tx calldata to use when calling the one inch router, 
-    /// this calldata can be generated using the 1inch api
+    /// @param payload tx calldata to use when calling the kyber router, 
+    /// this calldata can be generated using the kyber swap api
     /// @return _ Amount of tokens received from the swap
     function kyberSwap(address assetIn, uint256 amountIn, bytes memory payload) internal returns (uint256) {
         IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);

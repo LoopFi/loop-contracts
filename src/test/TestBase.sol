@@ -94,6 +94,7 @@ contract TestBase is Test {
         createAssets();
         createOracles();
         createCore();
+        addLiquidity();
         createAndSetPoolQuotaKeeper();
         //createGaugeAndSetGauge();
         createStakingLpEth();
@@ -181,14 +182,16 @@ contract TestBase is Test {
 
         underlyingToken = mockWETH;
 
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
+        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
+        vaultRegistry = new VaultRegistry();
+    }
+
+    function addLiquidity() internal virtual {
         uint256 availableLiquidity = 1_000_000 ether;
         mockWETH.mint(address(this), availableLiquidity);
         mockWETH.approve(address(liquidityPool), availableLiquidity);
         liquidityPool.deposit(availableLiquidity, address(this));
-
-        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
-        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
-        vaultRegistry = new VaultRegistry();
     }
 
     function createCDPVault(

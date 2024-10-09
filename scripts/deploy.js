@@ -339,6 +339,7 @@ async function deployGearbox() {
     'PoolV3',
     'PoolV3',
     false, // not a vault
+    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
     AddressProviderV3.address, // addressProvider_
     underlierAddress, // underlyingToken_
     LinearInterestRateModelV3.address, // interestRateModel_

@@ -271,23 +271,19 @@ contract PRBProxyRegistry is IPRBProxyRegistry {
     }
 
     function getAddress(address owner) public view returns (address) {
-        // Step 1: Create the salt using the owner's address
         bytes32 salt = bytes32(abi.encodePacked(owner));
 
-        // Step 2: Get the contract bytecode of DeployWithCreate2 (with the owner constructor argument)
-        bytes memory bytecode = abi.encodePacked(type(PRBProxy).creationCode, abi.encode(owner));
+        bytes memory bytecode = abi.encodePacked(type(PRBProxy).creationCode);
 
-        // Step 3: Compute the CREATE2 address using the formula:
         bytes32 hash = keccak256(
             abi.encodePacked(
-                bytes1(0xff),          // Fixed 0xff
-                address(this),         // Deployer address (this contract)
-                salt,                  // Salt (created from owner address)
-                keccak256(bytecode)    // Hash of the contract bytecode
+                bytes1(0xff),      
+                address(this),     
+                salt,              
+                keccak256(bytecode)
             )
         );
 
-        // Step 4: Return the computed address (last 20 bytes of the hash)
         return address(uint160(uint(hash)));
     }
 

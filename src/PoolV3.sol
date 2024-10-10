@@ -23,6 +23,7 @@ import {ICreditManagerV3} from "@gearbox-protocol/core-v3/contracts/interfaces/I
 import {ILinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "./interfaces/IPoolV3.sol";
+import {IWETH} from "./reward/interfaces/IWETH.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "@gearbox-protocol/core-v3/contracts/libraries/CreditLogic.sol";
@@ -56,9 +57,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     error CallerNotManagerException();
     error PoolV3LockedException();
+    error NoEthSent();
+    error WethTransferFailed();
+    error WrongUnderlying();
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
+
+    /// @notice Address wrapped ethereum
+    IWETH public immutable WETH;
 
     /// @notice Address provider contract address
     address public immutable override addressProvider;
@@ -149,6 +156,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
+        address weth_,
         address addressProvider_,
         address underlyingToken_,
         address interestRateModel_,
@@ -164,6 +172,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(underlyingToken_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
+        WETH = IWETH(weth_);
         addressProvider = addressProvider_; // U:[LP-1B]
         underlyingToken = underlyingToken_; // U:[LP-1B]
 
@@ -242,6 +251,37 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     ) external override returns (uint256 shares) {
         shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
         emit Refer(receiver, referralCode, assets); // U:[LP-6]
+    }
+
+    /// @notice Deposits given amount of ETH (converted to WETH) to the pool in exchange for pool shares
+    /// @param receiver Account to mint pool shares to
+    /// @return shares Number of shares minted
+    function depositETH(address receiver)
+        public
+        payable
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+        nonZeroAddress(receiver) // U:[LP-5]
+        returns (uint256 shares)
+    {
+        if (msg.value == 0) {
+            revert NoEthSent();
+        }
+
+        // Revert if the underlying token is not WETH
+        if (address(underlyingToken) != address(WETH)) {
+            revert WrongUnderlying();
+        }
+
+        // Convert ETH to WETH
+        WETH.deposit{value: msg.value}();
+
+        // Calculate the amount of underlying received after the fee
+        uint256 assetsReceived = _amountMinusFee(msg.value); // U:[LP-6]
+        shares = _convertToShares(assetsReceived); // U:[LP-6]
+
+        // The weth is already in the contract, so we can directly register the deposit 
+        _registerDeposit(receiver, msg.value, assetsReceived, shares); // U:[LP-6]
     }
 
     /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
@@ -374,6 +414,19 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), value: assetsSent}); // U:[LP-6,7]
 
+        _updateBaseInterest({
+            expectedLiquidityDelta: assetsReceived.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        }); // U:[LP-6,7]
+
+        _mint(receiver, shares); // U:[LP-6,7]
+        emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[LP-6,7]
+    }
+
+    /// @dev Same as `_deposit`, but for native ETH deposits
+    /// @dev The WETH is already in the contract, so we don't need to transfer it
+    function _registerDeposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
             availableLiquidityDelta: 0,

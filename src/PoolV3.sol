@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
+
+// updated to support native eth deposits
 pragma solidity ^0.8.19;
 pragma abicoder v1;
 
@@ -32,8 +34,6 @@ import {ContractsRegisterTrait} from "@gearbox-protocol/core-v3/contracts/traits
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
-import {ICDM} from "./interfaces/ICDM.sol";
 
 // EXCEPTIONS
 import "@gearbox-protocol/core-v3/contracts/interfaces/IExceptions.sol";
@@ -256,6 +256,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @notice Deposits given amount of ETH (converted to WETH) to the pool in exchange for pool shares
     /// @param receiver Account to mint pool shares to
     /// @return shares Number of shares minted
+    /// @dev This function can only be used if the underlying token is WETH
     function depositETH(address receiver)
         public
         payable
@@ -284,7 +285,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _registerDeposit(receiver, msg.value, assetsReceived, shares); // U:[LP-6]
     }
 
-    /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
+    /// @notice Deposits underlying tokens to the pool in exchange for given number of pool shares
     /// @param shares Number of shares to mint
     /// @param receiver Account to mint pool shares to
     /// @return assets Amount of underlying transferred from caller

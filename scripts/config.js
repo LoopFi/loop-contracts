@@ -28,7 +28,8 @@ module.exports = {
         "constructorArguments": {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
           "uniV3Router": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-          "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0"
+          "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+          "kyberRouter": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
         }
       },
       "PoolAction": {

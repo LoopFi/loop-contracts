@@ -254,6 +254,7 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
         rdntToken = _rdntToken;
         rewardsPerSecond = _rewardsPerSecond;
         persistRewardsPerSecond = true;
+        whitelistActive = true;
 
         eligibilityMode = EligibilityModes.FULL;
     }

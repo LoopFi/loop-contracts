@@ -27,3 +27,4 @@ anvil            :; anvil --fork-url $(MAINNET_RPC_URL) --auto-impersonate
 deploy-anvil     :; rm -rf scripts/*-local.json && npx hardhat run scripts/Deploy.js --network local --show-stack-traces
 deploy-tenderly  :; npx hardhat run scripts/Deploy.js --network tenderly
 deploy-arbitrum   :; npx hardhat run scripts/Deploy.js --network arbitrum
+deploy-mainnet   :; npx hardhat run scripts/Deploy.js --network mainnet

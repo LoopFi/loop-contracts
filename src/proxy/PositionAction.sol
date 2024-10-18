@@ -55,6 +55,16 @@ struct LeverParams {
     PoolActionParams auxAction;
 }
 
+struct LocalVars {
+        uint256 totalDebt;
+        uint256 subDebt;
+        uint256 withdrawnCollateral;
+        uint256 swapAmountOut;
+        uint256 residualDestAmount;
+        uint256 residualSrcAmount;
+        uint256 estimatedSwapInAmount;
+    }
+
 /// @title PositionAction
 /// @notice Base contract for interacting with CDPVaults via a proxy
 /// @dev This contract is designed to be called via a proxy contract and can be dangerous to call directly
@@ -454,110 +464,85 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
     /// @notice Callback function for the credit flash loan taken out in decreaseLever
     /// @param data The encoded bytes that were passed into the credit flash loan
-    function onCreditFlashLoan(
+     function onCreditFlashLoan(
         address /*initiator*/,
         uint256 /*amount*/,
         uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
-        if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
+        if (msg.sender != address(flashlender)) revert("PositionAction__onCreditFlashLoan__invalidSender");
         (LeverParams memory leverParams, uint256 subCollateral, address residualRecipient) = abi.decode(
             data,
             (LeverParams, uint256, address)
         );
 
-/*         uint256 subDebt = leverParams.primarySwap.amount;
-        underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee); */
-        // sub collateral and debt
-
-        // i think this is bad and wont work for exact in if the prices of two tokens are not near each other
-        /* ICDPVault(leverParams.vault).modifyCollateralAndDebt(
-            leverParams.position,
-            address(this),
-            address(this),
-            0,
-            -toInt256(subDebt)
-        );
-         */
-        // withdraw collateral and handle any CDP specific actions
-        
-        uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+        LocalVars memory vars;
+        vars.totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
-            uint256 limit = leverParams.primarySwap.limit;
-            leverParams.primarySwap.limit = min(totalDebt, limit);
-            uint256 subDebt = limit;
-            
-            underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee); */
-            // sub collateral and debt
+            vars.subDebt = leverParams.primarySwap.limit;
+            leverParams.primarySwap.limit = min(vars.totalDebt, vars.subDebt);
 
-            // i think this is bad and wont work for exact in if the prices of two tokens are not near each other
+            underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
                 address(this),
                 0,
-                -toInt256(subDebt)
+                -toInt256(vars.subDebt)
             );
 
-            uint256 estimatedSwapInAmount = leverParams.primarySwap.amount;
-            uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
-            
-            leverParams.primarySwap.amount = withdrawnCollateral;
+            vars.estimatedSwapInAmount = leverParams.primarySwap.amount;
+            vars.withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
+
+            leverParams.primarySwap.amount = vars.withdrawnCollateral;
 
             bytes memory swapData = _delegateCall(
                 address(swapAction),
                 abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
             );
 
-            uint256 swapAmountOut = abi.decode(swapData, (uint256));
-            uint256 residualDestAmount = swapAmountOut - subDebt;
+            vars.swapAmountOut = abi.decode(swapData, (uint256));
+            vars.residualDestAmount = vars.swapAmountOut - vars.subDebt;
 
-            // sub collateral and debt
-            if (residualDestAmount > 0) {
-                underlyingToken.forceApprove(address(leverParams.vault), residualAmount);
+            if (vars.residualDestAmount > 0) {
+                underlyingToken.forceApprove(address(leverParams.vault), vars.residualDestAmount);
                 ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                     leverParams.position,
                     address(this),
                     address(this),
                     0,
-                    -toInt256(residualDestAmount)
+                    -toInt256(vars.residualDestAmount)
                 );
             }
 
-            uint256 residualSrcAmount = withdrawnCollateral - swapAmountIn
-            if (residualSrcAmount > 0) {
-                // perform swap from collateral to arbitrary token if necessary
+            vars.residualSrcAmount = vars.withdrawnCollateral - vars.estimatedSwapInAmount;
+            if (vars.residualSrcAmount > 0) {
                 if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
-                    leverParams.auxSwap.amount = residualSrcAmount;
+                    leverParams.auxSwap.amount = vars.residualSrcAmount;
                     _delegateCall(
                         address(swapAction),
                         abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
                     );
                 } else {
-                    // otherwise just send the collateral to `residualRecipient`
-                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualSrcAmount);
+                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, vars.residualSrcAmount);
                 }
             }
-
-            // return balance of lrt to user
+            underlyingToken.forceApprove(address(flashlender), vars.subDebt + fee);
         } else {
-            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
-            uint256 subDebt = leverParams.primarySwap.amount;
-            
-            underlyingToken.forceApprove(address(leverParams.vault), subDebt + fee); */
-            // sub collateral and debt
+            leverParams.primarySwap.amount = min(vars.totalDebt, leverParams.primarySwap.amount);
+            vars.subDebt = leverParams.primarySwap.amount;
 
-            // i think this is bad and wont work for exact in if the prices of two tokens are not near each other
+            underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
                 address(this),
                 0,
-                -toInt256(subDebt)
+                -toInt256(vars.subDebt)
             );
 
-            uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
+            vars.withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
 
             bytes memory swapData = _delegateCall(
                 address(swapAction),
@@ -565,26 +550,22 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             );
             uint256 swapAmountIn = abi.decode(swapData, (uint256));
 
-            // swap collateral to stablecoin and calculate the amount leftover
-            uint256 residualAmount = withdrawnCollateral - swapAmountIn;
+            vars.residualSrcAmount = vars.withdrawnCollateral - swapAmountIn;
 
-            // send left over collateral that was not needed to payback the flash loan to `residualRecipient`
-            if (residualAmount > 0) {
-                // perform swap from collateral to arbitrary token if necessary
+            if (vars.residualSrcAmount > 0) {
                 if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
-                    leverParams.auxSwap.amount = residualAmount;
+                    leverParams.auxSwap.amount = vars.residualSrcAmount;
                     _delegateCall(
                         address(swapAction),
                         abi.encodeWithSelector(swapAction.swap.selector, leverParams.auxSwap)
                     );
                 } else {
-                    // otherwise just send the collateral to `residualRecipient`
-                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, residualAmount);
+                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, vars.residualSrcAmount);
                 }
             }
+            underlyingToken.forceApprove(address(flashlender), vars.subDebt + fee);
         }
 
-        underlyingToken.forceApprove(address(flashlender), subDebt + fee);
         return CALLBACK_SUCCESS_CREDIT;
     }
 

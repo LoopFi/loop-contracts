@@ -69,13 +69,19 @@ contract RewardManager is RewardManagerAbstract {
                 (uint256 lastBalance, uint256 index) = (_state.lastBalance, _state.index);
 
                 uint256 accrued = IERC20(tokens[i]).balanceOf(vault) - lastBalance;
+                uint256 deltaIndex;
+                uint256 advanceBalance;
+                if (totalShares != 0) {
+                    deltaIndex = accrued.divDown(totalShares);
+                    advanceBalance = deltaIndex.mulDown(totalShares);
+                }
 
                 if (index == 0) index = INITIAL_REWARD_INDEX;
-                if (totalShares != 0) index += accrued.divDown(totalShares);
+                if (totalShares != 0) index += deltaIndex;
 
                 rewardState[token] = RewardState({
                     index: index.Uint128(),
-                    lastBalance: (lastBalance + accrued).Uint128()
+                    lastBalance: (lastBalance + advanceBalance).Uint128()
                 });
 
                 indexes[i] = index;

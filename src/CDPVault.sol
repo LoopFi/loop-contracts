@@ -172,6 +172,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     error CDPVault__repayAmountNotEnough();
     error CDPVault__tooHighRepayAmount();
     error CDPVault__recoverERC20_invalidToken();
+
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -289,7 +290,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param position Address of the position
     /// @param amount Amount of debt to repay [Underlying token scale]
     /// @dev The borrower will repay the amount of credit in the underlying token
-    function repay(address borrower, address position, uint256 amount) external returns (int256 deltaDebt){
+    function repay(address borrower, address position, uint256 amount) external returns (int256 deltaDebt) {
         uint256 scaledAmount = wdiv(amount, poolUnderlyingScale);
         deltaDebt = -toInt256(scaledAmount);
         modifyCollateralAndDebt({
@@ -417,7 +418,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param collateralizer Address of who puts up or receives the collateral delta
     /// @param creditor Address of who provides or receives the credit delta for the debt delta
     /// @param deltaCollateral Amount of collateral to put up (+) or to remove (-) from the position [wad]
-    /// @param deltaDebt Amount of normalized debt (gross, before rate is applied) to generate (+) or 
+    /// @param deltaDebt Amount of normalized debt (gross, before rate is applied) to generate (+) or
     /// to settle (-) on this position [wad]
     function modifyCollateralAndDebt(
         address owner,
@@ -436,7 +437,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         ) revert CDPVault__modifyCollateralAndDebt_noPermission();
 
         // if the vault is paused allow only debt decreases
-        if (deltaDebt > 0 || deltaCollateral != 0){
+        if (deltaDebt > 0 || deltaCollateral != 0) {
             _requireNotPaused();
         }
 
@@ -465,7 +466,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
             uint256 scaledDebtIncrease = wmul(debtToIncrease, poolUnderlyingScale);
             pool.lendCreditAccount(scaledDebtIncrease, creditor);
-
         } else if (deltaDebt < 0) {
             uint256 debtToDecrease = abs(deltaDebt);
 
@@ -595,7 +595,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         uint256 spotPrice_ = spotPrice();
         uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
         if (spotPrice_ == 0) revert CDPVault__liquidatePosition_invalidSpotPrice();
-        
+
         // Ensure that there's no bad debt
         if (calcTotalDebt(debtData) > wmul(position.collateral, discountedPrice)) revert CDPVault__BadDebt();
 
@@ -679,10 +679,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         takeCollateral = position.collateral;
         repayAmount = wmul(takeCollateral, discountedPrice);
         uint256 loss = calcTotalDebt(debtData) - repayAmount;
-        uint256 profit;
-        if (repayAmount > debtData.debt) {
-            profit = repayAmount - debtData.debt;
-        }
 
         // transfer the repay amount from the liquidator to the vault
         poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
@@ -699,7 +695,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             totalDebt
         );
 
-        pool.repayCreditAccount(debtData.debt, profit, loss); // U:[CM-11]
+        pool.repayCreditAccount(debtData.debt, debtData.accruedInterest, loss); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
         token.safeTransfer(msg.sender, takeCollateral);
 

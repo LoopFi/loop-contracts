@@ -22,7 +22,7 @@ contract TranchessLPOracleTest is Test {
     uint256 settledDay = 1727877600;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"), getForkBlockNumber());
+        vm.createSelectFork(vm.rpcUrl("scroll"), getForkBlockNumber());
 
         tranchessOracle = TranchessLPOracle(
             address(

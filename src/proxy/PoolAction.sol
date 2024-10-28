@@ -15,6 +15,10 @@ import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {ISwapRouter} from "tranchess/interfaces/ISwapRouter.sol";
 import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
+
+interface ILiquidityGauge {
+    function stableSwap() external view returns (address);
+}
 /// @notice The protocol to use
 enum Protocol {
     BALANCER,
@@ -111,6 +115,21 @@ contract PoolAction is TransferAction {
                 if (input.tokenIn != address(0)) {
                     _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
                 }
+            } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
+                (address lpToken, uint256 baseDelta, uint256 quoteDelta, , ) = abi.decode(
+                    poolActionParams.args,
+                    (address, uint256, uint256, uint256, uint256)
+                );
+                IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+                address baseAddress = stableSwap.baseAddress();
+                address quoteAddress = stableSwap.quoteAddress();
+
+                if (baseDelta != 0) {
+                    _transferFrom(baseAddress, from, address(this), baseDelta, permitParams[0]);
+                }
+                if (quoteDelta != 0) {
+                    _transferFrom(quoteAddress, from, address(this), quoteDelta, permitParams[1]);
+                }
             } else revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
@@ -189,26 +208,24 @@ contract PoolAction is TransferAction {
     }
 
     function _tranchessJoin(PoolActionParams memory poolActionParams) internal {
-        (
-            address lpToken,
-            address baseToken,
-            address quoteToken,
-            uint256 baseDelta,
-            uint256 quoteDelta,
-            uint256 version,
-            uint256 deadline
-        ) = abi.decode(poolActionParams.args, (address, address, address, uint256, uint256, uint256, uint256));
+        (address lpToken, uint256 baseDelta, uint256 quoteDelta, uint256 version, uint256 deadline) = abi.decode(
+            poolActionParams.args,
+            (address, uint256, uint256, uint256, uint256)
+        );
 
-        if (baseToken != address(0)) {
-            IERC20(baseToken).forceApprove(address(tranchessRouter), baseDelta);
+        IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        address baseAddress = stableSwap.baseAddress();
+        address quoteAddress = stableSwap.quoteAddress();
+        if (baseDelta != 0) {
+            IERC20(baseAddress).forceApprove(address(tranchessRouter), baseDelta);
         }
-        if (quoteToken != address(0)) {
-            IERC20(quoteToken).forceApprove(address(tranchessRouter), quoteDelta);
+        if (quoteDelta != 0) {
+            IERC20(quoteAddress).forceApprove(address(tranchessRouter), quoteDelta);
         }
 
         tranchessRouter.addLiquidity(
-            baseToken,
-            quoteToken,
+            baseAddress,
+            quoteAddress,
             baseDelta,
             quoteDelta,
             poolActionParams.minOut,
@@ -353,19 +370,19 @@ contract PoolAction is TransferAction {
     }
 
     function _tranchessExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
-        (uint256 version, address quoteToken, address lpToken, address stableSwap, uint256 lpIn) = abi.decode(
+        (uint256 version, address lpToken, uint256 lpIn) = abi.decode(
             poolActionParams.args,
-            (uint256, address, address, address, uint256)
+            (uint256, address, uint256)
         );
 
         if (lpToken != address(0)) {
             IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
         }
-
-        retAmount = IStableSwap(stableSwap).removeQuoteLiquidity(version, lpIn, poolActionParams.minOut);
+        IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, poolActionParams.minOut);
 
         if (poolActionParams.recipient != address(this)) {
-            IERC20(quoteToken).safeTransfer(poolActionParams.recipient, retAmount);
+            IERC20(stableSwap.quoteAddress()).safeTransfer(poolActionParams.recipient, retAmount);
         }
     }
 }

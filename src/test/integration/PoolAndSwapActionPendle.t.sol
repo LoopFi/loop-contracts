@@ -80,7 +80,8 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             IBalancerVault(address(0)),
             IUniswapV3Router(address(0)),
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
-            kyberRouter
+            kyberRouter,
+            address(0) // TRANCHESS OUTER for SCROLL NETWORK
         );
 
         // setup user and userProxy

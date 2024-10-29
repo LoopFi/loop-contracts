@@ -92,7 +92,13 @@ contract IntegrationTestBase is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter);
+        swapAction = new SwapAction(
+            balancerVault,
+            univ3Router,
+            IPActionAddRemoveLiqV3(PENDLE_ROUTER),
+            kyberRouter,
+            TRANCHESS_ROUTER
+        );
         poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER, TRANCHESS_ROUTER);
 
         // configure balancer pools

@@ -33,6 +33,11 @@ import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.s
 import {SwapData, SwapType as SwapTypePendle} from "pendle/router/swap-aggregator/IPSwapAggregator.sol";
 import {PoolAction} from "src/proxy/PoolAction.sol";
 import {console} from "forge-std/console.sol";
+import {SwapAction, SwapParams, SwapType, SwapProtocol} from "src/proxy/SwapAction.sol";
+import {console} from "forge-std/console.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
+import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -41,6 +46,7 @@ interface IWETH {
 contract PoolActionTranchessTest is TestBase {
     using SafeERC20 for ERC20;
     PoolAction poolAction;
+    SwapAction swapAction;
     PRBProxyRegistry prbProxyRegistry;
 
     // PENDLE
@@ -64,10 +70,6 @@ contract PoolActionTranchessTest is TestBase {
     uint256 internal userPk;
     uint256 internal constant NONCE = 0;
 
-    // function getForkBlockNumber() internal pure override returns (uint256) {
-    //     return 19356381;
-    // }
-
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("scroll"), 10610811);
         usePatchedDeal = true;
@@ -75,7 +77,13 @@ contract PoolActionTranchessTest is TestBase {
 
         prbProxyRegistry = new PRBProxyRegistry();
         poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER);
-
+        swapAction = new SwapAction(
+            IBalancerVault(address(0)),
+            IUniswapV3Router(address(0)),
+            IPActionAddRemoveLiqV3(address(0)),
+            address(0),
+            TRANCHESS_ROUTER
+        );
         // setup user and userProxy
         userPk = 0x12341234;
         user = vm.addr(userPk);
@@ -142,5 +150,68 @@ contract PoolActionTranchessTest is TestBase {
         );
         assertGt(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "failed to join");
         console.log("lpToken balance: ", ERC20(lpToken).balanceOf(poolActionParams.recipient));
+    }
+
+    function test_swap_in_and_out_STONE() public {
+        SwapParams memory swapParams;
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.TRANCHESS_IN,
+            swapType: SwapType.EXACT_IN,
+            assetIn: address(0),
+            amount: 0,
+            limit: 99 ether,
+            recipient: user,
+            residualRecipient: user,
+            deadline: block.timestamp,
+            args: abi.encode(lpToken, 0, 100 ether, 0)
+        });
+
+        assertEq(ERC20(lpToken).balanceOf(swapParams.recipient), 0, "invalid lpToken balance");
+        vm.startPrank(user);
+        ERC20(STONE).transfer(address(userProxy), 100 ether);
+        userProxy.execute(address(swapAction), abi.encodeWithSelector(SwapAction.swap.selector, swapParams));
+        assertGt(ERC20(lpToken).balanceOf(swapParams.recipient), 0, "failed to swap");
+
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.TRANCHESS_OUT,
+            swapType: SwapType.EXACT_IN,
+            assetIn: address(0),
+            amount: 0,
+            limit: 99 ether,
+            recipient: user,
+            residualRecipient: user,
+            deadline: block.timestamp,
+            args: abi.encode(0, lpToken, ERC20(lpToken).balanceOf(user), 0)
+        });
+        ERC20(lpToken).transfer(address(userProxy), ERC20(lpToken).balanceOf(user));
+
+        userProxy.execute(address(swapAction), abi.encodeWithSelector(SwapAction.swap.selector, swapParams));
+        assertEq(ERC20(lpToken).balanceOf(address(swapAction)), 0, "invalid lpToken balance");
+        assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "invalid lpToken balance");
+        assertApproxEqRel(ERC20(STONE).balanceOf(swapParams.recipient), 100 ether, 0.001 ether, "failed to exit");
+    }
+
+    function test_transferAndSwap() public {
+        SwapParams memory swapParams;
+        PermitParams memory permitParams;
+        swapParams = SwapParams({
+            swapProtocol: SwapProtocol.TRANCHESS_IN,
+            swapType: SwapType.EXACT_IN,
+            assetIn: STONE,
+            amount: 0,
+            limit: 99 ether,
+            recipient: user,
+            residualRecipient: user,
+            deadline: block.timestamp,
+            args: abi.encode(lpToken, 0, 100 ether, 0)
+        });
+        assertEq(ERC20(lpToken).balanceOf(swapParams.recipient), 0, "invalid lpToken balance");
+        vm.startPrank(user);
+        ERC20(STONE).transfer(address(userProxy), 100 ether);
+        userProxy.execute(
+            address(swapAction),
+            abi.encodeWithSelector(SwapAction.transferAndSwap.selector, user, permitParams, swapParams)
+        );
+        assertGt(ERC20(lpToken).balanceOf(swapParams.recipient), 0, "failed to swap");
     }
 }

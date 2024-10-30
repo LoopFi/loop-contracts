@@ -12,7 +12,7 @@ interface ILiquidityGaugeV3 is ILiquidityGauge {
 }
 
 interface ISwapBonus {
-    function swapBonusToken() external view returns (address);
+    function bonusToken() external view returns (address);
 }
 
 /// NOTE: This RewardManager is used with SY & YTv2 & PendleMarket. For YTv1, it will use RewardManagerAbstract
@@ -43,7 +43,7 @@ contract RewardManagerTranchess is RewardManagerAbstract {
         vault = _vault;
         proxyRegistry = IPRBProxyRegistry(_proxyRegistry);
         chess = _chess;
-        swapBonusToken = ISwapBonus(market.swapBonus()).swapBonusToken();
+        swapBonusToken = ISwapBonus(market.swapBonus()).bonusToken();
     }
 
     function _updateRewardIndex()

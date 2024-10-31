@@ -68,7 +68,7 @@ abstract contract RewardManagerAbstract is IRewardManager, TokenHelper {
                 userIndex = INITIAL_REWARD_INDEX.Uint128();
             }
 
-            if (userIndex == index) continue;
+            if (userIndex == index || index == 0) continue;
 
             uint256 deltaIndex = index - userIndex;
 

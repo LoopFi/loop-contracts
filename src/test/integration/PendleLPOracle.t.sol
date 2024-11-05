@@ -49,7 +49,7 @@ contract PendleLPOracleTest is IntegrationTestBase {
         assertTrue(address(pendleOracle) != address(0));
     }
 
-    function test_spot_123(address token) public {
+    function test_spot(address token) public {
         (, int256 answer, , , ) = AggregatorV3Interface(weETHChainlink).latestRoundData();
         uint256 scaledAnswer = wdiv(uint256(answer), 10 ** AggregatorV3Interface(weETHChainlink).decimals());
         uint256 weETHRate = IPMarket(market).getLpToAssetRate(180);

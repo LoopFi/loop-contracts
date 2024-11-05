@@ -201,10 +201,12 @@ contract FlashlenderTest is TestBase {
     // override cdm to manually mint fees and flashlender with fees
     function createCore() internal override {
         super.createCore();
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
         flashlenderOne = new Flashlender(IPoolV3(address(liquidityPool)), 1e16); // 1% fee
         flashlenderFive = new Flashlender(IPoolV3(address(liquidityPool)), 5e16); // 5% fee
         setGlobalDebtCeiling(5_000_000 ether);
 
+        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
         liquidityPool.setCreditManagerDebtLimit(address(flashlenderOne), type(uint256).max);
         liquidityPool.setCreditManagerDebtLimit(address(flashlenderFive), type(uint256).max);
     }

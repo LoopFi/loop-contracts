@@ -9,13 +9,15 @@ import {PRBProxy} from "prb-proxy/PRBProxy.sol";
 import {IntegrationTestBase} from "./IntegrationTestBase.sol";
 import {wdiv, WAD} from "../../utils/Math.sol";
 import {Permission} from "../../utils/Permission.sol";
+import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 
 import {CDPVault} from "../../CDPVault.sol";
 
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAction.sol";
-import {LeverParams, PositionAction} from "../../proxy/PositionAction.sol";
+import {LeverParams, PositionAction, CreditParams} from "../../proxy/PositionAction.sol";
 import {PoolActionParams} from "../../proxy/PoolAction.sol";
+import {Flashlender} from "../../Flashlender.sol";
 
 import {PositionAction20} from "../../proxy/PositionAction20.sol";
 
@@ -138,8 +140,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
+        assertEq(normalDebt, borrowAmount + flashloanFee);
 
         // assert leverAction position is empty
         (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
@@ -166,7 +169,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, swapAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, borrowAmount);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
+        assertEq(normalDebt, borrowAmount + flashloanFee);
 
         // assert leverAction position is empty
         (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
@@ -242,7 +246,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral + expectedAmountOut);
 
         // assert normalDebt is the same as the amount of stablecoin borrowed
-        assertEq(normalDebt, initialNormalDebt + borrowAmount);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);  
+        assertEq(normalDebt, initialNormalDebt + borrowAmount + flashloanFee);
     }
 
     function test_increaseLever_with_proxy_collateralizer() public {
@@ -302,7 +307,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as borrowAmount
-        assertEq(normalDebt, borrowAmount);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
+        assertEq(normalDebt, borrowAmount + flashloanFee);
     }
 
     function test_increaseLever_with_different_EOA_collateralizer() public {
@@ -370,7 +376,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, expectedAmountOut + upFrontUnderliers);
 
         // assert normalDebt is the same as borrowAmount
-        assertEq(normalDebt, borrowAmount);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
+        assertEq(normalDebt, borrowAmount + flashloanFee);
     }
 
     function test_increaseLever_with_permission_agent() public {
@@ -460,7 +467,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert alice's position is levered up once by her and a 2nd time by bob
         (uint256 aliceCollateral, uint256 aliceNormalDebt, , , , ) = vault.positions(address(aliceProxy));
         assertGe(aliceCollateral, amountOutMin * 2 + upFrontUnderliers * 2);
-        assertEq(aliceNormalDebt, borrowAmount * 2);
+
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
+        assertEq(aliceNormalDebt, (borrowAmount + flashloanFee) * 2);
 
         // assert bob's position is unaffected
         (uint256 bobCollateral, uint256 bobNormalDebt, , , , ) = vault.positions(address(bobProxy));
@@ -478,10 +487,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             39_000 ether // amountOutMin
         );
         (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
-
-        emit log_named_uint("initialCollateral", initialCollateral);
-        emit log_named_uint("initialNormalDebt", initialNormalDebt);
-        emit log_named_uint("underlyingToken balance", underlyingToken.balanceOf(address(userProxy)));
 
         // build decrease lever params
         uint256 amountOut = 5_000 ether;
@@ -512,8 +517,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
 
-        emit log_named_uint("expectedAmountIn", expectedAmountIn);
-        emit log_named_uint("START DELEVER", 0);
         // call decreaseLever
         vm.prank(user);
         userProxy.execute(
@@ -531,8 +534,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping token
-        assertEq(normalDebt, initialNormalDebt - amountOut);
+        assertEq(normalDebt, initialNormalDebt - amountOut + flashloanFee);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -605,7 +609,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - maxAmountIn);
 
         // debt is decreased by amount out minus the accrued interest
-        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
+        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest + flashloanFee);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -745,7 +750,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
 
         // assert alice's position is levered down by bob
         assertEq(aliceCollateral, initialCollateral - maxAmountIn);
-        assertEq(aliceNormalDebt, initialNormalDebt - amountOut);
+
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
+        assertEq(aliceNormalDebt, initialNormalDebt - amountOut + flashloanFee);
 
         // assert bob's position is unaffected
         assertEq(bobCollateral, 0);
@@ -958,6 +965,121 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
     function test_onCreditFlashLoan_cannotCallDirectly() public {
         vm.expectRevert(PositionAction.PositionAction__onCreditFlashLoan__invalidSender.selector);
         positionAction.onCreditFlashLoan(address(0), 0, 0, "");
+    }
+
+    function test_leverageDownNotAccountingFees() public {
+        // Re-initialize the system to have fees > 0
+        uint256 depositAmount = 1_000 ether;
+        uint256 borrowAmount = 200 ether;
+
+        deal(address(token), user, depositAmount);
+
+        address[] memory assets = new address[](2);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
+
+        vm.startPrank(user);
+
+        // User deposits 1k ETH collateral
+        token.approve(address(vault), type(uint256).max);
+        vault.deposit(address(userProxy), depositAmount);
+
+        // User borrows 200 ETH
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.borrow.selector,
+                address(userProxy),
+                address(vault),
+                CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap})
+            )
+        );
+
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.decreaseLever.selector,
+                LeverParams({
+                    position: address(userProxy),
+                    vault: address(vault),
+                    collateralToken: address(token),
+                    primarySwap: SwapParams({
+                        swapProtocol: SwapProtocol.BALANCER,
+                        swapType: SwapType.EXACT_OUT,
+                        assetIn: address(token),
+                        amount: 1 ether,
+                        limit: 2 ether,
+                        recipient: address(positionAction),
+                        residualRecipient: address(positionAction),
+                        deadline: block.timestamp,
+                        args: abi.encode(weightedPoolIdArray, assets)
+                    }),
+                    auxSwap: emptySwap,
+                    auxAction: emptyPoolActionParams
+                }),
+                2 ether,
+                address(userProxy)
+            )
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_leverageDownWrongResidualHandling() public {
+        uint256 depositAmount = 1_000 ether;
+        uint256 borrowAmount = 200 ether;
+
+        deal(address(token), user, depositAmount);
+
+        address[] memory assets = new address[](2);
+        assets[0] = address(token);
+        assets[1] = address(underlyingToken);
+
+        vm.startPrank(user);
+
+        // User deposits 1k ETH collateral
+        token.approve(address(vault), type(uint256).max);
+        vault.deposit(address(userProxy), depositAmount);
+
+        // User borrows 200 ETH
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.borrow.selector,
+                address(userProxy),
+                address(vault),
+                CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap})
+            )
+        );
+
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.decreaseLever.selector,
+                LeverParams({
+                    position: address(userProxy),
+                    vault: address(vault),
+                    collateralToken: address(token),
+                    primarySwap: SwapParams({
+                        swapProtocol: SwapProtocol.BALANCER,
+                        swapType: SwapType.EXACT_IN,
+                        assetIn: address(token),
+                        amount: vault.virtualDebt(address(userProxy)),
+                        limit: 0,
+                        recipient: address(positionAction),
+                        residualRecipient: address(positionAction),
+                        deadline: block.timestamp,
+                        args: abi.encode(weightedPoolIdArray, assets)
+                    }),
+                    auxSwap: emptySwap,
+                    auxAction: emptyPoolActionParams
+                }),
+                201 ether,
+                address(userProxy)
+            )
+        );
+
+        vm.stopPrank();
     }
 
     // simple helper function to increase lever

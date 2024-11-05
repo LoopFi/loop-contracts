@@ -300,7 +300,8 @@ contract SwapAction is TransferAction {
         IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);
         (bool success, bytes memory result) = kyberRouter.call(payload);
         if (!success) _revertBytes(result);
-        return abi.decode(result, (uint256));
+        (uint256 returnAmount, /*uint256 gasUsed*/) = abi.decode(result, (uint256, uint256));
+        return returnAmount;
     }
 
     /// @notice Perform a swap using uniswap v3 exactInput or exactOutput function

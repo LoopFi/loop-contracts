@@ -100,7 +100,7 @@ contract SwapAction is TransferAction {
         address from,
         PermitParams calldata permitParams,
         SwapParams calldata swapParams
-    ) external payable returns (uint256) {
+    ) external returns (uint256) {
         if (from != address(this)) {
             uint256 amount = swapParams.swapType == SwapType.EXACT_IN ? swapParams.amount : swapParams.limit;
             _transferFrom(swapParams.assetIn, from, address(this), amount, permitParams);

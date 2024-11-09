@@ -673,7 +673,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
         // load price and calculate discounted price
         uint256 discountedPrice = wmul(spotPrice_, liqConfig_.liquidationDiscount);
-        // Enusure that the debt is greater than the collateral at discounted price
+        // Ensure that the debt is greater than the collateral at discounted price
         if (calcTotalDebt(debtData) <= wmul(position.collateral, discountedPrice)) revert CDPVault__noBadDebt();
         // compute collateral to take, debt to repay
         uint256 takeCollateral = wdiv(repayAmount, discountedPrice);

@@ -257,7 +257,9 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @param receiver Account to mint pool shares to
     /// @return shares Number of shares minted
     /// @dev This function can only be used if the underlying token is WETH
-    function depositETH(address receiver)
+    function depositETH(
+        address receiver
+    )
         public
         payable
         whenNotPaused // U:[LP-2A]
@@ -281,7 +283,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         uint256 assetsReceived = _amountMinusFee(msg.value); // U:[LP-6]
         shares = _convertToShares(assetsReceived); // U:[LP-6]
 
-        // The weth is already in the contract, so we can directly register the deposit 
+        // The weth is already in the contract, so we can directly register the deposit
         _registerDeposit(receiver, msg.value, assetsReceived, shares); // U:[LP-6]
     }
 
@@ -591,7 +593,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
         if (profit > 0) {
             _mint(treasury, _convertToShares(profit)); // U:[LP-14B]
-        } else if (loss > 0) {
+        }
+        if (loss > 0) {
             address treasury_ = treasury;
             uint256 sharesInTreasury = balanceOf(treasury_);
             uint256 sharesToBurn = _convertToShares(loss);

@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import "./RewardManagerAbstract.sol";
+import "src/pendle-rewards/RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
 import {console} from "forge-std/console.sol";
+import {ILiquidityGauge} from "tranchess/interfaces/ILiquidityGauge.sol";
 
-interface IPendleMarketV3 {
-    function redeemRewards(address user) external returns (uint256[] memory rewardsOut);
+interface ILiquidityGaugeV3 is ILiquidityGauge {
+    function swapBonus() external view returns (address);
+}
 
-    function getRewardTokens() external view returns (address[] memory);
-
-    function balanceOf(address account) external view returns (uint256);
+interface ISwapBonus {
+    function bonusToken() external view returns (address);
 }
 
 /// NOTE: This RewardManager is used with SY & YTv2 & PendleMarket. For YTv1, it will use RewardManagerAbstract
 /// NOTE: RewardManager must not have duplicated rewardTokens
-contract RewardManager is RewardManagerAbstract {
+contract RewardManagerTranchess is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];
 
@@ -26,19 +27,23 @@ contract RewardManager is RewardManagerAbstract {
 
     mapping(address => RewardState) public rewardState;
 
-    IPendleMarketV3 public immutable market;
+    ILiquidityGaugeV3 public immutable market;
     address public immutable vault;
     IPRBProxyRegistry public immutable proxyRegistry;
+    address public immutable swapBonusToken;
+    address public immutable chess;
 
     modifier onlyVault() {
         if (msg.sender != vault) revert OnlyVault();
         _;
     }
 
-    constructor(address _vault, address _market, address _proxyRegistry) {
-        market = IPendleMarketV3(_market);
+    constructor(address _vault, address _market, address _proxyRegistry, address _chess) {
+        market = ILiquidityGaugeV3(_market);
         vault = _vault;
         proxyRegistry = IPRBProxyRegistry(_proxyRegistry);
+        chess = _chess;
+        swapBonusToken = ISwapBonus(market.swapBonus()).bonusToken();
     }
 
     function _updateRewardIndex()
@@ -47,10 +52,16 @@ contract RewardManager is RewardManagerAbstract {
         override
         returns (address[] memory tokens, uint256[] memory indexes)
     {
-        tokens = market.getRewardTokens();
-        indexes = new uint256[](tokens.length);
-
-        if (tokens.length == 0) return (tokens, indexes);
+        if (swapBonusToken == chess) {
+            indexes = new uint256[](1);
+            tokens = new address[](1);
+            tokens[0] = chess;
+        } else {
+            indexes = new uint256[](2);
+            tokens = new address[](2);
+            tokens[0] = chess;
+            tokens[1] = swapBonusToken;
+        }
 
         if (lastRewardBlock != block.number) {
             // if we have not yet update the index for this block
@@ -58,7 +69,7 @@ contract RewardManager is RewardManagerAbstract {
 
             uint256 totalShares = _rewardSharesTotal();
             // Claim external rewards on Market
-            market.redeemRewards(address(vault));
+            market.claimRewards(address(vault));
 
             for (uint256 i = 0; i < tokens.length; ++i) {
                 address token = tokens[i];
@@ -76,7 +87,6 @@ contract RewardManager is RewardManagerAbstract {
                     deltaIndex = accrued.divDown(totalShares);
                     advanceBalance = deltaIndex.mulDown(totalShares);
                 }
-
                 if (index == 0) index = INITIAL_REWARD_INDEX;
                 if (totalShares != 0) index += deltaIndex;
 
@@ -99,7 +109,14 @@ contract RewardManager is RewardManagerAbstract {
     function _doTransferOutRewards(
         address user
     ) internal virtual override returns (address[] memory tokens, uint256[] memory rewardAmounts, address to) {
-        tokens = market.getRewardTokens();
+        if (swapBonusToken == chess) {
+            tokens = new address[](1);
+            tokens[0] = chess;
+        } else {
+            tokens = new address[](2);
+            tokens[0] = chess;
+            tokens[1] = swapBonusToken;
+        }
         rewardAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             rewardAmounts[i] = userReward[tokens[i]][user].accrued;

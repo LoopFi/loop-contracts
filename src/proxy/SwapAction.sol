@@ -16,6 +16,12 @@ import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {toInt256, abs} from "../utils/Math.sol";
 import {console} from "forge-std/console.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
+import {ISwapRouter} from "tranchess/interfaces/ISwapRouter.sol";
+import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
+
+interface ILiquidityGauge {
+    function stableSwap() external view returns (address);
+}
 
 /// @notice The swap protocol to use
 enum SwapProtocol {
@@ -23,7 +29,9 @@ enum SwapProtocol {
     UNIV3,
     PENDLE_IN,
     PENDLE_OUT,
-    KYBER
+    KYBER,
+    TRANCHESS_IN,
+    TRANCHESS_OUT
 }
 
 /// @notice The type of swap to perform
@@ -68,6 +76,8 @@ contract SwapAction is TransferAction {
     IPActionAddRemoveLiqV3 public immutable pendleRouter;
     /// @notice Kyber MetaAggregationRouterV2
     address public immutable kyberRouter;
+    /// @notice Tranchess Swap Router
+    ISwapRouter public immutable tranchessRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -80,11 +90,18 @@ contract SwapAction is TransferAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(IVault balancerVault_, IUniswapV3Router uniRouter_, IPActionAddRemoveLiqV3 pendleRouter_, address kyberRouter_) {
+    constructor(
+        IVault balancerVault_,
+        IUniswapV3Router uniRouter_,
+        IPActionAddRemoveLiqV3 pendleRouter_,
+        address kyberRouter_,
+        address tranchessRouter_
+    ) {
         balancerVault = balancerVault_;
         uniRouter = uniRouter_;
         pendleRouter = pendleRouter_;
         kyberRouter = kyberRouter_;
+        tranchessRouter = ISwapRouter(tranchessRouter_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,7 +162,11 @@ contract SwapAction is TransferAction {
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_IN) {
             retAmount = pendleJoin(swapParams.recipient, swapParams.limit, swapParams.args);
         } else if (swapParams.swapProtocol == SwapProtocol.PENDLE_OUT) {
-            retAmount = pendleExit(swapParams.recipient, swapParams.amount, swapParams.args);
+            retAmount = pendleExit(swapParams.recipient, swapParams.limit, swapParams.args);
+        } else if (swapParams.swapProtocol == SwapProtocol.TRANCHESS_IN) {
+            retAmount = tranchessJoin(swapParams);
+        } else if (swapParams.swapProtocol == SwapProtocol.TRANCHESS_OUT) {
+            retAmount = tranchessExit(swapParams.recipient, swapParams.limit, swapParams.args);
         } else revert SwapAction__swap_notSupported();
         // Transfer any remaining tokens to the residualRecipient or recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
@@ -295,7 +316,7 @@ contract SwapAction is TransferAction {
     /// @param assetIn Token to swap from
     /// @param amountIn Amount of `assetIn` to swap
     /// @param minOut Minimum amount of assets to receive
-    /// @param payload tx calldata to use when calling the kyber router, 
+    /// @param payload tx calldata to use when calling the kyber router,
     /// this calldata can be generated using the kyber swap api
     /// @return _ Amount of tokens received from the swap
     function kyberSwap(address assetIn, uint256 amountIn, uint256 minOut, bytes memory payload) internal returns (uint256) {
@@ -412,21 +433,67 @@ contract SwapAction is TransferAction {
         return SY.redeem(recipient, netSyToRedeem, tokenOut, minOut, true);
     }
 
+    function tranchessJoin(SwapParams memory swapParams) internal returns (uint256 retAmount) {
+        (address lpToken, uint256 baseDelta, uint256 quoteDelta, uint256 version) = abi.decode(
+            swapParams.args,
+            (address, uint256, uint256, uint256)
+        );
+
+        //IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        address baseAddress = IStableSwap(ILiquidityGauge(lpToken).stableSwap()).baseAddress();
+        address quoteAddress = IStableSwap(ILiquidityGauge(lpToken).stableSwap()).quoteAddress();
+        if (baseDelta != 0) {
+            IERC20(baseAddress).forceApprove(address(tranchessRouter), baseDelta);
+        }
+        if (quoteDelta != 0) {
+            IERC20(quoteAddress).forceApprove(address(tranchessRouter), quoteDelta);
+        }
+
+        tranchessRouter.addLiquidity(
+            baseAddress,
+            quoteAddress,
+            baseDelta,
+            quoteDelta,
+            swapParams.limit,
+            version,
+            swapParams.deadline
+        );
+
+        retAmount = IERC20(lpToken).balanceOf(address(this));
+
+        if (swapParams.recipient != address(this)) {
+            IERC20(lpToken).safeTransfer(swapParams.recipient, retAmount);
+        }
+    }
+
+    function tranchessExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 retAmount) {
+        (uint256 version, address lpToken, uint256 lpIn) = abi.decode(data, (uint256, address, uint256));
+
+        if (lpToken != address(0)) {
+            IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
+        }
+        IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, minOut);
+
+        if (recipient != address(this)) {
+            IERC20(stableSwap.quoteAddress()).safeTransfer(recipient, retAmount);
+        }
+    }
+
     /// @notice Helper function that decodes the swap params and returns the token that will be swapped into
     /// @param swapParams The parameters for the swap
     /// @return token The token that will be swapped into
     function getSwapToken(SwapParams calldata swapParams) public pure returns (address token) {
         if (swapParams.swapProtocol == SwapProtocol.BALANCER) {
             (, address[] memory primarySwapPath) = abi.decode(swapParams.args, (bytes32[], address[]));
-            
-            if (swapParams.swapType == SwapType.EXACT_OUT){ 
+
+            if (swapParams.swapType == SwapType.EXACT_OUT) {
                 // For EXACT_OUT, the token that will be swapped into is the first token in the path
                 token = primarySwapPath[0];
             } else {
                 // For EXACT_IN, the token that will be swapped into is the last token in the path
                 token = primarySwapPath[primarySwapPath.length - 1];
             }
-
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             token = decodeLastToken(swapParams.args);
         } else {

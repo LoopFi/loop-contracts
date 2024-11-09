@@ -24,6 +24,7 @@ contract IntegrationTestBase is TestBase {
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address internal constant PENDLE_ROUTER = 0x00000000005BBB0EF59571E58418F9a4357b68A0;
+    address internal constant TRANCHESS_ROUTER = 0x63BAEe33649E589Cc70435F898671461B624CBCc; // on SCROLL NETWORK
     // tokens
     ERC20 internal constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -91,8 +92,14 @@ contract IntegrationTestBase is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter);
-        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
+        swapAction = new SwapAction(
+            balancerVault,
+            univ3Router,
+            IPActionAddRemoveLiqV3(PENDLE_ROUTER),
+            kyberRouter,
+            TRANCHESS_ROUTER
+        );
+        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER, TRANCHESS_ROUTER);
 
         // configure balancer pools
         stablePool = _createBalancerTokenPool();

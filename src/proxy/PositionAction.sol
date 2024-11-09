@@ -472,7 +472,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             0,
             -toInt256(subDebt - fee)
         );
-        
+
         // withdraw collateral and handle any CDP specific actions
         uint256 withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
 

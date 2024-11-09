@@ -578,7 +578,10 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
-            auxSwap.amount = scaledCollateral;
+            if (auxSwap.swapType == SwapType.EXACT_IN) {
++               auxSwap.amount = scaledCollateral;
++           }
+            
             _delegateCall(
                 address(swapAction),
                 abi.encodeWithSelector(swapAction.swap.selector, auxSwap)

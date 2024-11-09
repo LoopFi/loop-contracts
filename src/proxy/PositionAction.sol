@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPermission} from "../interfaces/IPermission.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-import {toInt256, wmul, min} from "../utils/Math.sol";
+import {toInt256, wmul, wdiv, min} from "../utils/Math.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
 import {BaseAction} from "./BaseAction.sol";
 import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
@@ -573,20 +573,21 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         CollateralParams calldata collateralParams
     ) internal returns (uint256) {
         uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
+        uint256 scaledCollateral = wmul(collateral, ICDPVault(vault).tokenScale());
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
-            auxSwap.amount = collateral;
+            auxSwap.amount = scaledCollateral;
             _delegateCall(
                 address(swapAction),
                 abi.encodeWithSelector(swapAction.swap.selector, auxSwap)
             );
         } else {
             // otherwise just send the collateral to `collateralizer`
-            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, collateral);
+            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, scaledCollateral);
         }
-        return collateral;
+        return scaledCollateral;
     }
 
     /// @notice Borrows underlying token and optionally swaps underlying token to an arbitrary token
@@ -594,12 +595,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault
     /// @param creditParams The credit parameters
     function _borrow(address vault, address position, CreditParams calldata creditParams) internal {
+        uint256 scaledBorrowAmount = wdiv(creditParams.amount, ICDPVault(vault).poolUnderlyingScale());
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            toInt256(creditParams.amount)
+            toInt256(scaledBorrowAmount)
         );
         if (creditParams.auxSwap.assetIn == address(0)) {
             underlyingToken.forceApprove(address(this), creditParams.amount);
@@ -643,12 +645,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         }
 
         underlyingToken.forceApprove(address(vault), amount);
+        uint256 scaledAmount = wdiv(amount, ICDPVault(vault).poolUnderlyingScale());
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            -toInt256(amount)
+            -toInt256(scaledAmount)
         );
     }
 

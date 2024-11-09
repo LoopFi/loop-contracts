@@ -265,14 +265,15 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         });
     }
 
-    /// @notice Borrows credit against collateral
+    /// @notice Borrows 'underlying tokens' against collateral
     /// @param borrower Address of the borrower
     /// @param position Address of the position
     /// @param amount Amount of debt to generate [Underlying token scale]
+    /// @return borrowAmount Amount of debt created [wad]
     /// @dev The borrower will receive the amount of credit in the underlying token
-    function borrow(address borrower, address position, uint256 amount) external returns (int256 deltaDebt) {
-        uint256 scaledAmount = wdiv(amount, poolUnderlyingScale);
-        deltaDebt = toInt256(scaledAmount);
+    function borrow(address borrower, address position, uint256 amount) external returns (uint256 borrowAmount) {
+        borrowAmount = wdiv(amount, poolUnderlyingScale);
+        int256 deltaDebt = toInt256(borrowAmount);
         modifyCollateralAndDebt({
             owner: position,
             collateralizer: position,
@@ -280,8 +281,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: 0,
             deltaDebt: deltaDebt
         });
-
-        return deltaDebt;
     }
 
     /// @notice Repays credit against collateral
@@ -289,9 +288,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     /// @param position Address of the position
     /// @param amount Amount of debt to repay [Underlying token scale]
     /// @dev The borrower will repay the amount of credit in the underlying token
-    function repay(address borrower, address position, uint256 amount) external returns (int256 deltaDebt){
-        uint256 scaledAmount = wdiv(amount, poolUnderlyingScale);
-        deltaDebt = -toInt256(scaledAmount);
+    function repay(address borrower, address position, uint256 amount) external returns (uint256 repayAmount){
+        repayAmount = wdiv(amount, poolUnderlyingScale);
+        int256 deltaDebt = -toInt256(repayAmount);
         modifyCollateralAndDebt({
             owner: position,
             collateralizer: position,
@@ -299,8 +298,6 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             deltaCollateral: 0,
             deltaDebt: deltaDebt
         });
-
-        return deltaDebt;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -497,7 +494,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt - newDebt));
 
             uint256 scaledRemainingDebt = wmul(debtData.debt - newDebt, poolUnderlyingScale);
-            pool.repayCreditAccount(scaledRemainingDebt, profit, 0);
+            uint256 scaledProfit = wmul(profit, poolUnderlyingScale);
+            pool.repayCreditAccount(scaledRemainingDebt, scaledProfit, 0);
 
             position.cumulativeQuotaInterest = newCumulativeQuotaInterest;
             position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
@@ -634,16 +632,22 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         // update liquidated position
         position = _modifyPosition(owner, position, newDebt, newCumulativeIndex, -toInt256(takeCollateral), totalDebt);
 
-        pool.repayCreditAccount(debtData.debt - newDebt, profit, 0); // U:[CM-11]
+        uint256 scaledProfit = wmul(profit, poolUnderlyingScale);
+        uint256 scaledRemainingDebt = wmul(debtData.debt - newDebt, poolUnderlyingScale);
+
+        pool.repayCreditAccount(scaledRemainingDebt, scaledProfit, 0); // U:[CM-11]
         // transfer the collateral amount from the vault to the liquidator
-        token.safeTransfer(msg.sender, takeCollateral);
+
+        uint256 scaledTakeCollateral = wmul(takeCollateral, tokenScale);
+        token.safeTransfer(msg.sender, scaledTakeCollateral);
 
         // Mint the penalty from the vault to the treasury
         poolUnderlying.safeTransferFrom(msg.sender, address(pool), penalty);
         IPoolV3Loop(address(pool)).mintProfit(penalty);
 
         if (debtData.debt - newDebt != 0) {
-            IPoolV3(pool).updateQuotaRevenue(_calcQuotaRevenueChange(-int(debtData.debt - newDebt))); // U:[PQK-15]
+            uint256 scaledDeltaDebt = wmul(debtData.debt - newDebt, poolUnderlyingScale);
+            IPoolV3(pool).updateQuotaRevenue(_calcQuotaRevenueChange(-int(scaledDeltaDebt))); // U:[PQK-15]
         }
     }
 
@@ -685,7 +689,8 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         }
 
         // transfer the repay amount from the liquidator to the vault
-        poolUnderlying.safeTransferFrom(msg.sender, address(pool), repayAmount);
+        uint256 scaledRepayAmount = wmul(repayAmount, poolUnderlyingScale);
+        poolUnderlying.safeTransferFrom(msg.sender, address(pool), scaledRepayAmount);
 
         position.cumulativeQuotaInterest = 0;
         position.cumulativeQuotaIndexLU = debtData.cumulativeQuotaIndexNow;
@@ -699,13 +704,18 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
             totalDebt
         );
 
-        pool.repayCreditAccount(debtData.debt, profit, loss); // U:[CM-11]
+        uint256 scaledDebt = wmul(debtData.debt, poolUnderlyingScale);
+        uint256 scaledProfit = wmul(profit, poolUnderlyingScale);
+        pool.repayCreditAccount(scaledDebt, scaledProfit, wmul(loss, poolUnderlyingScale)); // U:[CM-11]
+
         // transfer the collateral amount from the vault to the liquidator
-        token.safeTransfer(msg.sender, takeCollateral);
+        uint256 scaledTakeCollateral = wmul(takeCollateral, tokenScale);
+        token.safeTransfer(msg.sender, scaledTakeCollateral);
 
         int256 quotaRevenueChange = _calcQuotaRevenueChange(-int(debtData.debt));
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U:[PQK-15]
+            int256 scaledQuotaRevenueChange = wmul(poolUnderlyingScale, quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(scaledQuotaRevenueChange); // U:[PQK-15]
         }
     }
 

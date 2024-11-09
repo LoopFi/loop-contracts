@@ -13,12 +13,18 @@ import {IPPrincipalToken} from "pendle/interfaces/IPPrincipalToken.sol";
 import {IStandardizedYield} from "pendle/interfaces/IStandardizedYield.sol";
 import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
+import {ISwapRouter} from "tranchess/interfaces/ISwapRouter.sol";
+import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
 
+interface ILiquidityGauge {
+    function stableSwap() external view returns (address);
+}
 /// @notice The protocol to use
 enum Protocol {
     BALANCER,
     UNIV3,
-    PENDLE
+    PENDLE,
+    TRANCHESS
 }
 
 /// @notice The parameters for a join
@@ -45,6 +51,8 @@ contract PoolAction is TransferAction {
     IVault public immutable balancerVault;
     /// @notice Pendle Router
     IPActionAddRemoveLiqV3 public immutable pendleRouter;
+    /// @notice Tranchess Swap Router
+    ISwapRouter public immutable tranchessRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -58,9 +66,10 @@ contract PoolAction is TransferAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address balancerVault_, address _pendleRouter) {
+    constructor(address balancerVault_, address _pendleRouter, address _tranchessRouter) {
         balancerVault = IVault(balancerVault_);
         pendleRouter = IPActionAddRemoveLiqV3(_pendleRouter);
+        tranchessRouter = ISwapRouter(_tranchessRouter);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -106,6 +115,21 @@ contract PoolAction is TransferAction {
                 if (input.tokenIn != address(0)) {
                     _transferFrom(input.tokenIn, from, address(this), input.netTokenIn, permitParams[0]);
                 }
+            } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
+                (address lpToken, uint256 baseDelta, uint256 quoteDelta, , ) = abi.decode(
+                    poolActionParams.args,
+                    (address, uint256, uint256, uint256, uint256)
+                );
+                IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+                address baseAddress = stableSwap.baseAddress();
+                address quoteAddress = stableSwap.quoteAddress();
+
+                if (baseDelta != 0) {
+                    _transferFrom(baseAddress, from, address(this), baseDelta, permitParams[0]);
+                }
+                if (quoteDelta != 0) {
+                    _transferFrom(quoteAddress, from, address(this), quoteDelta, permitParams[1]);
+                }
             } else revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
@@ -119,6 +143,8 @@ contract PoolAction is TransferAction {
             _balancerJoin(poolActionParams);
         } else if (poolActionParams.protocol == Protocol.PENDLE) {
             _pendleJoin(poolActionParams);
+        } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
+            _tranchessJoin(poolActionParams);
         } else {
             revert PoolAction__join_unsupportedProtocol();
         }
@@ -181,59 +207,90 @@ contract PoolAction is TransferAction {
         );
     }
 
+    function _tranchessJoin(PoolActionParams memory poolActionParams) internal {
+        (address lpToken, uint256 baseDelta, uint256 quoteDelta, uint256 version, uint256 deadline) = abi.decode(
+            poolActionParams.args,
+            (address, uint256, uint256, uint256, uint256)
+        );
+
+        IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        address baseAddress = stableSwap.baseAddress();
+        address quoteAddress = stableSwap.quoteAddress();
+        if (baseDelta != 0) {
+            IERC20(baseAddress).forceApprove(address(tranchessRouter), baseDelta);
+        }
+        if (quoteDelta != 0) {
+            IERC20(quoteAddress).forceApprove(address(tranchessRouter), quoteDelta);
+        }
+
+        tranchessRouter.addLiquidity(
+            baseAddress,
+            quoteAddress,
+            baseDelta,
+            quoteDelta,
+            poolActionParams.minOut,
+            version,
+            deadline
+        );
+
+        if (poolActionParams.recipient != address(this)) {
+            IERC20(lpToken).safeTransfer(poolActionParams.recipient, IERC20(lpToken).balanceOf(address(this)));
+        }
+    }
+
     /// @notice Helper function to update the join parameters for a levered position
     /// @param poolActionParams The parameters for the join
     /// @param upFrontToken The upfront token for the levered position
     /// @param joinToken The token to join with
     /// @param flashLoanAmount The amount of the flash loan
     /// @param upfrontAmount The amount of the upfront token
-function updateLeverJoin(
-    PoolActionParams memory poolActionParams,
-    address joinToken,
-    address upFrontToken,
-    uint256 flashLoanAmount,
-    uint256 upfrontAmount
-) external view returns (PoolActionParams memory outParams) {
-    outParams = poolActionParams;
+    function updateLeverJoin(
+        PoolActionParams memory poolActionParams,
+        address joinToken,
+        address upFrontToken,
+        uint256 flashLoanAmount,
+        uint256 upfrontAmount
+    ) external view returns (PoolActionParams memory outParams) {
+        outParams = poolActionParams;
 
-    if (poolActionParams.protocol == Protocol.BALANCER) {
-        (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
-            .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
+        if (poolActionParams.protocol == Protocol.BALANCER) {
+            (bytes32 poolId, address[] memory assets, uint256[] memory assetsIn, uint256[] memory maxAmountsIn) = abi
+                .decode(poolActionParams.args, (bytes32, address[], uint256[], uint256[]));
 
-        (address poolToken, ) = balancerVault.getPool(poolId);
+            (address poolToken, ) = balancerVault.getPool(poolId);
 
-        uint256 len = assets.length;
-        // the offset is needed because of the BPT token that needs to be skipped from the join
-        bool skipIndex = false;
-        uint256 joinAmount = flashLoanAmount;
-        if (upFrontToken == joinToken) {
-            joinAmount += upfrontAmount;
-        }
+            uint256 len = assets.length;
+            // the offset is needed because of the BPT token that needs to be skipped from the join
+            bool skipIndex = false;
+            uint256 joinAmount = flashLoanAmount;
+            if (upFrontToken == joinToken) {
+                joinAmount += upfrontAmount;
+            }
 
-        // update the join parameters with the new amounts
-        for (uint256 i = 0; i < len; ) {
-            uint256 assetIndex = i - (skipIndex ? 1 : 0);
-            if (assets[i] == joinToken) {
-                maxAmountsIn[i] = joinAmount;
-                assetsIn[assetIndex] = joinAmount;
-            } else if (assets[i] == upFrontToken && assets[i] != poolToken) {
-                maxAmountsIn[i] = upfrontAmount;
-                assetsIn[assetIndex] = upfrontAmount;
-            } else {
-                skipIndex = skipIndex || assets[i] == poolToken;
-                if (assets[i] == poolToken) {
-                    maxAmountsIn[i] = 0;
+            // update the join parameters with the new amounts
+            for (uint256 i = 0; i < len; ) {
+                uint256 assetIndex = i - (skipIndex ? 1 : 0);
+                if (assets[i] == joinToken) {
+                    maxAmountsIn[i] = joinAmount;
+                    assetsIn[assetIndex] = joinAmount;
+                } else if (assets[i] == upFrontToken && assets[i] != poolToken) {
+                    maxAmountsIn[i] = upfrontAmount;
+                    assetsIn[assetIndex] = upfrontAmount;
+                } else {
+                    skipIndex = skipIndex || assets[i] == poolToken;
+                    if (assets[i] == poolToken) {
+                        maxAmountsIn[i] = 0;
+                    }
+                }
+                unchecked {
+                    i++;
                 }
             }
-            unchecked {
-                i++;
-            }
-        }
 
-        // update the join parameters
-        outParams.args = abi.encode(poolId, assets, assetsIn, maxAmountsIn);
+            // update the join parameters
+            outParams.args = abi.encode(poolId, assets, assetsIn, maxAmountsIn);
+        }
     }
-}
 
     /*//////////////////////////////////////////////////////////////
                              EXIT VARIANTS
@@ -246,6 +303,8 @@ function updateLeverJoin(
             retAmount = _balancerExit(poolActionParams);
         } else if (poolActionParams.protocol == Protocol.PENDLE) {
             retAmount = _pendleExit(poolActionParams);
+        } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
+            retAmount = _tranchessExit(poolActionParams);
         } else revert PoolAction__exit_unsupportedProtocol();
     }
 
@@ -308,5 +367,22 @@ function updateLeverJoin(
         }
 
         return SY.redeem(poolActionParams.recipient, netSyToRedeem, tokenOut, poolActionParams.minOut, true);
+    }
+
+    function _tranchessExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
+        (uint256 version, address lpToken, uint256 lpIn) = abi.decode(
+            poolActionParams.args,
+            (uint256, address, uint256)
+        );
+
+        if (lpToken != address(0)) {
+            IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
+        }
+        IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
+        retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, poolActionParams.minOut);
+
+        if (poolActionParams.recipient != address(this)) {
+            IERC20(stableSwap.quoteAddress()).safeTransfer(poolActionParams.recipient, retAmount);
+        }
     }
 }

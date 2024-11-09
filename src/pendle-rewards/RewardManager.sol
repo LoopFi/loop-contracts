@@ -63,6 +63,7 @@ contract RewardManager is RewardManagerAbstract {
             for (uint256 i = 0; i < tokens.length; ++i) {
                 address token = tokens[i];
 
+                if (token == address(market)) continue;
                 // the entire token balance of the contract must be the rewards of the contract
 
                 RewardState memory _state = rewardState[token];

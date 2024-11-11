@@ -14,10 +14,9 @@ import {IStandardizedYield} from "pendle/interfaces/IStandardizedYield.sol";
 import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {toInt256, abs} from "../utils/Math.sol";
-import {console} from "forge-std/console.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
-import {ISwapRouter} from "tranchess/interfaces/ISwapRouter.sol";
-import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
+import {ISwapRouter} from "src/interfaces/ISwapRouterTranchess.sol";
+import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
 
 interface ILiquidityGauge {
     function stableSwap() external view returns (address);

@@ -4,19 +4,17 @@ pragma solidity ^0.8.0;
 import "src/pendle-rewards/RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
-import {console} from "forge-std/console.sol";
-import {ILiquidityGauge} from "tranchess/interfaces/ILiquidityGauge.sol";
 
-interface ILiquidityGaugeV3 is ILiquidityGauge {
+interface ILiquidityGaugeV3 {
     function swapBonus() external view returns (address);
+
+    function claimRewards(address account) external;
 }
 
 interface ISwapBonus {
     function bonusToken() external view returns (address);
 }
 
-/// NOTE: This RewardManager is used with SY & YTv2 & PendleMarket. For YTv1, it will use RewardManagerAbstract
-/// NOTE: RewardManager must not have duplicated rewardTokens
 contract RewardManagerTranchess is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];

@@ -95,12 +95,12 @@ module.exports = {
   },
   "Vaults": {
     "PendleVaultSwell": {
-      "name": "Pendle CDP Vault rswETH",
+      "name": "rswETH (Swell)",
       "description": "This vault allows for borrowing and lending of assets",
       "type": "CDPVault",
       "collateralType": "ERC20",
       "lrt": '0xfae103dc9cf190ed75350761e95403b7b8afa6c0',
-      "lrtName": "RSWETH",
+      "lrtName": "rswETH",
       "oracle": {
         "type": "PendleLPOracle",
         "deploymentArguments": {
@@ -123,7 +123,7 @@ module.exports = {
         },
         "configs": {
             "debtFloor": toWad('1'),
-            "liquidationRatio": toWad('1.05'),
+            "liquidationRatio": toWad('1.1'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
             "roleAdmin": "deployer",
@@ -134,12 +134,12 @@ module.exports = {
       }
     },
     "PendleVaultBedrock": {
-      "name": "Pendle CDP Vault uniETH",
+      "name": "uniETH (Bedrock)",
       "description": "This vault allows for borrowing and lending of assets",
       "type": "CDPVault",
       "collateralType": "ERC20",
       "lrt": '0xf1376bcef0f78459c0ed0ba5ddce976f1ddf51f4',
-      "lrtName": "UNIETH",
+      "lrtName": "uniETH",
       "oracle": {
         "type": "PendleLPOracle",
         "deploymentArguments": {
@@ -162,7 +162,7 @@ module.exports = {
         },
         "configs": {
             "debtFloor": toWad('1'),
-            "liquidationRatio": toWad('1.05'),
+            "liquidationRatio": toWad('1.1'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
             "roleAdmin": "deployer",
@@ -173,7 +173,7 @@ module.exports = {
       }
     },
     "PendleVaultKelp": {
-      "name": "Pendle CDP Vault agETH",
+      "name": "agETH (Kelp)",
       "description": "This vault allows for borrowing and lending of assets",
       "type": "CDPVault",
       "collateralType": "ERC20",
@@ -201,7 +201,7 @@ module.exports = {
         },
         "configs": {
             "debtFloor": toWad('1'),
-            "liquidationRatio": toWad('1.05'),
+            "liquidationRatio": toWad('1.1'),
             "liquidationPenalty": toWad('0.99'),
             "liquidationDiscount": toWad('0.98'),
             "roleAdmin": "deployer",

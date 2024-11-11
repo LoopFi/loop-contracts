@@ -329,7 +329,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         uint256 upFrontAmount,
         address collateralizer,
         PermitParams calldata permitParams
-    ) external onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
+    ) external payable onlyDelegatecall onlyRegisteredVault(leverParams.vault) {
         // validate the primary swap
         if (
             leverParams.primarySwap.swapType != SwapType.EXACT_IN ||
@@ -344,6 +344,10 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 leverParams.auxSwap.assetIn != upFrontToken ||
                 leverParams.auxSwap.recipient != self)
         ) revert PositionAction__increaseLever_invalidAuxSwap();
+
+        if (msg.value >= 0) {
+            WETH.deposit{value: msg.value}();
+        }
 
         // transfer any up front amount to the LeverAction contract
         if (upFrontAmount > 0) {

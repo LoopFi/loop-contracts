@@ -42,10 +42,32 @@ import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/
 import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {RewardManagerTranchess} from "src/tranchess-rewards/RewardManagerTranchess.sol";
-import {ILiquidityGauge} from "tranchess/interfaces/ILiquidityGauge.sol";
+
+//import {ILiquidityGauge} from "tranchess/interfaces/ILiquidityGauge.sol";
 
 interface IWETH {
     function deposit() external payable;
+}
+
+interface ILG {
+    function syncWithVotingEscrow(address account) external;
+}
+
+interface ILiquidityGauge {
+    function workingBalanceOf(address account) external view returns (uint256);
+
+    function claimableRewards(
+        address account
+    )
+        external
+        returns (
+            uint256 chessRewards,
+            uint256 bonusRewards,
+            uint256 totalRewards,
+            uint256 totalBonusRewards,
+            uint256 totalRewardsInclBonus,
+            uint256 totalBonusRewardsInclBonus
+        );
 }
 
 contract RewardManagerTranchessTest is TestBase {
@@ -218,14 +240,21 @@ contract RewardManagerTranchessTest is TestBase {
             ILiquidityGauge(address(lpToken)).workingBalanceOf(address(vault)),
             "working balance vault after deposit"
         );
+
         (uint256 chessRewards, uint256 bonusRewards, , , , ) = ILiquidityGauge(address(lpToken)).claimableRewards(
-            address(vault)
+            address(lpTokenHolder)
         );
-        console.log("chess rewards after deposit: ", chessRewards);
 
         vm.stopPrank();
-        vm.warp(block.timestamp + 10 weeks);
-        vm.roll(block.number + 100000);
+        vm.prank(lpTokenHolder);
+        ILG(address(lpToken)).syncWithVotingEscrow(lpTokenHolder);
+        console.log("chess rewards after deposit: ", chessRewards);
+        (chessRewards, bonusRewards, , , , ) = ILiquidityGauge(address(lpToken)).claimableRewards(
+            address(lpTokenHolder)
+        );
+        console.log("chess rewards after first sync: ", chessRewards);
+        vm.warp(block.timestamp + 1 weeks);
+        vm.roll(block.number + 1000);
         // Mock claiming rewards
         vm.prank(chessHolder);
         ERC20(chess).transfer(address(vault), 10000 ether);
@@ -247,7 +276,7 @@ contract RewardManagerTranchessTest is TestBase {
                 args: abi.encode(0, lpToken, collateral)
             })
         });
-
+        vm.stopPrank();
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
         // No reward yet
         assertEq(ERC20(chess).balanceOf(address(user)), 0);
@@ -255,9 +284,12 @@ contract RewardManagerTranchessTest is TestBase {
             ILiquidityGauge(address(lpToken)).workingBalanceOf(address(vault)),
             "working balance vault after some time while deposited"
         );
+        vm.prank(lpTokenHolder);
+        ILG(address(lpToken)).syncWithVotingEscrow(lpTokenHolder);
+
         (chessRewards, bonusRewards, , , , ) = ILiquidityGauge(address(lpToken)).claimableRewards(address(vault));
         console.log("chess rewards after some time: ", chessRewards);
-
+        vm.startPrank(user);
         userProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(

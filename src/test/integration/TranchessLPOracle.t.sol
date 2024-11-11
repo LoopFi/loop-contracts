@@ -43,9 +43,6 @@ contract TranchessLPOracleTest is Test {
         assertEq(tranchessOracle.stalePeriod(), staleTime);
         assertEq(address(tranchessOracle.stableSwap()), stableSwap);
         assertEq(address(tranchessOracle.aggregator()), stoneEthChainlink);
-        assertEq(tranchessOracle.settledDay(), settledDay);
-        assertEq(address(tranchessOracle.fund()), fund, "fund address is not correct");
-        assertEq(address(tranchessOracle.lpToken()), lpToken);
     }
 
     function test_oracle_price() public {
@@ -55,18 +52,8 @@ contract TranchessLPOracleTest is Test {
     function test_spot() public {
         (, int256 answer, , , ) = AggregatorV3Interface(stoneEthChainlink).latestRoundData();
         uint256 scaledAnswer = wdiv(uint256(answer), 10 ** AggregatorV3Interface(stoneEthChainlink).decimals());
-        uint256 baseBalance = tranchessOracle.stableSwap().baseBalance();
-        uint256 quoteBalance = tranchessOracle.stableSwap().quoteBalance();
-        uint256 oraclePrice;
-        if (settledDay > block.timestamp) {
-            oraclePrice = tranchessOracle.stableSwap().getOraclePrice();
-        } else {
-            (oraclePrice, ) = tranchessOracle.fund().historicalNavs(settledDay);
-        }
-        uint256 totalValueInAsset = (baseBalance * oraclePrice) / 1e18 + quoteBalance;
-        uint256 lpTokenTotalSupply = tranchessOracle.lpToken().totalSupply();
-        uint256 lpTokenValue = (totalValueInAsset * 1e18) / lpTokenTotalSupply;
-        assertEq(tranchessOracle.spot(address(0)), wdiv(lpTokenValue, scaledAnswer));
+        uint256 lpVirtualPrice = IStableSwapV2(stableSwap).getCurrentPrice();
+        assertEq(tranchessOracle.spot(address(0)), wmul(lpVirtualPrice, scaledAnswer));
     }
 
     function test_getStatus() public {

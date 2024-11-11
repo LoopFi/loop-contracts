@@ -375,9 +375,6 @@ contract PoolAction is TransferAction {
             (uint256, address, uint256)
         );
 
-        if (lpToken != address(0)) {
-            IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
-        }
         IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
         retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, poolActionParams.minOut);
 

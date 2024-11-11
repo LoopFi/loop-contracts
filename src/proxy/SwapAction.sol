@@ -465,9 +465,6 @@ contract SwapAction is TransferAction {
     function tranchessExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 retAmount) {
         (uint256 version, address lpToken, uint256 lpIn) = abi.decode(data, (uint256, address, uint256));
 
-        if (lpToken != address(0)) {
-            IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
-        }
         IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
         retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, minOut);
 

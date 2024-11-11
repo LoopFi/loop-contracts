@@ -13,7 +13,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {LinearInterestRateModelV3} from "@gearbox-protocol/core-v3/contracts/pool/LinearInterestRateModelV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
-import {ICDM} from "../interfaces/ICDM.sol";
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
 import {CDPVault} from "../CDPVault.sol";
 
@@ -35,12 +34,6 @@ import {PoolQuotaKeeperV3} from "src/quotas/PoolQuotaKeeperV3.sol";
 import {MockVoter} from "src/test/MockVoter.sol";
 import {StakingLPEth} from "src/StakingLPEth.sol";
 import {Silo} from "src/Silo.sol";
-
-contract CreditCreator {
-    constructor(ICDM cdm) {
-        cdm.modifyPermission(msg.sender, true);
-    }
-}
 
 contract TestBase is Test {
     address public mockTreasury;
@@ -70,8 +63,6 @@ contract TestBase is Test {
     bool public usePatchedDeal = false;
 
     uint256 internal constant initialGlobalDebtCeiling = 100_000_000_000 ether;
-
-    CreditCreator private creditCreator;
 
     struct CDPAccessParams {
         address roleAdmin;

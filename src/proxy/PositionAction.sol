@@ -626,10 +626,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
             auxSwap.amount = collateral;
-            _delegateCall(
-                address(swapAction),
-                abi.encodeWithSelector(swapAction.swap.selector, auxSwap)
-            );
+            _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, auxSwap));
         } else {
             // otherwise just send the collateral to `collateralizer`
             IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, collateral);
@@ -691,13 +688,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         }
 
         underlyingToken.forceApprove(address(vault), amount);
-        ICDPVault(vault).modifyCollateralAndDebt(
-            position,
-            address(this),
-            address(this),
-            0,
-            -toInt256(amount)
-        );
+        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, -toInt256(amount));
     }
 
     /// @dev Sends remaining tokens back to `sender` instead of leaving them on the proxy

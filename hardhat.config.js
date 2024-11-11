@@ -48,6 +48,10 @@ module.exports = {
     arbitrum: {
       url: process.env.ARBITRUM_RPC,
       accounts: [process.env.ARB_DEPLOYER_PRIVATE_KEY]
+    },
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     }
   }
 };

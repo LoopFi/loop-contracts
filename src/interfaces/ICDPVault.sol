@@ -4,9 +4,7 @@ pragma solidity ^0.8.19;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-import {ICDM} from "./ICDM.sol";
 import {IOracle} from "./IOracle.sol";
-import {IBuffer} from "./IBuffer.sol";
 import {IPause} from "./IPause.sol";
 import {IPermission} from "./IPermission.sol";
 import {IInterestRateModel} from "./IInterestRateModel.sol";

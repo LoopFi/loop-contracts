@@ -40,7 +40,7 @@ module.exports = {
       },
     },
     "Gearbox": {
-      "initialGlobalDebtCeiling": toWad('100000000'),
+      "initialGlobalDebtCeiling": "115792089237316195423570985008687907853269984665640564039457584007913129639935",//max uint256
     },
     "Treasury": {
       "constructorArguments": {
@@ -60,6 +60,7 @@ module.exports = {
     "LiquidityPoolWETH": {
       "name": "Loop Liquidity Pool - WETH",
       "symbol": "lpETH",
+      "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
       "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" //WETH
     }
   },

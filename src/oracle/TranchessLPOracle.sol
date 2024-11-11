@@ -34,12 +34,6 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
     uint256 public immutable aggregatorScale;
     /// @notice Stableswap contract
     IStableSwapV2 public immutable stableSwap;
-    /// @notice Settlement day
-    uint256 public immutable settledDay;
-    /// @notice Fund contract
-    IFundV5 public immutable fund;
-    /// @notice LP token
-    IERC20 public immutable lpToken;
 
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
@@ -70,9 +64,6 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
         stalePeriod = stalePeriod_;
         aggregatorScale = 10 ** uint256(aggregator.decimals());
         stableSwap = IStableSwapV2(stableSwap_);
-        fund = IFundV5(address(stableSwap.fund()));
-        settledDay = fund.getSettledDay();
-        lpToken = IERC20(stableSwap.lpToken());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -117,9 +108,9 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
         bool isValid;
         (isValid, price) = _fetchAndValidate();
         if (!isValid) revert TranchessLPOracle__spot_invalidValue();
-        uint256 lpTokenValue = _fetchAssetValue();
+        uint256 lpVirtualPrice = _fetchVirtualPrice();
 
-        return (lpTokenValue * SCALE) / price;
+        return (lpVirtualPrice * price) / SCALE;
     }
 
     /// @notice Fetches and validates the latest price from Chainlink
@@ -149,18 +140,8 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /// @notice Validates the PT oracle
-    /// @return lpTokenValue LP token value in the underlying asset[WAD]
-    function _fetchAssetValue() internal view returns (uint256 lpTokenValue) {
-        uint256 baseBalance = stableSwap.baseBalance();
-        uint256 quoteBalance = stableSwap.quoteBalance();
-        uint256 oraclePrice;
-        if (settledDay > block.timestamp) {
-            oraclePrice = stableSwap.getOraclePrice();
-        } else {
-            (oraclePrice, ) = fund.historicalNavs(settledDay);
-        }
-        uint256 totalValueInAsset = (baseBalance * oraclePrice) / SCALE + quoteBalance;
-        uint256 lpTokenTotalSupply = lpToken.totalSupply();
-        lpTokenValue = (totalValueInAsset * SCALE) / lpTokenTotalSupply;
+    /// @return virtualPrice LP token virtual price
+    function _fetchVirtualPrice() internal view returns (uint256 virtualPrice) {
+        return stableSwap.getCurrentPrice();
     }
 }

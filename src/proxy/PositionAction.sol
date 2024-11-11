@@ -56,14 +56,14 @@ struct LeverParams {
 }
 
 struct LocalVars {
-        uint256 totalDebt;
-        uint256 subDebt;
-        uint256 withdrawnCollateral;
-        uint256 swapAmountOut;
-        uint256 residualDestAmount;
-        uint256 residualSrcAmount;
-        uint256 estimatedSwapInAmount;
-    }
+    uint256 totalDebt;
+    uint256 subDebt;
+    uint256 withdrawnCollateral;
+    uint256 swapAmountOut;
+    uint256 residualDestAmount;
+    uint256 residualSrcAmount;
+    uint256 estimatedSwapInAmount;
+}
 
 /// @title PositionAction
 /// @notice Base contract for interacting with CDPVaults via a proxy
@@ -470,7 +470,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
     /// @notice Callback function for the credit flash loan taken out in decreaseLever
     /// @param data The encoded bytes that were passed into the credit flash loan
-     function onCreditFlashLoan(
+    function onCreditFlashLoan(
         address /*initiator*/,
         uint256 /*amount*/,
         uint256 fee,

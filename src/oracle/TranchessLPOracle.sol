@@ -8,8 +8,7 @@ import {AggregatorV3Interface} from "../vendor/AggregatorV3Interface.sol";
 
 import {wdiv, wmul} from "../utils/Math.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
-import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
-import {IFundV5} from "tranchess/interfaces/IFundV5.sol";
+import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IStableSwapV2 is IStableSwap {

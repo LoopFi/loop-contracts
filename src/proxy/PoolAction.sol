@@ -13,8 +13,8 @@ import {IPPrincipalToken} from "pendle/interfaces/IPPrincipalToken.sol";
 import {IStandardizedYield} from "pendle/interfaces/IStandardizedYield.sol";
 import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
-import {ISwapRouter} from "tranchess/interfaces/ISwapRouter.sol";
-import {IStableSwap} from "tranchess/interfaces/IStableSwap.sol";
+import {ISwapRouter} from "src/interfaces/ISwapRouterTranchess.sol";
+import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
 
 interface ILiquidityGauge {
     function stableSwap() external view returns (address);
@@ -375,9 +375,6 @@ contract PoolAction is TransferAction {
             (uint256, address, uint256)
         );
 
-        if (lpToken != address(0)) {
-            IERC20(lpToken).forceApprove(address(tranchessRouter), lpIn);
-        }
         IStableSwap stableSwap = IStableSwap(ILiquidityGauge(lpToken).stableSwap());
         retAmount = stableSwap.removeQuoteLiquidity(version, lpIn, poolActionParams.minOut);
 

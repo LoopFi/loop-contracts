@@ -25,7 +25,6 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
-    uint256 public constant SCALE = 1e18;
     /// @notice Chainlink aggregator address
     AggregatorV3Interface public immutable aggregator;
     /// @notice Stable period in seconds
@@ -110,7 +109,7 @@ contract TranchessLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable
         if (!isValid) revert TranchessLPOracle__spot_invalidValue();
         uint256 lpVirtualPrice = _fetchVirtualPrice();
 
-        return (lpVirtualPrice * price) / SCALE;
+        return wmul(lpVirtualPrice, price);
     }
 
     /// @notice Fetches and validates the latest price from Chainlink

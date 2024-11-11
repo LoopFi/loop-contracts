@@ -476,7 +476,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         uint256 fee,
         bytes calldata data
     ) external returns (bytes32) {
-        if (msg.sender != address(flashlender)) revert("PositionAction__onCreditFlashLoan__invalidSender");
+        if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
         (LeverParams memory leverParams, uint256 subCollateral, address residualRecipient) = abi.decode(
             data,
             (LeverParams, uint256, address)

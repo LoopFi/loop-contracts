@@ -235,7 +235,7 @@ contract RewardManagerTranchessTest is TestBase {
         );
 
         test_deposit_with_entry_swap_from_STONE();
-        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+        (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
         console.log(
             ILiquidityGauge(address(lpToken)).workingBalanceOf(address(vault)),
             "working balance vault after deposit"

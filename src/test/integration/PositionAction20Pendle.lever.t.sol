@@ -324,8 +324,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - lpToRedeem);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
-        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), repayAmount);
-        assertEq(normalDebt, initialNormalDebt - repayAmount + flashloanFee);
+        assertEq(normalDebt, initialNormalDebt - repayAmount);
 
         // assert that the left over was transfered to the user proxy
         assertGt(ERC20(wstETH).balanceOf(address(userProxy)), 0);

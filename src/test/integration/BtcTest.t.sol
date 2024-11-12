@@ -110,8 +110,8 @@ contract BtcTest is IntegrationTestBase {
         vaultRegistry = new VaultRegistry();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter);
-        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER);
+        swapAction = new SwapAction(balancerVault, univ3Router, IPActionAddRemoveLiqV3(PENDLE_ROUTER), kyberRouter, TRANCHESS_ROUTER);
+        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER, TRANCHESS_ROUTER);
 
         // deploy position actions
         positionAction = new PositionAction20(

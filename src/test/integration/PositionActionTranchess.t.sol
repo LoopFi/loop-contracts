@@ -184,7 +184,7 @@ contract PositionActionTranchessTest is TestBase {
     function test_withdraw_and_swap_to_STONE() public {
         test_deposit_with_entry_swap_from_STONE();
 
-        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+        (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
 
         CollateralParams memory collateralParams = CollateralParams({
             targetToken: address(lpToken),

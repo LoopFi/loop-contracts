@@ -470,7 +470,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             address(this),
             address(this),
             0,
-            -toInt256(subDebt - fee)
+            -toInt256(subDebt)
         );
 
         // withdraw collateral and handle any CDP specific actions
@@ -579,8 +579,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
             if (auxSwap.swapType == SwapType.EXACT_IN) {
-+               auxSwap.amount = scaledCollateral;
-+           }
+               auxSwap.amount = scaledCollateral;
+            }
             
             _delegateCall(
                 address(swapAction),

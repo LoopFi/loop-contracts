@@ -534,9 +534,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
         assertEq(collateral, initialCollateral - maxAmountIn);
 
-        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping token
-        assertEq(normalDebt, initialNormalDebt - amountOut + flashloanFee);
+        assertEq(normalDebt, initialNormalDebt - amountOut);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -609,8 +608,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - maxAmountIn);
 
         // debt is decreased by amount out minus the accrued interest
-        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
-        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest + flashloanFee);
+        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -751,8 +749,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert alice's position is levered down by bob
         assertEq(aliceCollateral, initialCollateral - maxAmountIn);
 
-        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
-        assertEq(aliceNormalDebt, initialNormalDebt - amountOut + flashloanFee);
+        assertEq(aliceNormalDebt, initialNormalDebt - amountOut);
 
         // assert bob's position is unaffected
         assertEq(bobCollateral, 0);

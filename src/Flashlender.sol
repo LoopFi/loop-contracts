@@ -123,7 +123,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         uint256 fee = wmul(amount, protocolFee);
         uint256 total = amount + fee;
 
-        pool.lendCreditAccount(amount, address(receiver));
+        pool.lendCreditAccount(total, address(receiver));
 
         emit CreditFlashLoan(address(receiver), amount, fee);
 

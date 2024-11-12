@@ -2,9 +2,19 @@ const hre = require('hardhat');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const CONFIG = require('./config.js');
 const { BigNumber } = require('ethers');
 const { BalancerSDK, Network, PoolType } = require('@balancer-labs/sdk');
+
+const network = process.env.CONFIG_NETWORK || process.argv.find(arg => arg.startsWith('--network='))?.split('=')[1] || 'mainnet';
+
+const CONFIG = (() => {
+  try {
+    return require(`./config_${network}.js`);
+  } catch (e) {
+    console.log(`Config file for network ${network} not found, using default config.js`);
+    return require('./config.js');
+  }
+})();
 
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
@@ -365,6 +375,10 @@ async function deployGearbox() {
   await verifyOnTenderly('PoolV3', PoolV3.address);
   await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
 
+  return { PoolV3, AddressProviderV3 };
+}
+
+async function  deployBalancerPool() {
   // Cheat WETH to deployer
   const url = process.env.TENDERLY_FORK_URL;
   const value = BigNumber.from(10).pow(18).mul(1000);
@@ -474,8 +488,6 @@ async function deployGearbox() {
   console.log('Pool Tokens balances: ' + tokens.balances);
 
   await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
-
-  return { PoolV3, AddressProviderV3 };
 }
 
 
@@ -934,7 +946,7 @@ async function createPositions() {
   // await deployGearbox();
   // await logVaults();
   // await createPositions();
-  //await verifyAllDeployedContracts();
+  // await verifyAllDeployedContracts();
 })()).catch((error) => {
   console.error(error);
   process.exitCode = 1;

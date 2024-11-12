@@ -45,7 +45,7 @@ contract TranchessLPOracleTest is Test {
         assertEq(address(tranchessOracle.aggregator()), stoneEthChainlink);
     }
 
-    function test_oracle_price() public {
+    function test_oracle_price() public view {
         console.log(tranchessOracle.spot(address(0)));
     }
 

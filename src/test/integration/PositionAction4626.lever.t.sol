@@ -60,7 +60,8 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(mockWETH)
         );
 
         weightedUnderlierPoolId = _createBalancerPool(address(token), address(underlyingToken)).getPoolId();

@@ -12,6 +12,7 @@ import {BaseAction} from "./BaseAction.sol";
 import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
 import {PoolAction, PoolActionParams} from "./PoolAction.sol";
 import {IVaultRegistry} from "../interfaces/IVaultRegistry.sol";
+import {IWETH} from "../reward/interfaces/IWETH.sol";
 
 import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "../interfaces/IFlashlender.sol";
 
@@ -98,6 +99,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     SwapAction public immutable swapAction;
     /// @notice The PoolAction contract
     PoolAction public immutable poolAction;
+    /// @notice The WETH contract
+    IWETH public immutable WETH;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -123,7 +126,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_) {
+    constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_, address weth_) {
         if (
             flashlender_ == address(0) ||
             swapAction_ == address(0) ||
@@ -138,6 +141,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         self = address(this);
         swapAction = SwapAction(swapAction_);
         poolAction = PoolAction(poolAction_);
+        WETH = IWETH(weth_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -345,7 +349,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 leverParams.auxSwap.recipient != self)
         ) revert PositionAction__increaseLever_invalidAuxSwap();
 
-        if (msg.value >= 0) {
+        // deposit any WETH sent to the contract
+        if (msg.value > 0) {
             WETH.deposit{value: msg.value}();
         }
 

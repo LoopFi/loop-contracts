@@ -402,7 +402,7 @@ async function deployGearbox() {
 
   console.log("deposited weth")
 
-  const balancer = new BalancerSDK({
+  /* const balancer = new BalancerSDK({
     network: Network.MAINNET,
     rpcUrl: process.env.MAINNET_RPC_URL,
   });
@@ -473,7 +473,7 @@ async function deployGearbox() {
   console.log('Pool Tokens Addresses: ' + tokens.tokens);
   console.log('Pool Tokens balances: ' + tokens.balances);
 
-  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
+  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool'); */
 
   return { PoolV3, AddressProviderV3 };
 }

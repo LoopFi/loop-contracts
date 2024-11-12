@@ -151,7 +151,8 @@ contract PositionActionLeverTranchessTest is TestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(mockWETH)
         );
         // setup user and userProxy
         userPk = 0x12341234;
@@ -313,7 +314,7 @@ contract PositionActionLeverTranchessTest is TestBase {
     function test_withdraw_and_swap_to_STONE() public {
         test_deposit_with_entry_swap_from_STONE();
 
-        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+        (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
 
         CollateralParams memory collateralParams = CollateralParams({
             targetToken: address(lpToken),

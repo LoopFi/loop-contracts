@@ -88,7 +88,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(mockWETH)
         );
 
         vm.label(user, "user");

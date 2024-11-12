@@ -487,9 +487,8 @@ async function  deployBalancerPool() {
   console.log('Pool Tokens Addresses: ' + tokens.tokens);
   console.log('Pool Tokens balances: ' + tokens.balances);
 
-  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
+  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool'); */
 }
-
 
 async function deployAuraVaults() {
   console.log(`

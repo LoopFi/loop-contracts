@@ -26,8 +26,9 @@ contract PositionAction4626 is PositionAction {
         address flashlender_,
         address swapActions_,
         address poolAction_,
-        address vaultRegistry_
-    ) PositionAction(flashlender_, swapActions_, poolAction_, vaultRegistry_) {}
+        address vaultRegistry_,
+        address weth_
+    ) PositionAction(flashlender_, swapActions_, poolAction_, vaultRegistry_, weth_) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION

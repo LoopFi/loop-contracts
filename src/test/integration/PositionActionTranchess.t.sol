@@ -126,7 +126,8 @@ contract PositionActionTranchessTest is TestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(mockWETH)
         );
         // setup user and userProxy
         userPk = 0x12341234;

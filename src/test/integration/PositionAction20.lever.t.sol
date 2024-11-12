@@ -71,7 +71,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(mockWETH)
         );
 
         // configure oracle spot prices

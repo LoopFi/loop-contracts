@@ -269,4 +269,22 @@ contract PRBProxyRegistry is IPRBProxyRegistry {
         // Log the plugin installation.
         emit InstallPlugin(owner, _proxies[owner], plugin, methods);
     }
+
+    function getAddress(address owner) public view returns (address) {
+        bytes32 salt = bytes32(abi.encodePacked(owner));
+
+        bytes memory bytecode = abi.encodePacked(type(PRBProxy).creationCode);
+
+        bytes32 hash = keccak256(
+            abi.encodePacked(
+                bytes1(0xff),      
+                address(this),     
+                salt,              
+                keccak256(bytecode)
+            )
+        );
+
+        return address(uint160(uint(hash)));
+    }
+
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {PRBProxyRegistry} from "../../prb-proxy/PRBProxyRegistry.sol";
 import {PRBProxy} from "prb-proxy/PRBProxy.sol";
 import {TestBase} from "../TestBase.sol";
@@ -25,6 +26,7 @@ contract IntegrationTestBase is TestBase {
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address internal constant PENDLE_ROUTER = 0x00000000005BBB0EF59571E58418F9a4357b68A0;
     address internal constant TRANCHESS_ROUTER = 0x63BAEe33649E589Cc70435F898671461B624CBCc; // on SCROLL NETWORK
+    address internal constant SPECTRA_ROUTER = 0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a;
     // tokens
     ERC20 internal constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -33,6 +35,7 @@ contract IntegrationTestBase is TestBase {
     ERC20 internal constant OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
     ERC20 internal constant WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
     ERC20 internal constant PENDLE_LP_STETH = ERC20(0xC374f7eC85F8C7DE3207a10bB1978bA104bdA3B2); // st-ETH 25DEC25
+    ERC4626 internal constant YN_ETH = ERC4626(0x09db87A538BD693E9d08544577d5cCfAA6373A48);
 
     address internal constant pendleLP_STETH_Holder = 0x3300eebeEA8239b90a435e403B130a853A0d7DfF;
     address internal constant USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
@@ -57,6 +60,8 @@ contract IntegrationTestBase is TestBase {
     // kyber
     address kyberRouter = 0x6131B5fae19EA4f9D964eAc0408E4408b66337b5;
 
+    // SPECTRA
+    address ynETHPool = 0x08DA2b1EA8f2098D44C8690dDAdCa3d816c7C0d5;
     // balancer parameters
     IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
     IComposableStablePoolFactory internal constant stablePoolFactory =
@@ -97,9 +102,10 @@ contract IntegrationTestBase is TestBase {
             univ3Router,
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
-            TRANCHESS_ROUTER
+            TRANCHESS_ROUTER,
+            SPECTRA_ROUTER
         );
-        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER, TRANCHESS_ROUTER);
+        poolAction = new PoolAction(BALANCER_VAULT, PENDLE_ROUTER, TRANCHESS_ROUTER, SPECTRA_ROUTER);
 
         // configure balancer pools
         stablePool = _createBalancerTokenPool();

@@ -42,6 +42,8 @@ import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/
 import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {IUniswapV3Router, ExactInputParams, ExactOutputParams, decodeLastToken} from "../../vendor/IUniswapV3Router.sol";
+import {Constants} from "src/vendor/Constants.sol";
+import {Commands} from "src/vendor/Commands.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -63,7 +65,7 @@ contract MockUniswap {
     }
 }
 
-contract PositionActionLeverTranchessTest is TestBase {
+contract PositionActionLeverSpectraTest is TestBase {
     using SafeERC20 for ERC20;
     PoolAction poolAction;
     SwapAction swapAction;
@@ -92,6 +94,18 @@ contract PositionActionLeverTranchessTest is TestBase {
     address fund = address(0x4B0D5Fe3C1F58FD68D20651A5bC761553C10D955); // tranchess fund 2 stone
     address lpToken = address(0xD48Cc42e154775f8a65EEa1D6FA1a11A31B09B65); // tranchess lp token (liquidity gauge)
     uint256 settledDay = 1727877600;
+
+    // SPECTRA ynETH
+    address internal constant SPECTRA_ROUTER = 0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a;
+    address curvePool = address(0x08DA2b1EA8f2098D44C8690dDAdCa3d816c7C0d5); // Spectra ynETH PT-sw-ynETH / sw-ynETH
+    address lpTokenTracker = address(0x85F05383f7Cb67f35385F7bF3B74E68F4795CbB9);
+    ERC4626 swYnETH = ERC4626(0x6e0dccf49D095F8ea8920A8aF03D236FA167B7E0);
+    address pTswYnETH = address(0x57E9EBeB30852D31f99A08E39068d93b0D8FC917);
+    address ynETH = address(0x09db87A538BD693E9d08544577d5cCfAA6373A48);
+    address weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    // holders
+    address ynETHHolder = address(0xdED077cCF229aBf68882d062d97982f28D6D714D);
+    address wethHolder = address(0x57757E3D981446D585Af0D9Ae4d7DF6D64647806);
     // user
     PRBProxy userProxy;
     address internal user;
@@ -110,19 +124,19 @@ contract PositionActionLeverTranchessTest is TestBase {
     address kyberRouter = 0x6131B5fae19EA4f9D964eAc0408E4408b66337b5;
 
     function setUp() public virtual override {
-        vm.createSelectFork(vm.rpcUrl("scroll"), 10610811);
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 21272674);
         usePatchedDeal = true;
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, address(0));
+        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, SPECTRA_ROUTER);
 
         // configure permissions and system settings
         setGlobalDebtCeiling(15_000_000 ether);
 
         // deploy vaults
         vault = createCDPVault(
-            IERC20(lpToken), // token
+            IERC20(lpTokenTracker), // token
             5_000_000 ether, // debt ceiling
             0, // debt floor
             1.25 ether, // liquidation ratio
@@ -130,13 +144,13 @@ contract PositionActionLeverTranchessTest is TestBase {
             1.05 ether // liquidation discount
         );
 
-        createGaugeAndSetGauge(address(vault), address(lpToken));
-        oracle.updateSpot(address(lpToken), 1 ether);
+        createGaugeAndSetGauge(address(vault), address(lpTokenTracker));
+        oracle.updateSpot(address(lpTokenTracker), 1 ether);
 
         uniswap = new MockUniswap();
-        vm.prank(stoneHolderForUni);
-        ERC20(STONE).transfer(address(uniswap), 10000 ether);
-        underlyingToken.mint(address(uniswap), 10000 ether);
+        vm.prank(wethHolder);
+        ERC20(weth).transfer(address(uniswap), 1000 ether);
+        underlyingToken.mint(address(uniswap), 1000 ether);
 
         swapAction = new SwapAction(
             balancerVault,
@@ -144,7 +158,7 @@ contract PositionActionLeverTranchessTest is TestBase {
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
             TRANCHESS_ROUTER,
-            address(0)
+            SPECTRA_ROUTER
         );
 
         // deploy position actions
@@ -161,32 +175,50 @@ contract PositionActionLeverTranchessTest is TestBase {
         userProxy = PRBProxy(payable(address(prbProxyRegistry.deployFor(user))));
         deal(user, 10 ether);
 
-        vm.prank(stoneHolder);
-        ERC20(STONE).transfer(user, 100 ether);
+        vm.prank(wethHolder);
+        ERC20(weth).transfer(user, 200 ether);
 
-        vm.prank(address(userProxy));
-        IERC20(lpToken).approve(address(user), type(uint256).max);
-        vm.prank(address(userProxy));
-        IERC20(STONE).approve(address(user), type(uint256).max);
+        // vm.prank(address(userProxy));
+        // IERC20(lpToken).approve(address(user), type(uint256).max);
+        // vm.prank(address(userProxy));
+        // IERC20(STONE).approve(address(user), type(uint256).max);
     }
 
-    function test_increaseLever_Tranchess() public {
-        test_deposit_with_entry_swap_from_STONE();
+    function test_increaseLever_Spectra() public {
+        test_deposit_with_entry_swap_from_WETH();
         uint256 borrowAmount = 10 ether;
 
+        // PoolActionParams memory poolActionParams;
+
+        // poolActionParams = PoolActionParams({
+        //     protocol: Protocol.SPECTRA,
+        //     minOut: 0,
+        //     recipient: address(positionAction),
+        //     args: abi.encode(lpToken, 0, (borrowAmount * 999) / 1000, 0, block.timestamp + 1000)
+        // });
+
+        bytes memory commandsJoin = abi.encodePacked(
+            bytes1(uint8(Commands.TRANSFER_FROM)),
+            bytes1(uint8(Commands.DEPOSIT_ASSET_IN_IBT)),
+            bytes1(uint8(Commands.CURVE_ADD_LIQUIDITY))
+        );
+        bytes[] memory inputsJoin = new bytes[](3);
+        inputsJoin[0] = abi.encode(weth, (borrowAmount * 999) / 1000);
+        inputsJoin[1] = abi.encode(address(swYnETH), Constants.CONTRACT_BALANCE, Constants.ADDRESS_THIS);
+        inputsJoin[2] = abi.encode(curvePool, [Constants.CONTRACT_BALANCE, 0], 0, address(positionAction));
         PoolActionParams memory poolActionParams;
 
         poolActionParams = PoolActionParams({
-            protocol: Protocol.TRANCHESS,
+            protocol: Protocol.SPECTRA,
             minOut: 0,
             recipient: address(positionAction),
-            args: abi.encode(lpToken, 0, (borrowAmount * 999) / 1000, 0, block.timestamp + 1000)
+            args: abi.encode(commandsJoin, inputsJoin, block.timestamp + 1000)
         });
 
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
             vault: address(vault),
-            collateralToken: address(lpToken),
+            collateralToken: address(lpTokenTracker),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.UNIV3,
                 swapType: SwapType.EXACT_IN,
@@ -196,7 +228,7 @@ contract PositionActionLeverTranchessTest is TestBase {
                 recipient: address(positionAction),
                 residualRecipient: address(positionAction),
                 deadline: block.timestamp + 100,
-                args: abi.encode(address(underlyingToken), address(STONE), (borrowAmount * 999) / 1000)
+                args: abi.encode(address(underlyingToken), address(weth), (borrowAmount * 999) / 1000)
             }),
             auxSwap: emptySwap,
             auxAction: poolActionParams
@@ -219,39 +251,45 @@ contract PositionActionLeverTranchessTest is TestBase {
     }
 
     function test_decreaseLever_Tranchess() public {
-        test_increaseLever_Tranchess();
+        test_increaseLever_Spectra();
         (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         console.log("collateral: ", collateral);
         console.log("debt: ", debt);
         PoolActionParams memory poolActionParams;
 
+        bytes memory commandsExit = abi.encodePacked(
+            bytes1(uint8(Commands.TRANSFER_FROM)),
+            bytes1(uint8(Commands.CURVE_REMOVE_LIQUIDITY_ONE_COIN))
+        );
+        bytes[] memory inputsExit = new bytes[](2);
+        inputsExit[0] = abi.encode(address(lpTokenTracker), collateral / 2);
+        inputsExit[1] = abi.encode(address(curvePool), collateral / 2, 0, 0, address(positionAction));
         poolActionParams = PoolActionParams({
-            protocol: Protocol.TRANCHESS,
+            protocol: Protocol.SPECTRA,
             minOut: 0,
             recipient: address(positionAction),
-            args: abi.encode(0, lpToken, collateral / 2)
+            args: abi.encode(commandsExit, inputsExit, address(swYnETH), block.timestamp + 1000)
         });
-
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
             vault: address(vault),
-            collateralToken: address(lpToken),
+            collateralToken: address(lpTokenTracker),
             primarySwap: SwapParams({
                 swapProtocol: SwapProtocol.UNIV3,
                 swapType: SwapType.EXACT_OUT,
-                assetIn: address(STONE),
+                assetIn: address(swYnETH),
                 amount: debt / 2,
                 limit: debt / 2,
                 recipient: address(positionAction),
                 residualRecipient: address(user),
                 deadline: block.timestamp + 100,
-                args: abi.encode(address(STONE), address(underlyingToken), ((((debt / 2) * 99) / 100)))
+                args: abi.encode(address(swYnETH), address(underlyingToken), ((((debt / 2) * 99) / 100)))
             }),
             auxSwap: emptySwap,
             auxAction: poolActionParams
         });
 
-        assertEq(ERC20(STONE).balanceOf(address(user)), 0);
+        assertEq(ERC20(swYnETH).balanceOf(address(user)), 0);
         vm.startPrank(user);
 
         // call increaseLever
@@ -263,38 +301,48 @@ contract PositionActionLeverTranchessTest is TestBase {
         assertApproxEqAbs(collateralAfter, collateral / 2, 1);
         assertEq(debtAfter, debt / 2);
         assertApproxEqRel(
-            ERC20(STONE).balanceOf(address(user)),
-            collateral / 2 - debt / 2,
+            ERC20(swYnETH).balanceOf(address(user)),
+            collateral - debt / 2,
             0.01 ether,
-            "STONE BALANCE"
+            "swYnETH BALANCE"
         );
-        assertEq(ERC20(lpToken).balanceOf(address(user)), 0);
-        assertEq(ERC20(STONE).balanceOf(address(positionAction)), 0);
-        assertEq(ERC20(lpToken).balanceOf(address(positionAction)), 0);
+        assertEq(ERC20(lpTokenTracker).balanceOf(address(user)), 0);
+        assertEq(ERC20(swYnETH).balanceOf(address(positionAction)), 0);
+        assertEq(ERC20(lpTokenTracker).balanceOf(address(positionAction)), 0);
         assertEq(underlyingToken.balanceOf(address(user)) / 1e18, 0);
     }
 
-    function test_deposit_with_entry_swap_from_STONE() public {
+    function test_deposit_with_entry_swap_from_WETH() public {
         uint256 depositAmount = 100 ether;
 
+        bytes memory commandsJoin = abi.encodePacked(
+            bytes1(uint8(Commands.TRANSFER_FROM)),
+            bytes1(uint8(Commands.DEPOSIT_ASSET_IN_IBT)),
+            bytes1(uint8(Commands.CURVE_ADD_LIQUIDITY))
+        );
+        bytes[] memory inputsJoin = new bytes[](3);
+        inputsJoin[0] = abi.encode(weth, 100 ether);
+        inputsJoin[1] = abi.encode(address(swYnETH), Constants.CONTRACT_BALANCE, Constants.ADDRESS_THIS);
+        inputsJoin[2] = abi.encode(curvePool, [Constants.CONTRACT_BALANCE, 0], 0, address(userProxy));
+
         CollateralParams memory collateralParams = CollateralParams({
-            targetToken: address(STONE),
+            targetToken: address(weth),
             amount: 0, // not used for swaps
             collateralizer: address(user),
             auxSwap: SwapParams({
-                swapProtocol: SwapProtocol.TRANCHESS_IN,
+                swapProtocol: SwapProtocol.SPECTRA,
                 swapType: SwapType.EXACT_IN,
-                assetIn: address(STONE),
+                assetIn: address(weth),
                 amount: depositAmount, // amount to swap in
-                limit: 99 ether, // min amount of collateral token to receive
+                limit: 98 ether, // min amount of collateral token to receive
                 recipient: address(userProxy),
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
-                args: abi.encode(lpToken, 0, 100 ether, 0)
+                args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
             })
         });
         vm.startPrank(user);
-        ERC20(STONE).approve(address(userProxy), depositAmount);
+        ERC20(weth).approve(address(userProxy), depositAmount);
         userProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
@@ -305,67 +353,77 @@ contract PositionActionLeverTranchessTest is TestBase {
                 emptyPermitParams
             )
         );
-        assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "failed to deposit");
+        assertEq(ERC20(lpTokenTracker).balanceOf(address(userProxy)), 0, "failed to deposit");
+
         (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
 
-        assertApproxEqRel(collateral, 100 ether, 0.01 ether, "invalid collateral amount");
+        assertApproxEqRel(collateral, 49.5 ether, 0.01 ether, "invalid collateral amount");
         assertEq(debt, 0);
     }
 
-    function test_withdraw_and_swap_to_STONE() public {
-        test_deposit_with_entry_swap_from_STONE();
+    // function test_withdraw_and_swap_to_STONE() public {
+    //     test_deposit_with_entry_swap_from_STONE();
 
-        (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
+    //     (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
 
-        CollateralParams memory collateralParams = CollateralParams({
-            targetToken: address(lpToken),
-            amount: collateral, // not used for swaps
-            collateralizer: address(user),
-            auxSwap: SwapParams({
-                swapProtocol: SwapProtocol.TRANCHESS_OUT,
-                swapType: SwapType.EXACT_IN,
-                assetIn: address(lpToken),
-                amount: collateral, // amount to swap in
-                limit: 98 ether, // min amount of collateral token to receive
-                recipient: address(user),
-                residualRecipient: address(user),
-                deadline: block.timestamp + 100,
-                args: abi.encode(0, lpToken, collateral)
-            })
-        });
-        assertEq(ERC20(STONE).balanceOf(address(user)), 0);
-        userProxy.execute(
-            address(positionAction),
-            abi.encodeWithSelector(
-                positionAction.withdraw.selector,
-                address(userProxy),
-                address(vault),
-                collateralParams,
-                emptyPermitParams
-            )
-        );
-        assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "failed to withdraw");
-        // (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
-        assertGt(ERC20(STONE).balanceOf(address(user)), 0);
-        // Little less because of the exiting
-        assertApproxEqRel(100 ether, ERC20(STONE).balanceOf(address(user)), 0.01 ether, "invalid stone amount amount");
-    }
+    //     CollateralParams memory collateralParams = CollateralParams({
+    //         targetToken: address(lpToken),
+    //         amount: collateral, // not used for swaps
+    //         collateralizer: address(user),
+    //         auxSwap: SwapParams({
+    //             swapProtocol: SwapProtocol.TRANCHESS_OUT,
+    //             swapType: SwapType.EXACT_IN,
+    //             assetIn: address(lpToken),
+    //             amount: collateral, // amount to swap in
+    //             limit: 98 ether, // min amount of collateral token to receive
+    //             recipient: address(user),
+    //             residualRecipient: address(user),
+    //             deadline: block.timestamp + 100,
+    //             args: abi.encode(0, lpToken, collateral)
+    //         })
+    //     });
+    //     assertEq(ERC20(STONE).balanceOf(address(user)), 0);
+    //     userProxy.execute(
+    //         address(positionAction),
+    //         abi.encodeWithSelector(
+    //             positionAction.withdraw.selector,
+    //             address(userProxy),
+    //             address(vault),
+    //             collateralParams,
+    //             emptyPermitParams
+    //         )
+    //     );
+    //     assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "failed to withdraw");
+    //     // (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+    //     assertGt(ERC20(STONE).balanceOf(address(user)), 0);
+    //     // Little less because of the exiting
+    //     assertApproxEqRel(100 ether, ERC20(STONE).balanceOf(address(user)), 0.01 ether, "invalid stone amount amount");
+    // }
 
     function test_multisend_simple_delegatecall() public {
+        bytes memory commandsJoin = abi.encodePacked(
+            bytes1(uint8(Commands.TRANSFER_FROM)),
+            bytes1(uint8(Commands.DEPOSIT_ASSET_IN_IBT)),
+            bytes1(uint8(Commands.CURVE_ADD_LIQUIDITY))
+        );
+        bytes[] memory inputsJoin = new bytes[](3);
+        inputsJoin[0] = abi.encode(weth, 100 ether);
+        inputsJoin[1] = abi.encode(address(swYnETH), Constants.CONTRACT_BALANCE, Constants.ADDRESS_THIS);
+        inputsJoin[2] = abi.encode(curvePool, [Constants.CONTRACT_BALANCE, 0], 0, address(userProxy));
         PoolActionParams memory poolActionParams;
 
         poolActionParams = PoolActionParams({
-            protocol: Protocol.TRANCHESS,
+            protocol: Protocol.SPECTRA,
             minOut: 0,
             recipient: address(userProxy),
-            args: abi.encode(lpToken, 0, 100 ether, 0, block.timestamp + 1000)
+            args: abi.encode(commandsJoin, inputsJoin, block.timestamp + 1000)
         });
 
-        uint256 depositAmount = 99 ether;
+        uint256 depositAmount = 45 ether;
         uint256 borrowAmount = 10 ether;
 
         CollateralParams memory collateralParams = CollateralParams({
-            targetToken: address(lpToken),
+            targetToken: address(lpTokenTracker),
             amount: depositAmount,
             collateralizer: address(userProxy),
             auxSwap: emptySwap
@@ -407,7 +465,7 @@ contract PositionActionLeverTranchessTest is TestBase {
         delegateCall[2] = false;
 
         vm.startPrank(user);
-        ERC20(STONE).transfer(address(userProxy), 100 ether);
+        ERC20(weth).transfer(address(userProxy), 100 ether);
         //ERC20(STONE).approve(address(userProxy), 100 ether);
         userProxy.execute(
             address(positionAction),
@@ -422,14 +480,14 @@ contract PositionActionLeverTranchessTest is TestBase {
     function test_repayAndWithdraw() public {
         test_multisend_simple_delegatecall();
 
-        uint256 depositAmount = 99 ether;
+        uint256 depositAmount = 45 ether;
         uint256 borrowAmount = 10 ether;
         // build withdraw params
         CollateralParams memory collateralParams;
         CreditParams memory creditParams;
         {
             collateralParams = CollateralParams({
-                targetToken: address(lpToken),
+                targetToken: address(lpTokenTracker),
                 amount: depositAmount,
                 collateralizer: address(user),
                 auxSwap: emptySwap
@@ -452,60 +510,32 @@ contract PositionActionLeverTranchessTest is TestBase {
         (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
         assertEq(collateral, 0);
         assertEq(debt, 0);
-        assertEq(IERC20(lpToken).balanceOf(address(user)), 99 ether);
+        assertEq(IERC20(lpTokenTracker).balanceOf(address(user)), 45 ether);
     }
 
-    function test_join_with_STONE_and_exit() public {
-        PoolActionParams memory poolActionParams;
+    // function test_join_with_STONE_and_exit() public {
+    //     PoolActionParams memory poolActionParams;
 
-        poolActionParams = PoolActionParams({
-            protocol: Protocol.TRANCHESS,
-            minOut: 0,
-            recipient: user,
-            args: abi.encode(lpToken, 0, 100 ether, 0, block.timestamp + 1000)
-        });
+    //     poolActionParams = PoolActionParams({
+    //         protocol: Protocol.TRANCHESS,
+    //         minOut: 0,
+    //         recipient: user,
+    //         args: abi.encode(lpToken, 0, 100 ether, 0, block.timestamp + 1000)
+    //     });
 
-        assertEq(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "invalid lpToken balance");
-        vm.startPrank(user);
-        ERC20(STONE).transfer(address(userProxy), 100 ether);
-        userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.join.selector, poolActionParams));
-        assertGt(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "failed to join");
+    //     assertEq(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "invalid lpToken balance");
+    //     vm.startPrank(user);
+    //     ERC20(STONE).transfer(address(userProxy), 100 ether);
+    //     userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.join.selector, poolActionParams));
+    //     assertGt(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "failed to join");
 
-        poolActionParams.args = abi.encode(0, lpToken, ERC20(lpToken).balanceOf(poolActionParams.recipient));
+    //     poolActionParams.args = abi.encode(0, lpToken, ERC20(lpToken).balanceOf(poolActionParams.recipient));
 
-        ERC20(lpToken).transfer(address(userProxy), ERC20(lpToken).balanceOf(user));
+    //     ERC20(lpToken).transfer(address(userProxy), ERC20(lpToken).balanceOf(user));
 
-        userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.exit.selector, poolActionParams));
-        assertEq(ERC20(lpToken).balanceOf(address(poolAction)), 0, "invalid lpToken balance");
-        assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "invalid lpToken balance");
-        assertApproxEqRel(ERC20(STONE).balanceOf(poolActionParams.recipient), 100 ether, 0.001 ether, "failed to exit");
-    }
-
-    function test_transferAndJoin_with_STONE() public {
-        PoolActionParams memory poolActionParams;
-        PermitParams memory permitParams;
-
-        poolActionParams = PoolActionParams({
-            protocol: Protocol.TRANCHESS,
-            minOut: 0,
-            recipient: user,
-            args: abi.encode(lpToken, 0, 100 ether, 0, block.timestamp + 1000)
-        });
-
-        vm.startPrank(user);
-        ERC20(STONE).approve(address(userProxy), 100 ether);
-        // WETH.approve(address(userProxy), type(uint256).max);
-
-        PermitParams[] memory permitParamsArray = new PermitParams[](2);
-        permitParamsArray[0] = permitParams;
-        permitParamsArray[1] = permitParams;
-
-        assertEq(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "failed to join");
-        userProxy.execute(
-            address(poolAction),
-            abi.encodeWithSelector(PoolAction.transferAndJoin.selector, user, permitParamsArray, poolActionParams)
-        );
-        assertGt(ERC20(lpToken).balanceOf(poolActionParams.recipient), 0, "failed to join");
-        console.log("lpToken balance: ", ERC20(lpToken).balanceOf(poolActionParams.recipient));
-    }
+    //     userProxy.execute(address(poolAction), abi.encodeWithSelector(PoolAction.exit.selector, poolActionParams));
+    //     assertEq(ERC20(lpToken).balanceOf(address(poolAction)), 0, "invalid lpToken balance");
+    //     assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "invalid lpToken balance");
+    //     assertApproxEqRel(ERC20(STONE).balanceOf(poolActionParams.recipient), 100 ether, 0.001 ether, "failed to exit");
+    // }
 }

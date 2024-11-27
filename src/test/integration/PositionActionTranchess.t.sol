@@ -95,7 +95,7 @@ contract PositionActionTranchessTest is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER);
+        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, address(0));
 
         // configure permissions and system settings
         setGlobalDebtCeiling(15_000_000 ether);
@@ -118,7 +118,8 @@ contract PositionActionTranchessTest is TestBase {
             univ3Router,
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
-            TRANCHESS_ROUTER
+            TRANCHESS_ROUTER,
+            address(0)
         );
 
         // deploy position actions

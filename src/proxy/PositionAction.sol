@@ -525,7 +525,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                         0,
                         -toInt256(vars.residualDestAmount)
                     );
-                } else if (leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN) {
+                } else if (
+                    leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN
+                ) {
                     leverParams.auxSwap.amount = vars.residualDestAmount;
                     _delegateCall(
                         address(swapAction),
@@ -538,7 +540,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
             vars.residualSrcAmount = vars.withdrawnCollateral - vars.estimatedSwapInAmount;
             if (vars.residualSrcAmount > 0) {
-                    IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, vars.residualSrcAmount);
+                IERC20(leverParams.primarySwap.assetIn).safeTransfer(residualRecipient, vars.residualSrcAmount);
             }
             underlyingToken.forceApprove(address(flashlender), leverParams.primarySwap.limit + fee);
         } else {

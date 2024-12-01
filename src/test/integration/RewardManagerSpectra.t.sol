@@ -153,20 +153,12 @@ contract RewardManagerSpectraTest is TestBase {
         userPk2 = 0x12341235;
         user2 = vm.addr(userPk2);
         userProxy2 = PRBProxy(payable(address(prbProxyRegistry.deployFor(user2))));
-        // vm.prank(stoneHolder);
-        // ERC20(STONE).transfer(user, 100 ether);
-        // vm.startPrank(lpTokenHolder);
-        // ERC20(lpToken).transfer(user2, 10 ether);
-        // ERC20(lpToken).transfer(user, 10 ether);
-        // vm.stopPrank();
+
         vm.startPrank(wethHolder);
         ERC20(weth).transfer(user, 100 ether);
         ERC20(weth).transfer(user2, 100 ether);
         vm.stopPrank();
-        // vm.prank(address(userProxy));
-        // IERC20(lpToken).approve(address(user), type(uint256).max);
-        // vm.prank(address(userProxy));
-        // IERC20(STONE).approve(address(user), type(uint256).max);
+
         rewardManager.addRewardToken(address(weth));
     }
 
@@ -727,5 +719,21 @@ contract RewardManagerSpectraTest is TestBase {
             "failed to get rewards user2"
         );
         assertApproxEqAbs(ERC20(weth).balanceOf(address(vault)), 0, 100);
+    }
+
+    function test_addRewardToken() public {
+        assertEq(rewardManager.rewardTokensLength(), 1);
+        rewardManager.addRewardToken(address(0x1));
+        assertEq(rewardManager.rewardTokensLength(), 2);
+    }
+
+    function test_removeRewardToken() public {
+        assertEq(rewardManager.rewardTokensLength(), 1);
+        rewardManager.addRewardToken(address(0x1));
+        rewardManager.addRewardToken(address(0x2));
+        rewardManager.addRewardToken(address(0x3));
+        assertEq(rewardManager.rewardTokensLength(), 4);
+        rewardManager.removeRewardToken(address(0x2));
+        assertEq(rewardManager.rewardTokensLength(), 3);
     }
 }

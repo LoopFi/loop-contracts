@@ -136,6 +136,9 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         return _doTransferOutRewards(user);
     }
 
+    /// @notice Add a reward token to the reward manager
+    /// @dev Make sure to not have duplicate reward tokens
+    /// @param token The address of the reward token
     function addRewardToken(address token) external onlyOwner {
         rewardTokens.push(token);
     }
@@ -156,5 +159,9 @@ contract RewardManagerSpectra is RewardManagerAbstract {
 
     function updateIndexRewards() external onlyVault {
         _updateRewardIndex();
+    }
+
+    function rewardTokensLength() external view returns (uint256) {
+        return rewardTokens.length;
     }
 }

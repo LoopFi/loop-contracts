@@ -68,9 +68,7 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
-        // if (_getStatus()) revert SpectraYnETHOracle__authorizeUpgrade_validStatus();
-    }
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 PRICING
@@ -80,7 +78,7 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @param /*token*/ Token address, ignored for this oracle
     /// @dev The status is valid if the price is validated and not stale
     function getStatus(address /*token*/) public view virtual override returns (bool status) {
-        return true; //_getStatus();
+        return true;
     }
 
     /// @notice Returns the latest price for the asset from Chainlink [WAD]

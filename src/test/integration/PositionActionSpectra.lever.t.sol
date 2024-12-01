@@ -74,26 +74,10 @@ contract PositionActionLeverSpectraTest is TestBase {
     PRBProxyRegistry prbProxyRegistry;
 
     MockUniswap uniswap;
-    // PENDLE
-    address market = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
-    address pendleOwner = 0x1FcCC097db89A86Bfc474A1028F93958295b1Fb7;
-    address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee; // etherfi staked eth
 
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address internal constant PENDLE_ROUTER = 0x00000000005BBB0EF59571E58418F9a4357b68A0;
-
-    // TRANCHESS
-    address constant TRANCHESS_ROUTER = 0x63BAEe33649E589Cc70435F898671461B624CBCc; // on SCROLL NETWORK
-    address STONE = address(0x80137510979822322193FC997d400D5A6C747bf7); // STONE (quoteToken)
-    address staYSTONE2 = address(0x09750800529E7BBCd07D4760989B19061E79165B); //baseToken
-    address stoneHolderForUni = address(0xAD3d07d431B85B525D81372802504Fa18DBd554c);
-    address stoneHolder = address(0xa62F7C8D24A456576DF0f3840cE5A79630c23961);
-    address stableSwap = address(0xEC8bFa1D15842D6B670d11777A08c39B09A5FF00); // tranchess stableswap
-    address stoneEthChainlink = address(0x0E4d8D665dA14D35444f0eCADc82F78a804A5F95); // stone/eth chainlink feed
-    address fund = address(0x4B0D5Fe3C1F58FD68D20651A5bC761553C10D955); // tranchess fund 2 stone
-    address lpToken = address(0xD48Cc42e154775f8a65EEa1D6FA1a11A31B09B65); // tranchess lp token (liquidity gauge)
-    uint256 settledDay = 1727877600;
 
     // SPECTRA ynETH
     address internal constant SPECTRA_ROUTER = 0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a;
@@ -129,7 +113,7 @@ contract PositionActionLeverSpectraTest is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, SPECTRA_ROUTER);
+        poolAction = new PoolAction(address(0), address(0), address(0), SPECTRA_ROUTER);
 
         // configure permissions and system settings
         setGlobalDebtCeiling(15_000_000 ether);
@@ -157,7 +141,7 @@ contract PositionActionLeverSpectraTest is TestBase {
             IUniswapV3Router(address(uniswap)),
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
-            TRANCHESS_ROUTER,
+            address(0),
             SPECTRA_ROUTER
         );
 
@@ -177,25 +161,11 @@ contract PositionActionLeverSpectraTest is TestBase {
 
         vm.prank(wethHolder);
         ERC20(weth).transfer(user, 200 ether);
-
-        // vm.prank(address(userProxy));
-        // IERC20(lpToken).approve(address(user), type(uint256).max);
-        // vm.prank(address(userProxy));
-        // IERC20(STONE).approve(address(user), type(uint256).max);
     }
 
     function test_increaseLever_Spectra() public {
         test_deposit_with_entry_swap_from_WETH();
         uint256 borrowAmount = 10 ether;
-
-        // PoolActionParams memory poolActionParams;
-
-        // poolActionParams = PoolActionParams({
-        //     protocol: Protocol.SPECTRA,
-        //     minOut: 0,
-        //     recipient: address(positionAction),
-        //     args: abi.encode(lpToken, 0, (borrowAmount * 999) / 1000, 0, block.timestamp + 1000)
-        // });
 
         bytes memory commandsJoin = abi.encodePacked(
             bytes1(uint8(Commands.TRANSFER_FROM)),
@@ -235,7 +205,7 @@ contract PositionActionLeverSpectraTest is TestBase {
         });
 
         vm.startPrank(user);
-        //  ERC20(STONE).approve(address(userProxy), type(uint256).max);
+
         // call increaseLever
         userProxy.execute(
             address(positionAction),
@@ -360,45 +330,6 @@ contract PositionActionLeverSpectraTest is TestBase {
         assertApproxEqRel(collateral, 49.5 ether, 0.01 ether, "invalid collateral amount");
         assertEq(debt, 0);
     }
-
-    // function test_withdraw_and_swap_to_STONE() public {
-    //     test_deposit_with_entry_swap_from_STONE();
-
-    //     (uint256 collateral, , , , , ) = vault.positions(address(userProxy));
-
-    //     CollateralParams memory collateralParams = CollateralParams({
-    //         targetToken: address(lpToken),
-    //         amount: collateral, // not used for swaps
-    //         collateralizer: address(user),
-    //         auxSwap: SwapParams({
-    //             swapProtocol: SwapProtocol.TRANCHESS_OUT,
-    //             swapType: SwapType.EXACT_IN,
-    //             assetIn: address(lpToken),
-    //             amount: collateral, // amount to swap in
-    //             limit: 98 ether, // min amount of collateral token to receive
-    //             recipient: address(user),
-    //             residualRecipient: address(user),
-    //             deadline: block.timestamp + 100,
-    //             args: abi.encode(0, lpToken, collateral)
-    //         })
-    //     });
-    //     assertEq(ERC20(STONE).balanceOf(address(user)), 0);
-    //     userProxy.execute(
-    //         address(positionAction),
-    //         abi.encodeWithSelector(
-    //             positionAction.withdraw.selector,
-    //             address(userProxy),
-    //             address(vault),
-    //             collateralParams,
-    //             emptyPermitParams
-    //         )
-    //     );
-    //     assertEq(ERC20(lpToken).balanceOf(address(userProxy)), 0, "failed to withdraw");
-    //     // (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
-    //     assertGt(ERC20(STONE).balanceOf(address(user)), 0);
-    //     // Little less because of the exiting
-    //     assertApproxEqRel(100 ether, ERC20(STONE).balanceOf(address(user)), 0.01 ether, "invalid stone amount amount");
-    // }
 
     function test_multisend_simple_delegatecall() public {
         bytes memory commandsJoin = abi.encodePacked(

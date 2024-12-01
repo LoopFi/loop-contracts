@@ -8,7 +8,6 @@ import "pendle/core/libraries/TokenHelper.sol";
 import "pendle/core/libraries/math/PMath.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./RewardManagerAbstract.sol";
-import {console} from "forge-std/console.sol";
 
 /// NOTE: RewardManager must not have duplicated rewardTokens
 abstract contract RewardManagerAbstract is IRewardManager, TokenHelper {

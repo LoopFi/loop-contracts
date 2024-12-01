@@ -103,8 +103,6 @@ contract RewardManagerSpectra is RewardManagerAbstract {
             rewardAmounts[i] = userReward[tokens[i]][user].accrued;
             if (rewardAmounts[i] != 0) {
                 userReward[tokens[i]][user].accrued = 0;
-                console.log("rewardAmounts[i]: ", rewardAmounts[i]);
-                console.log("rewardState[tokens[i]].lastBalance: ", rewardState[tokens[i]].lastBalance);
                 rewardState[tokens[i]].lastBalance -= rewardAmounts[i].Uint128();
             }
         }

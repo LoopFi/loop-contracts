@@ -16,7 +16,7 @@ module.exports = {
           "balancerVault": "0x0000000000000000000000000000000000000000",
           "uniV3Router": "0x0000000000000000000000000000000000000000",
           "pendleRouter": "0x0000000000000000000000000000000000000000",
-          "kyberRouter": "0x0000000000000000000000000000000000000000",
+          "kyberRouter": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
           "tranchessRouter": "0x63BAEe33649E589Cc70435F898671461B624CBCc"
         }
       },
@@ -47,6 +47,7 @@ module.exports = {
   },
   "Pools": {
     "LiquidityPoolWETH": {
+      "WETH": "0x5300000000000000000000000000000000000004",
       "name": "Loop ETH - lpETH",
       "symbol": "lpETH",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
@@ -54,8 +55,8 @@ module.exports = {
     }
   },
   "Vaults": {
-    "ScrollVaultSTONE2LP": {
-      "name": "CDPVault STONE2LP",
+    "VaultSTONE2LP": {
+      "name": "STONE2LP",
       "description": "This vault allows for borrowing and lending of assets",
       "type": "CDPVault",
       "collateralType": "ERC20",

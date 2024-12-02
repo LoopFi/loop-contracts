@@ -29,3 +29,4 @@ deploy-anvil     :; rm -rf scripts/*-local.json && npx hardhat run scripts/Deplo
 deploy-tenderly  :; npx hardhat run scripts/Deploy.js --network tenderly
 deploy-arbitrum   :; npx hardhat run scripts/Deploy.js --network arbitrum
 deploy-mainnet   :; npx hardhat run scripts/Deploy.js --network mainnet
+deploy-scroll    :; npx hardhat run scripts/Deploy.js --network scroll

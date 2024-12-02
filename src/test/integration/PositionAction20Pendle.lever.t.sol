@@ -273,6 +273,8 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         uint256 repayAmount = 2.5 ether; // amount of stablecoin to repay
         uint256 lpToRedeem = 3 ether; // LP AMOUNT to Redeem for underlying and sell it for stablecoin
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), repayAmount);
+
         assets = new address[](3);
         assets[0] = address(underlyingToken);
         assets[1] = address(WETH);
@@ -325,7 +327,7 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - lpToRedeem);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping PENDLE LP
-        assertEq(normalDebt, initialNormalDebt - repayAmount);
+        assertEq(normalDebt, initialNormalDebt - repayAmount + flashloanFee);
 
         // assert that the left over was transfered to the user proxy
         assertGt(ERC20(wstETH).balanceOf(address(userProxy)), 0);

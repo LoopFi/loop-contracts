@@ -391,16 +391,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
 
-        /* if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
-            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
-            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
-
-            // residual recipient is required if the primary swap is an exact out swap
-            if (residualRecipient == address(0)) {
-                revert PositionAction__decreaseLever_invalidResidualRecipient();
-            }
-        } */
-
         if (residualRecipient == address(0)) {
             revert PositionAction__decreaseLever_invalidResidualRecipient();
         }
@@ -491,7 +481,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         vars.totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
-            vars.subDebt = min(vars.totalDebt, leverParams.primarySwap.limit);
+            vars.subDebt = min(vars.totalDebt + fee, leverParams.primarySwap.limit);
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
@@ -499,7 +489,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt)
+                -toInt256(vars.subDebt - fee)
             );
 
             vars.estimatedSwapInAmount = leverParams.primarySwap.amount;
@@ -542,7 +532,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
             underlyingToken.forceApprove(address(flashlender), leverParams.primarySwap.limit + fee);
         } else {
-            leverParams.primarySwap.amount = min(vars.totalDebt, leverParams.primarySwap.amount);
+            leverParams.primarySwap.amount = min(vars.totalDebt + fee, leverParams.primarySwap.amount);
             vars.subDebt = leverParams.primarySwap.amount;
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
@@ -551,7 +541,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt)
+                -toInt256(vars.subDebt - fee)
             );
 
             vars.withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);

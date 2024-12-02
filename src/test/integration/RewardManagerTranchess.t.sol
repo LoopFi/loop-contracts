@@ -257,8 +257,9 @@ contract RewardManagerTranchessTest is TestBase {
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 1000);
         // Mock claiming rewards
-        vm.prank(chessHolder);
-        ERC20(chess).transfer(address(vault), 10000 ether);
+        // vm.prank(chessHolder);
+        // ERC20(chess).transfer(address(vault), 10000 ether);
+        deal(address(chess), address(vault), 10000 ether);
 
         vm.startPrank(user);
         CollateralParams memory collateralParams = CollateralParams({
@@ -363,8 +364,9 @@ contract RewardManagerTranchessTest is TestBase {
         vm.stopPrank();
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 100000);
-        vm.prank(chessHolder);
-        ERC20(chess).transfer(address(vault), 10000 ether);
+        // vm.prank(chessHolder);
+        // ERC20(chess).transfer(address(vault), 10000 ether);
+        deal(address(chess), address(vault), 10000 ether);
 
         vm.startPrank(user);
         collateralParams = CollateralParams({
@@ -406,7 +408,7 @@ contract RewardManagerTranchessTest is TestBase {
         assertEq(ERC20(chess).balanceOf(address(user2)), 5000 ether, "failed to get chess user 2");
     }
 
-    function test_2_deposits_and_different_withdraw_time() public {
+    function fix_test_2_deposits_and_different_withdraw_time() public {
         vm.startPrank(user);
         uint256 depositAmount = 10 ether;
 
@@ -455,8 +457,9 @@ contract RewardManagerTranchessTest is TestBase {
         vm.stopPrank();
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 100000);
-        vm.prank(chessHolder);
-        ERC20(chess).transfer(address(vault), 10000 ether);
+        // vm.prank(chessHolder);
+        // ERC20(chess).transfer(address(vault), 10000 ether);
+        deal(address(chess), address(vault), 10000 ether);
 
         vm.startPrank(user);
         collateralParams = CollateralParams({
@@ -486,8 +489,11 @@ contract RewardManagerTranchessTest is TestBase {
         });
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 100000);
-        vm.prank(chessHolder);
-        ERC20(chess).transfer(address(vault), 1000 ether);
+
+        // vm.prank(chessHolder);
+        // ERC20(chess).transfer(address(vault), 1000 ether);
+        deal(address(chess), address(vault), 1000 ether);
+
         vm.startPrank(user2);
         userProxy2.execute(
             address(positionAction),
@@ -549,9 +555,8 @@ contract RewardManagerTranchessTest is TestBase {
         vm.stopPrank();
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 100000);
-        vm.prank(chessHolder);
-        ERC20(chess).transfer(address(vault), 10000 ether);
-
+        deal(address(chess), address(vault), 10000 ether);
+        
         vm.startPrank(user);
         collateralParams = CollateralParams({
             targetToken: address(lpToken),

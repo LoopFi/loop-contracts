@@ -497,6 +497,8 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assets[0] = address(underlyingToken);
         assets[1] = address(token);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
+
         LeverParams memory leverParams = LeverParams({
             position: address(userProxy),
             vault: address(vault),
@@ -536,7 +538,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - maxAmountIn);
 
         // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping token
-        assertEq(normalDebt, initialNormalDebt - amountOut);
+        assertEq(normalDebt, initialNormalDebt - amountOut + flashloanFee);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -589,6 +591,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         });
 
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
         (, uint256 accruedInterest, ) = vault.getDebtInfo(address(userProxy));
 
         // call decreaseLever
@@ -609,7 +612,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         assertEq(collateral, initialCollateral - maxAmountIn);
 
         // debt is decreased by amount out minus the accrued interest
-        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest);
+        assertEq(normalDebt, initialNormalDebt - amountOut + accruedInterest + flashloanFee);
 
         // assert that the left over was transfered to the user proxy
         assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
@@ -660,7 +663,6 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         });
 
         uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
-
         // call decreaseLever
         vm.prank(user);
         userProxy.execute(
@@ -724,6 +726,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                 auxAction: emptyPoolActionParams
             });
         }
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
 
         // call decreaseLever on alice's position as bob and expect failure because alice did not give bob permission
         vm.prank(bob);
@@ -750,7 +753,7 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
         // assert alice's position is levered down by bob
         assertEq(aliceCollateral, initialCollateral - maxAmountIn);
 
-        assertEq(aliceNormalDebt, initialNormalDebt - amountOut);
+        assertEq(aliceNormalDebt, initialNormalDebt - amountOut + flashloanFee);
 
         // assert bob's position is unaffected
         assertEq(bobCollateral, 0);
@@ -1050,6 +1053,9 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
             )
         );
 
+        uint256 limit = (vault.virtualDebt(address(userProxy)) * 105) / 100;
+        address residualRecipient = address(0x12341234);
+
         userProxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
@@ -1062,20 +1068,24 @@ contract PositionAction20_Lever_Test is IntegrationTestBase {
                         swapProtocol: SwapProtocol.BALANCER,
                         swapType: SwapType.EXACT_IN,
                         assetIn: address(token),
-                        amount: vault.virtualDebt(address(userProxy)),
-                        limit: 0,
+                        amount: depositAmount,
+                        limit: limit,
                         recipient: address(positionAction),
-                        residualRecipient: address(positionAction),
+                        residualRecipient: residualRecipient,
                         deadline: block.timestamp,
                         args: abi.encode(weightedPoolIdArray, assets)
                     }),
                     auxSwap: emptySwap,
                     auxAction: emptyPoolActionParams
                 }),
-                201 ether,
-                address(userProxy)
+                depositAmount,
+                residualRecipient
             )
         );
+
+        (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+        assertEq(collateral, 0);
+        assertEq(debt, 0);
 
         vm.stopPrank();
     }

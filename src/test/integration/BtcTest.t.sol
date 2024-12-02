@@ -118,7 +118,8 @@ contract BtcTest is IntegrationTestBase {
             address(flashlender),
             address(swapAction),
             address(poolAction),
-            address(vaultRegistry)
+            address(vaultRegistry),
+            address(0)
         );
 
         vm.label({account: address(liquidityPool), newLabel: "Liquidity Pool"});
@@ -396,7 +397,7 @@ contract BtcTest is IntegrationTestBase {
         assertGt(posDebt, scaledBorrowAmount - scaledRepayAmount);
     }
 
-    function test_action_repay_withInterest(address user) public {
+    function test_action_repay_withInterest(address user) checkUser(user) public {
         uint256 depositAmount = 100 * 10 ** 8;
         uint256 borrowAmount = 50 * 10 ** 8;
         PRBProxy userProxy = _deployProxyFor(user);

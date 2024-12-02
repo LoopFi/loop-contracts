@@ -253,6 +253,7 @@ contract PositionActionLeverTranchessTest is TestBase {
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
         vm.startPrank(user);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), debt / 2);
         // call increaseLever
         userProxy.execute(
             address(positionAction),
@@ -260,7 +261,7 @@ contract PositionActionLeverTranchessTest is TestBase {
         );
         (uint256 collateralAfter, uint256 debtAfter, , , , ) = vault.positions(address(userProxy));
         assertApproxEqAbs(collateralAfter, collateral / 2, 1);
-        assertEq(debtAfter, debt / 2);
+        assertEq(debtAfter, debt / 2 + flashloanFee);
         assertApproxEqRel(
             ERC20(STONE).balanceOf(address(user)),
             collateral / 2 - debt / 2,

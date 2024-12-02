@@ -52,12 +52,14 @@ contract PositionActionPendle is PositionAction {
     /// @notice Withdraw collateral from the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to withdraw [wad]
+    /// @param minAmountOut The minimum amount out for the aux swap
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
-        uint256 amount
+        uint256 amount,
+        uint256 minAmountOut
     ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
         address collateralToken = address(ICDPVault(vault).token());
@@ -65,7 +67,7 @@ contract PositionActionPendle is PositionAction {
         if (dst != collateralToken && dst != address(0)) {
             PoolActionParams memory poolActionParams = PoolActionParams({
                 protocol: Protocol.PENDLE,        
-                minOut: 0,                   
+                minOut: minAmountOut,                   
                 recipient: address(this),     
                 args: abi.encode(
                     collateralToken,          
@@ -113,7 +115,7 @@ contract PositionActionPendle is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral);
+        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(

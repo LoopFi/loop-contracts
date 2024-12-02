@@ -27,6 +27,8 @@ struct CollateralParams {
     address collateralizer;
     // optional swap from `targetToken` to collateral, or collateral to `targetToken`
     SwapParams auxSwap;
+    // minimum amount out for the aux swap
+    uint256 minAmountOut;
 }
 
 /// @notice Struct containing parameters used for borrowing or repaying underlying token
@@ -181,12 +183,14 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault position
     /// @param dst Token the caller expects to receive
     /// @param amount The amount of collateral to deposit [wad]
+    /// @param minAmountOut The minimum amount out for the aux swap
     /// @return Amount of collateral (or dst) withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
-        uint256 amount
+        uint256 amount,
+        uint256 minAmountOut
     ) internal virtual returns (uint256);
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault, handles any CDP specific actions
@@ -613,7 +617,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address position,
         CollateralParams calldata collateralParams
     ) internal returns (uint256) {
-        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
+        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount, collateralParams.minAmountOut);
         uint256 scaledCollateral = wmul(collateral, ICDPVault(vault).tokenScale());
 
         // perform swap from collateral to arbitrary token

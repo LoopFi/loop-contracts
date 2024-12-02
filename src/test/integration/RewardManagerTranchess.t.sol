@@ -208,7 +208,8 @@ contract RewardManagerTranchessTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(lpToken, 0, 100 ether, 0)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(STONE).approve(address(userProxy), depositAmount);
@@ -276,7 +277,8 @@ contract RewardManagerTranchessTest is TestBase {
                 residualRecipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(0, lpToken, collateral)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.stopPrank();
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
@@ -324,7 +326,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy), depositAmount);
@@ -347,7 +350,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy2), depositAmount);
@@ -373,7 +377,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -392,7 +397,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         vm.startPrank(user2);
         userProxy2.execute(
@@ -416,7 +422,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy), depositAmount);
@@ -440,7 +447,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy2), depositAmount);
@@ -466,7 +474,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -485,7 +494,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         vm.warp(block.timestamp + 1 weeks);
         vm.roll(block.number + 100000);
@@ -516,7 +526,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy), depositAmount);
@@ -538,7 +549,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         ERC20(lpToken).approve(address(userProxy2), depositAmount);
@@ -562,7 +574,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount / 2,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -585,7 +598,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount / 2,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -608,7 +622,8 @@ contract RewardManagerTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy2.execute(

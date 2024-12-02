@@ -161,7 +161,8 @@ contract PositionActionTranchessTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(lpToken, 0, 100 ether, 0)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(STONE).approve(address(userProxy), depositAmount);
@@ -201,7 +202,8 @@ contract PositionActionTranchessTest is TestBase {
                 residualRecipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(0, lpToken, collateral)
-            })
+            }),
+            minAmountOut: 0
         });
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
         userProxy.execute(
@@ -238,7 +240,8 @@ contract PositionActionTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         CreditParams memory creditParams = CreditParams({
@@ -302,7 +305,8 @@ contract PositionActionTranchessTest is TestBase {
                 targetToken: address(lpToken),
                 amount: depositAmount,
                 collateralizer: address(user),
-                auxSwap: emptySwap
+                auxSwap: emptySwap,
+                minAmountOut: 0
             });
             creditParams = CreditParams({amount: borrowAmount, creditor: address(userProxy), auxSwap: emptySwap});
         }

@@ -108,7 +108,8 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
                         targetToken: address(stakingLPEth),
                         amount: depositAmount,
                         collateralizer: address(user),
-                        auxSwap: emptySwap
+                        auxSwap: emptySwap,
+                        minAmountOut: 0
                     }),
                     emptyPermitParams
                 )

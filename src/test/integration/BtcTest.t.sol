@@ -221,7 +221,8 @@ contract BtcTest is IntegrationTestBase {
             targetToken: address(token),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -258,7 +259,8 @@ contract BtcTest is IntegrationTestBase {
             targetToken: address(token),
             amount: initialDeposit,
             collateralizer: address(user),
-            auxSwap: auxSwap
+            auxSwap: auxSwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);

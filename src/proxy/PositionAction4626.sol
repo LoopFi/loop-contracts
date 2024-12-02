@@ -58,12 +58,14 @@ contract PositionAction4626 is PositionAction {
     /// @param position Address of the position
     /// @param dst Token the caller expects to receive
     /// @param amount Amount of collateral to withdraw [wad]
+    /// @param /*minAmountOut*/ The minimum amount out for the aux swap
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
-        uint256 amount
+        uint256 amount,
+        uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
 

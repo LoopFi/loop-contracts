@@ -248,10 +248,10 @@ async function deployCore() {
   );
 
   await deployContract('ERC165Plugin');
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
-  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address);
-
+  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
   console.log('------------------------------------');
 }
 
@@ -487,7 +487,7 @@ async function  deployBalancerPool() {
   console.log('Pool Tokens Addresses: ' + tokens.tokens);
   console.log('Pool Tokens balances: ' + tokens.balances);
 
-  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool'); */
+  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
 }
 
 async function deployAuraVaults() {

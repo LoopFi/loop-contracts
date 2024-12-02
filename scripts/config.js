@@ -17,6 +17,7 @@ module.exports = {
         "debtCeiling": toWad('100000000')
       }
     },
+    "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     "Flashlender": {
       "constructorArguments": {
         "protocolFee_": toWad('0')

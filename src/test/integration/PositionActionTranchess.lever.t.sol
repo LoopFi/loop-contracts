@@ -253,6 +253,7 @@ contract PositionActionLeverTranchessTest is TestBase {
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
         vm.startPrank(user);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), debt / 2);
         // call increaseLever
         userProxy.execute(
             address(positionAction),
@@ -260,7 +261,7 @@ contract PositionActionLeverTranchessTest is TestBase {
         );
         (uint256 collateralAfter, uint256 debtAfter, , , , ) = vault.positions(address(userProxy));
         assertApproxEqAbs(collateralAfter, collateral / 2, 1);
-        assertEq(debtAfter, debt / 2);
+        assertEq(debtAfter, debt / 2 + flashloanFee);
         assertApproxEqRel(
             ERC20(STONE).balanceOf(address(user)),
             collateral / 2 - debt / 2,
@@ -290,7 +291,8 @@ contract PositionActionLeverTranchessTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(lpToken, 0, 100 ether, 0)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(STONE).approve(address(userProxy), depositAmount);
@@ -330,7 +332,8 @@ contract PositionActionLeverTranchessTest is TestBase {
                 residualRecipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(0, lpToken, collateral)
-            })
+            }),
+            minAmountOut: 0
         });
         assertEq(ERC20(STONE).balanceOf(address(user)), 0);
         userProxy.execute(
@@ -367,7 +370,8 @@ contract PositionActionLeverTranchessTest is TestBase {
             targetToken: address(lpToken),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         CreditParams memory creditParams = CreditParams({
@@ -431,7 +435,8 @@ contract PositionActionLeverTranchessTest is TestBase {
                 targetToken: address(lpToken),
                 amount: depositAmount,
                 collateralizer: address(user),
-                auxSwap: emptySwap
+                auxSwap: emptySwap,
+                minAmountOut: 0
             });
             creditParams = CreditParams({amount: borrowAmount, creditor: address(userProxy), auxSwap: emptySwap});
         }

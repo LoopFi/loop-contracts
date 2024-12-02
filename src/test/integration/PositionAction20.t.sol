@@ -87,7 +87,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -139,7 +140,8 @@ contract PositionAction20Test is IntegrationTestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
-            })
+            }),
+            minAmountOut: 0
         });
 
         uint256 expectedCollateral = _simulateBalancerSwap(collateralParams.auxSwap);
@@ -174,7 +176,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -208,7 +211,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap // no entry swap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -261,7 +265,8 @@ contract PositionAction20Test is IntegrationTestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
-            })
+            }),
+            minAmountOut: 0
         });
 
         uint256 expectedAmountIn = _simulateBalancerSwap(collateralParams.auxSwap);
@@ -316,7 +321,8 @@ contract PositionAction20Test is IntegrationTestBase {
                 residualRecipient: address(user),
                 deadline: block.timestamp + 100,
                 args: abi.encode(poolIds, assets)
-            })
+            }),
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -349,7 +355,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: initialDeposit,
             collateralizer: address(user),
-            auxSwap: auxSwap
+            auxSwap: auxSwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -400,7 +407,8 @@ contract PositionAction20Test is IntegrationTestBase {
                     residualRecipient: address(user),
                     deadline: block.timestamp + 100,
                     args: abi.encode(poolIds, assets)
-                })
+                }),
+                minAmountOut: 0
             });
             expectedAmountOut = _simulateBalancerSwap(collateralParams.auxSwap);
         }
@@ -579,7 +587,8 @@ contract PositionAction20Test is IntegrationTestBase {
                 targetToken: address(token),
                 amount: depositAmount,
                 collateralizer: user,
-                auxSwap: emptySwap
+                auxSwap: emptySwap,
+                minAmountOut: 0
             });
             creditParams = CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap});
         }
@@ -620,7 +629,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: upFrontUnderliers,
             collateralizer: address(user),
-            auxSwap: emptySwap // no entry swap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         CreditParams memory creditParams = CreditParams({
             amount: borrowAmount,
@@ -697,7 +707,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: address(token),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         CreditParams memory creditParams = CreditParams({
@@ -808,7 +819,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: token,
             amount: amount,
             collateralizer: address(proxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(proxy.owner());
@@ -837,7 +849,8 @@ contract PositionAction20Test is IntegrationTestBase {
             targetToken: token,
             amount: depositAmount,
             collateralizer: address(proxy),
-            auxSwap: auxSwap // no entry swap
+            auxSwap: auxSwap, // no entry swap
+            minAmountOut: 0
         });
         CreditParams memory creditParams = CreditParams({
             amount: borrowAmount,

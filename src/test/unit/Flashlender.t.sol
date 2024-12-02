@@ -201,10 +201,12 @@ contract FlashlenderTest is TestBase {
     // override cdm to manually mint fees and flashlender with fees
     function createCore() internal override {
         super.createCore();
+        flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0); // no fee
         flashlenderOne = new Flashlender(IPoolV3(address(liquidityPool)), 1e16); // 1% fee
         flashlenderFive = new Flashlender(IPoolV3(address(liquidityPool)), 5e16); // 5% fee
         setGlobalDebtCeiling(5_000_000 ether);
 
+        liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
         liquidityPool.setCreditManagerDebtLimit(address(flashlenderOne), type(uint256).max);
         liquidityPool.setCreditManagerDebtLimit(address(flashlenderFive), type(uint256).max);
     }
@@ -303,8 +305,19 @@ contract FlashlenderTest is TestBase {
         assertEq(newShares - currentShares, expectedFee); // expect that the treasury received the fees
         assertEq(virtualDebt(vault, address(flashlenderFive)), 0);
 
+        vm.warp(block.timestamp + 60 days);
+
         assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
-        flashlenderFive.creditFlashLoan(immediatePaybackReceiverFive, flashLoanAmount + expectedFee, "");
+
+        uint256 borrowedAmount = liquidityPool.creditManagerBorrowed(address(flashlenderFive));
+        emit log_named_uint("1 borrowedAmount", borrowedAmount);
+        flashlenderFive.creditFlashLoan(immediatePaybackReceiverFive, flashLoanAmount, "");
+
+        borrowedAmount = liquidityPool.creditManagerBorrowed(address(flashlenderFive));
+        emit log_named_uint("2 borrowedAmount", borrowedAmount);
+        currentShares = liquidityPool.balanceOf(treasury);
+        emit log_named_uint("currentShares", currentShares);
+        emit log_named_uint("(underlyingToken.balanceOf(address(immediatePaybackReceiverFive))", underlyingToken.balanceOf(address(immediatePaybackReceiverFive)));
         assertEq(underlyingToken.balanceOf(address(immediatePaybackReceiverFive)), 0);
     }
 

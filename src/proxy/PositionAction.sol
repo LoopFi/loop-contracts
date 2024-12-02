@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPermission} from "../interfaces/IPermission.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-import {toInt256, wmul, min} from "../utils/Math.sol";
+import {toInt256, wmul, wdiv, min} from "../utils/Math.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
 import {BaseAction} from "./BaseAction.sol";
 import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
@@ -27,6 +27,8 @@ struct CollateralParams {
     address collateralizer;
     // optional swap from `targetToken` to collateral, or collateral to `targetToken`
     SwapParams auxSwap;
+    // minimum amount out for the aux swap
+    uint256 minAmountOut;
 }
 
 /// @notice Struct containing parameters used for borrowing or repaying underlying token
@@ -181,12 +183,14 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault position
     /// @param dst Token the caller expects to receive
     /// @param amount The amount of collateral to deposit [wad]
+    /// @param minAmountOut The minimum amount out for the aux swap
     /// @return Amount of collateral (or dst) withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
-        uint256 amount
+        uint256 amount,
+        uint256 minAmountOut
     ) internal virtual returns (uint256);
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault, handles any CDP specific actions
@@ -389,16 +393,6 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         IPermission(leverParams.vault).modifyPermission(leverParams.position, self, true);
 
-        /* if (leverParams.primarySwap.swapType == SwapType.EXACT_OUT) {
-            uint256 totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
-            leverParams.primarySwap.amount = min(totalDebt, leverParams.primarySwap.amount);
-
-            // residual recipient is required if the primary swap is an exact out swap
-            if (residualRecipient == address(0)) {
-                revert PositionAction__decreaseLever_invalidResidualRecipient();
-            }
-        } */
-
         if (residualRecipient == address(0)) {
             revert PositionAction__decreaseLever_invalidResidualRecipient();
         }
@@ -489,7 +483,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         vars.totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
-            vars.subDebt = min(vars.totalDebt, leverParams.primarySwap.limit);
+            vars.subDebt = min(vars.totalDebt + fee, leverParams.primarySwap.limit);
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
@@ -497,7 +491,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt)
+                -toInt256(vars.subDebt - fee)
             );
 
             vars.estimatedSwapInAmount = leverParams.primarySwap.amount;
@@ -540,7 +534,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             }
             underlyingToken.forceApprove(address(flashlender), leverParams.primarySwap.limit + fee);
         } else {
-            leverParams.primarySwap.amount = min(vars.totalDebt, leverParams.primarySwap.amount);
+            leverParams.primarySwap.amount = min(vars.totalDebt + fee, leverParams.primarySwap.amount);
             vars.subDebt = leverParams.primarySwap.amount;
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
@@ -549,7 +543,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt)
+                -toInt256(vars.subDebt - fee)
             );
 
             vars.withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
@@ -623,18 +617,25 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address position,
         CollateralParams calldata collateralParams
     ) internal returns (uint256) {
-        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount);
+        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount, collateralParams.minAmountOut);
+        uint256 scaledCollateral = wmul(collateral, ICDPVault(vault).tokenScale());
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
-            auxSwap.amount = collateral;
-            _delegateCall(address(swapAction), abi.encodeWithSelector(swapAction.swap.selector, auxSwap));
+            if (auxSwap.swapType == SwapType.EXACT_IN) {
+               auxSwap.amount = scaledCollateral;
+            }
+            
+            _delegateCall(
+                address(swapAction),
+                abi.encodeWithSelector(swapAction.swap.selector, auxSwap)
+            );
         } else {
             // otherwise just send the collateral to `collateralizer`
-            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, collateral);
+            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, scaledCollateral);
         }
-        return collateral;
+        return scaledCollateral;
     }
 
     /// @notice Borrows underlying token and optionally swaps underlying token to an arbitrary token
@@ -642,12 +643,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault
     /// @param creditParams The credit parameters
     function _borrow(address vault, address position, CreditParams calldata creditParams) internal {
+        uint256 scaledBorrowAmount = wdiv(creditParams.amount, ICDPVault(vault).poolUnderlyingScale());
         ICDPVault(vault).modifyCollateralAndDebt(
             position,
             address(this),
             address(this),
             0,
-            toInt256(creditParams.amount)
+            toInt256(scaledBorrowAmount)
         );
         if (creditParams.auxSwap.assetIn == address(0)) {
             underlyingToken.forceApprove(address(this), creditParams.amount);
@@ -691,7 +693,14 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         }
 
         underlyingToken.forceApprove(address(vault), amount);
-        ICDPVault(vault).modifyCollateralAndDebt(position, address(this), address(this), 0, -toInt256(amount));
+        uint256 scaledAmount = wdiv(amount, ICDPVault(vault).poolUnderlyingScale());
+        ICDPVault(vault).modifyCollateralAndDebt(
+            position,
+            address(this),
+            address(this),
+            0,
+            -toInt256(scaledAmount)
+        );
     }
 
     /// @dev Sends remaining tokens back to `sender` instead of leaving them on the proxy

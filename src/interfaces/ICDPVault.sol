@@ -39,6 +39,10 @@ interface ICDPVaultBase is IAccessControl, IPause, IPermission {
 
     function tokenScale() external view returns (uint256);
 
+    function poolUnderlying() external view returns (IERC20);
+
+    function poolUnderlyingScale() external view returns (uint256);
+
     function vaultConfig() external view returns (uint128 debtFloor, uint64 liquidationRatio);
 
     function totalDebt() external view returns (uint256);

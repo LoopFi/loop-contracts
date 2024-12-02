@@ -115,7 +115,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: address(PENDLE_LP_STETH),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -149,7 +150,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: address(PENDLE_LP_STETH),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -181,7 +183,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: address(PENDLE_LP_STETH),
             amount: initialDeposit,
             collateralizer: address(user),
-            auxSwap: auxSwap
+            auxSwap: auxSwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -301,7 +304,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
                 targetToken: address(PENDLE_LP_STETH),
                 amount: depositAmount,
                 collateralizer: user,
-                auxSwap: emptySwap
+                auxSwap: emptySwap,
+                minAmountOut: 0
             });
             creditParams = CreditParams({amount: borrowAmount, creditor: user, auxSwap: emptySwap});
         }
@@ -344,7 +348,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: address(PENDLE_LP_STETH),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         CreditParams memory creditParams = CreditParams({
@@ -399,7 +404,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: address(PENDLE_LP_STETH),
             amount: depositAmount,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(user);
@@ -456,7 +462,8 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: token,
             amount: amount,
             collateralizer: address(proxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         vm.prank(proxy.owner());
@@ -506,12 +513,13 @@ contract PositionAction20PendleTest is IntegrationTestBase {
             targetToken: token,
             amount: depositAmount,
             collateralizer: address(proxy),
-            auxSwap: auxSwap // no entry swap
+            auxSwap: auxSwap, // no entry swap
+            minAmountOut: 0
         });
         CreditParams memory creditParams = CreditParams({
             amount: borrowAmount,
             creditor: proxy.owner(),
-            auxSwap: auxSwap // no exit swap
+            auxSwap: auxSwap
         });
 
         vm.startPrank(proxy.owner());

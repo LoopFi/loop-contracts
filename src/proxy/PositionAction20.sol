@@ -57,7 +57,8 @@ contract PositionAction20 is PositionAction {
         address vault,
         address position,
         address /*dst*/,
-        uint256 amount
+        uint256 amount,
+        uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
         return ICDPVault(vault).withdraw(position, amount);
     }
@@ -89,6 +90,6 @@ contract PositionAction20 is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256) {
-        return _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral);
+        return _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
     }
 }

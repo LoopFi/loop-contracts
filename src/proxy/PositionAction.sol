@@ -352,10 +352,8 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // deposit any WETH sent to the contract
         if (msg.value > 0) {
             WETH.deposit{value: msg.value}();
-        }
-
-        // transfer any up front amount to the LeverAction contract
-        if (upFrontAmount > 0) {
+            WETH.transfer(self, upFrontAmount);
+        } else if (upFrontAmount > 0) { // transfer any up front amount to the LeverAction contract
             if (collateralizer == address(this)) {
                 IERC20(upFrontToken).safeTransfer(self, upFrontAmount); // if tokens are on the proxy then just transfer
             } else {

@@ -89,18 +89,18 @@ contract PoolActionSpectraTest is TestBase {
         deal(user, 10 ether);
         vm.label(user, "user");
         vm.label(lpTokenTracker, "lpTokenTracker");
-        vm.prank(ynETHHolder);
-        ERC20(ynETH).transfer(user, 100 ether);
-        vm.prank(wethHolder);
-        ERC20(weth).transfer(user, 200 ether);
-        vm.startPrank(user);
-        ERC20(weth).approve(address(swYnETH), 100 ether);
-        swYnETH.deposit(100 ether, user);
+        deal(address(ynETH), user, 100 ether);
+        deal(address(weth), user, 100 ether);
+        deal(address(swYnETH), user, 100 ether);
+    }
+
+    function test_deploy_spectra() public {
+
     }
 
     function test_balance() public {
         assertEq(ERC20(ynETH).balanceOf(user), 100 ether, "invalid ynETH balance");
-        assertEq(swYnETH.balanceOf(user), 98655211964670624557, "invalid sw-ynETH balance"); // 98.65 sw-ynETH
+        assertEq(swYnETH.balanceOf(user), 100 ether, "invalid sw-ynETH balance"); // 98.65 sw-ynETH
     }
 
     function test_join_with_WETH_and_exit() public {

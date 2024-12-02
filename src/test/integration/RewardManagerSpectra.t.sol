@@ -189,7 +189,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -248,7 +249,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: user,
                 deadline: block.timestamp,
                 args: abi.encode(commandsExit, inputsExit, swYnETH, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.stopPrank();
 
@@ -322,7 +324,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -356,7 +359,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy2),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
 
         ERC20(weth).approve(address(userProxy2), depositAmount);
@@ -386,7 +390,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -406,7 +411,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         vm.startPrank(user2);
         userProxy2.execute(
@@ -456,7 +462,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -490,7 +497,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy2),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
 
         ERC20(weth).approve(address(userProxy2), depositAmount);
@@ -520,7 +528,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -548,7 +557,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         vm.startPrank(user2);
         userProxy2.execute(
@@ -593,7 +603,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -627,7 +638,8 @@ contract RewardManagerSpectraTest is TestBase {
                 residualRecipient: address(userProxy2),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
 
         ERC20(weth).approve(address(userProxy2), depositAmount);
@@ -657,7 +669,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral / 2,
             collateralizer: address(user),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         userProxy.execute(
@@ -698,7 +711,8 @@ contract RewardManagerSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: collateral,
             collateralizer: address(user2),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
         vm.startPrank(user2);
         userProxy2.execute(

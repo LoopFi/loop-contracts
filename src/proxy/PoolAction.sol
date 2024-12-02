@@ -146,7 +146,7 @@ contract PoolAction is TransferAction {
                     _transferFrom(quoteAddress, from, address(this), quoteDelta, permitParams[1]);
                 }
             } else if (poolActionParams.protocol == Protocol.SPECTRA) {
-                (bytes memory commands, bytes[] memory inputs, ) = abi.decode(
+                (, bytes[] memory inputs, ) = abi.decode(
                     poolActionParams.args,
                     (bytes, bytes[], uint256)
                 );

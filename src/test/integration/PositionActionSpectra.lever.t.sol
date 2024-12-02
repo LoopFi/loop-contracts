@@ -262,6 +262,8 @@ contract PositionActionLeverSpectraTest is TestBase {
         assertEq(ERC20(swYnETH).balanceOf(address(user)), 0);
         vm.startPrank(user);
 
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), debt / 2);
+
         // call increaseLever
         userProxy.execute(
             address(positionAction),
@@ -269,7 +271,7 @@ contract PositionActionLeverSpectraTest is TestBase {
         );
         (uint256 collateralAfter, uint256 debtAfter, , , , ) = vault.positions(address(userProxy));
         assertApproxEqAbs(collateralAfter, collateral / 2, 1);
-        assertEq(debtAfter, debt / 2);
+        assertEq(debtAfter, debt / 2 + flashloanFee);
         assertApproxEqRel(
             ERC20(swYnETH).balanceOf(address(user)),
             collateral - debt / 2,
@@ -309,7 +311,8 @@ contract PositionActionLeverSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -357,7 +360,8 @@ contract PositionActionLeverSpectraTest is TestBase {
             targetToken: address(lpTokenTracker),
             amount: depositAmount,
             collateralizer: address(userProxy),
-            auxSwap: emptySwap
+            auxSwap: emptySwap,
+            minAmountOut: 0
         });
 
         CreditParams memory creditParams = CreditParams({
@@ -421,7 +425,8 @@ contract PositionActionLeverSpectraTest is TestBase {
                 targetToken: address(lpTokenTracker),
                 amount: depositAmount,
                 collateralizer: address(user),
-                auxSwap: emptySwap
+                auxSwap: emptySwap,
+                minAmountOut: 0
             });
             creditParams = CreditParams({amount: borrowAmount, creditor: address(userProxy), auxSwap: emptySwap});
         }

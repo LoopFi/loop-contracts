@@ -166,7 +166,8 @@ contract PositionActionSpectraTest is TestBase {
                 residualRecipient: address(userProxy),
                 deadline: block.timestamp + 100,
                 args: abi.encode(commandsJoin, inputsJoin, lpTokenTracker, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         vm.startPrank(user);
         ERC20(weth).approve(address(userProxy), depositAmount);
@@ -214,7 +215,8 @@ contract PositionActionSpectraTest is TestBase {
                 residualRecipient: user,
                 deadline: block.timestamp,
                 args: abi.encode(commandsExit, inputsExit, swYnETH, block.timestamp + 1000)
-            })
+            }),
+            minAmountOut: 0
         });
         assertEq(ERC20(swYnETH).balanceOf(address(user)), 0);
         userProxy.execute(

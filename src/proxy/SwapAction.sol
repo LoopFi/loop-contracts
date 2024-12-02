@@ -87,6 +87,7 @@ contract SwapAction is TransferAction {
 
     error SwapAction__swap_notSupported();
     error SwapAction__revertBytes_emptyRevertBytes();
+    error SwapAction__kyberSwap_slippageFailed();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -121,7 +122,7 @@ contract SwapAction is TransferAction {
         address from,
         PermitParams calldata permitParams,
         SwapParams calldata swapParams
-    ) external payable returns (uint256) {
+    ) external returns (uint256) {
         if (from != address(this)) {
             uint256 amount = swapParams.swapType == SwapType.EXACT_IN ? swapParams.amount : swapParams.limit;
             _transferFrom(swapParams.assetIn, from, address(this), amount, permitParams);
@@ -152,7 +153,7 @@ contract SwapAction is TransferAction {
                 swapParams.deadline
             );
         } else if (swapParams.swapProtocol == SwapProtocol.KYBER && swapParams.swapType == SwapType.EXACT_IN) {
-            retAmount = kyberSwap(swapParams.assetIn, swapParams.amount, swapParams.args);
+            retAmount = kyberSwap(swapParams.assetIn, swapParams.amount, swapParams.limit, swapParams.args);
         } else if (swapParams.swapProtocol == SwapProtocol.UNIV3) {
             retAmount = uniV3Swap(
                 swapParams.swapType,
@@ -321,14 +322,17 @@ contract SwapAction is TransferAction {
     /// @notice Perform an swap using Kyber MetaAggregationRouterV2
     /// @param assetIn Token to swap from
     /// @param amountIn Amount of `assetIn` to swap
+    /// @param minOut Minimum amount of assets to receive
     /// @param payload tx calldata to use when calling the kyber router,
     /// this calldata can be generated using the kyber swap api
     /// @return _ Amount of tokens received from the swap
-    function kyberSwap(address assetIn, uint256 amountIn, bytes memory payload) internal returns (uint256) {
+    function kyberSwap(address assetIn, uint256 amountIn, uint256 minOut, bytes memory payload) internal returns (uint256) {
         IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);
         (bool success, bytes memory result) = kyberRouter.call(payload);
         if (!success) _revertBytes(result);
-        return abi.decode(result, (uint256));
+        (uint256 returnAmount, /*uint256 gasUsed*/) = abi.decode(result, (uint256, uint256));
+        if (returnAmount < minOut) revert SwapAction__kyberSwap_slippageFailed();
+        return returnAmount;
     }
 
     /// @notice Perform a swap using uniswap v3 exactInput or exactOutput function

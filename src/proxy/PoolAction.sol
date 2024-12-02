@@ -64,6 +64,7 @@ contract PoolAction is TransferAction {
     error PoolAction__join_unsupportedProtocol();
     error PoolAction__transferAndJoin_unsupportedProtocol();
     error PoolAction__transferAndJoin_invalidPermitParams();
+    error PoolAction__transferAndJoin_invalidAssetOrder();
     error PoolAction__exit_unsupportedProtocol();
 
     /*//////////////////////////////////////////////////////////////
@@ -100,6 +101,15 @@ contract PoolAction is TransferAction {
 
                 if (assets.length != permitParams.length) {
                     revert PoolAction__transferAndJoin_invalidPermitParams();
+                }
+
+                // ensure the assets are in the correct order
+                if (assets.length > 1) {
+                    for (uint256 i = 0; i < assets.length - 1; i++) {
+                        if (assets[i] > assets[i + 1]) {
+                            revert PoolAction__transferAndJoin_invalidAssetOrder();
+                        }
+                    }
                 }
 
                 for (uint256 i = 0; i < assets.length; ) {

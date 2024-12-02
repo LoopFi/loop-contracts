@@ -52,6 +52,10 @@ module.exports = {
     mainnet: {
       url: process.env.MAINNET_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    },
+    scroll: {
+      url: process.env.SCROLL_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     }
   }
 };

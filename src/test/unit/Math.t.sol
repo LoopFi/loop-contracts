@@ -59,4 +59,12 @@ contract MathTest is Test {
             wdiv(x, y);
         }
     }
+
+
+    function test_wmul_commutative(uint128 a, uint128 b) public {
+        uint256 mul1 = wmul(uint256(a), uint256(b));
+        uint256 mul2 = wmul(uint256(b), uint256(a));
+
+        assertEq(mul1, mul2);
+    }
 }

@@ -295,6 +295,8 @@ contract RewardManagerSpectraTest is TestBase {
             ),
             returnData
         );
+        vault.grantRole(keccak256("VAULT_REWARDS_ROLE"), address(this));
+        vault.claimSpectraRewards(address(weth), 0, 0, proofs);
     }
 
     function test_2_deposits_and_same_withdraw() public {

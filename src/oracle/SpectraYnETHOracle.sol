@@ -30,14 +30,6 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     uint256[50] private __gap;
 
     /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error SpectraYnETHOracle__spot_invalidValue();
-    error SpectraYnETHOracle__authorizeUpgrade_validStatus();
-    error SpectraYnETHOracle__validatePtOracle_invalidValue();
-
-    /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 

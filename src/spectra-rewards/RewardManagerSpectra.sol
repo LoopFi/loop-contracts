@@ -34,12 +34,12 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         _;
     }
 
-    constructor(address _vault, address _market, address _proxyRegistry, address _owner, address _campaingManager) {
+    constructor(address _vault, address _market, address _proxyRegistry, address _owner, address _campaignManager) {
         market = _market;
         vault = _vault;
         owner = _owner;
         proxyRegistry = IPRBProxyRegistry(_proxyRegistry);
-        campaignManager = _campaingManager;
+        campaignManager = _campaignManager;
     }
 
     function _updateRewardIndex()

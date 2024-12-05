@@ -146,10 +146,7 @@ contract PoolAction is TransferAction {
                     _transferFrom(quoteAddress, from, address(this), quoteDelta, permitParams[1]);
                 }
             } else if (poolActionParams.protocol == Protocol.SPECTRA) {
-                (, bytes[] memory inputs, ) = abi.decode(
-                    poolActionParams.args,
-                    (bytes, bytes[], uint256)
-                );
+                (, bytes[] memory inputs, ) = abi.decode(poolActionParams.args, (bytes, bytes[], uint256));
                 (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
                 if (tokenIn != address(0)) {
                     _transferFrom(tokenIn, from, address(this), amountIn, permitParams[0]);
@@ -268,7 +265,7 @@ contract PoolAction is TransferAction {
             (bytes, bytes[], uint256)
         );
         (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
-        IERC20(tokenIn).approve(address(spectraRouter), amountIn);
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
         spectraRouter.execute(commands, inputs, deadline);
     }
 
@@ -427,7 +424,7 @@ contract PoolAction is TransferAction {
 
         (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
         uint256 balBefore = IERC20(tokenOut).balanceOf(address(this));
-        IERC20(tokenIn).approve(address(spectraRouter), amountIn);
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
         spectraRouter.execute(commands, inputs, deadline);
         retAmount = IERC20(tokenOut).balanceOf(address(this)) - balBefore;
     }

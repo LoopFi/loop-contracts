@@ -15,7 +15,7 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
 import {CDPVault} from "../CDPVault.sol";
-
+import {CDPVaultSpectra} from "../CDPVaultSpectra.sol";
 import {PatchedDeal} from "./utils/PatchedDeal.sol";
 import {Flashlender} from "../Flashlender.sol";
 
@@ -212,6 +212,50 @@ contract TestBase is Test {
                 }),
                 debtCeiling
             );
+    }
+
+    function createCDPVaultSpectra(
+        IERC20 token_,
+        uint256 debtCeiling,
+        uint128 debtFloor,
+        uint64 liquidationRatio,
+        uint64 liquidationPenalty,
+        uint64 liquidationDiscount
+    ) internal returns (CDPVaultSpectra) {
+        return
+            createCDPVaultSpectra(
+                CDPVaultConstants({
+                    pool: liquidityPool,
+                    oracle: oracle,
+                    token: token_,
+                    tokenScale: 10 ** IERC20Metadata(address(token_)).decimals()
+                }),
+                CDPVaultConfig({
+                    debtFloor: debtFloor,
+                    liquidationRatio: liquidationRatio,
+                    liquidationPenalty: liquidationPenalty,
+                    liquidationDiscount: liquidationDiscount,
+                    roleAdmin: address(this),
+                    vaultAdmin: address(this),
+                    pauseAdmin: address(this)
+                }),
+                debtCeiling
+            );
+    }
+
+    function createCDPVaultSpectra(
+        CDPVaultConstants memory constants,
+        CDPVaultConfig memory configs,
+        uint256 debtCeiling
+    ) internal returns (CDPVaultSpectra vault) {
+        vault = new CDPVaultSpectra(constants, configs);
+
+        if (debtCeiling > 0) {
+            constants.pool.setCreditManagerDebtLimit(address(vault), debtCeiling);
+        }
+
+        vaultRegistry.addVault(ICDPVault(address(vault)));
+        vm.label({account: address(vault), newLabel: "CDPVault"});
     }
 
     function createCDPVault(

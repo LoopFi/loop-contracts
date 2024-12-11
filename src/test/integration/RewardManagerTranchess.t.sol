@@ -43,8 +43,6 @@ import {IUniswapV3Router} from "../../vendor/IUniswapV3Router.sol";
 import {PermitParams} from "../../proxy/TransferAction.sol";
 import {RewardManagerTranchess} from "src/tranchess-rewards/RewardManagerTranchess.sol";
 
-//import {ILiquidityGauge} from "tranchess/interfaces/ILiquidityGauge.sol";
-
 interface IWETH {
     function deposit() external payable;
 }
@@ -126,7 +124,7 @@ contract RewardManagerTranchessTest is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER);
+        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, address(0));
 
         // configure permissions and system settings
         setGlobalDebtCeiling(15_000_000 ether);
@@ -158,7 +156,8 @@ contract RewardManagerTranchessTest is TestBase {
             univ3Router,
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
-            TRANCHESS_ROUTER
+            TRANCHESS_ROUTER,
+            address(0)
         );
 
         // deploy position actions

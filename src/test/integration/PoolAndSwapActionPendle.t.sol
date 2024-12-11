@@ -75,13 +75,14 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
         vm.label(wstETH_bb_a_WETH_BPTl, "wstETH-bb-a-WETH-BPTl");
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), PENDLE_ROUTER, TRANCHESS_ROUTER);
+        poolAction = new PoolAction(address(0), PENDLE_ROUTER, TRANCHESS_ROUTER, SPECTRA_ROUTER);
         swapAction = new SwapAction(
             IBalancerVault(address(0)),
             IUniswapV3Router(address(0)),
             IPActionAddRemoveLiqV3(PENDLE_ROUTER),
             kyberRouter,
-            address(0) // TRANCHESS OUTER for SCROLL NETWORK
+            address(0), // TRANCHESS OUTER for SCROLL NETWORK
+            address(0)
         );
 
         // setup user and userProxy

@@ -76,13 +76,14 @@ contract PoolActionTranchessTest is TestBase {
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();
-        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER);
+        poolAction = new PoolAction(address(0), address(0), TRANCHESS_ROUTER, address(0));
         swapAction = new SwapAction(
             IBalancerVault(address(0)),
             IUniswapV3Router(address(0)),
             IPActionAddRemoveLiqV3(address(0)),
             address(0),
-            TRANCHESS_ROUTER
+            TRANCHESS_ROUTER,
+            address(0)
         );
         // setup user and userProxy
         userPk = 0x12341234;

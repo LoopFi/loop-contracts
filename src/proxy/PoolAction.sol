@@ -15,6 +15,7 @@ import {IPYieldToken} from "pendle/interfaces/IPYieldToken.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouterTranchess.sol";
 import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
+import {ISpectraRouter} from "src/interfaces/ISpectraRouter.sol";
 
 interface ILiquidityGauge {
     function stableSwap() external view returns (address);
@@ -24,7 +25,8 @@ enum Protocol {
     BALANCER,
     UNIV3,
     PENDLE,
-    TRANCHESS
+    TRANCHESS,
+    SPECTRA
 }
 
 /// @notice The parameters for a join
@@ -53,6 +55,8 @@ contract PoolAction is TransferAction {
     IPActionAddRemoveLiqV3 public immutable pendleRouter;
     /// @notice Tranchess Swap Router
     ISwapRouter public immutable tranchessRouter;
+    /// @notice Spectra Router
+    ISpectraRouter public immutable spectraRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -67,10 +71,11 @@ contract PoolAction is TransferAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address balancerVault_, address _pendleRouter, address _tranchessRouter) {
+    constructor(address balancerVault_, address _pendleRouter, address _tranchessRouter, address _spectraRouter) {
         balancerVault = IVault(balancerVault_);
         pendleRouter = IPActionAddRemoveLiqV3(_pendleRouter);
         tranchessRouter = ISwapRouter(_tranchessRouter);
+        spectraRouter = ISpectraRouter(_spectraRouter);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -140,6 +145,12 @@ contract PoolAction is TransferAction {
                 if (quoteDelta != 0) {
                     _transferFrom(quoteAddress, from, address(this), quoteDelta, permitParams[1]);
                 }
+            } else if (poolActionParams.protocol == Protocol.SPECTRA) {
+                (, bytes[] memory inputs, ) = abi.decode(poolActionParams.args, (bytes, bytes[], uint256));
+                (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
+                if (tokenIn != address(0)) {
+                    _transferFrom(tokenIn, from, address(this), amountIn, permitParams[0]);
+                }
             } else revert PoolAction__transferAndJoin_unsupportedProtocol();
         }
 
@@ -155,9 +166,9 @@ contract PoolAction is TransferAction {
             _pendleJoin(poolActionParams);
         } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
             _tranchessJoin(poolActionParams);
-        } else {
-            revert PoolAction__join_unsupportedProtocol();
-        }
+        } else if (poolActionParams.protocol == Protocol.SPECTRA) {
+            _spectraJoin(poolActionParams);
+        } else revert PoolAction__join_unsupportedProtocol();
     }
 
     /// @notice Perform a join using the Balancer protocol
@@ -248,6 +259,16 @@ contract PoolAction is TransferAction {
         }
     }
 
+    function _spectraJoin(PoolActionParams memory poolActionParams) internal {
+        (bytes memory commands, bytes[] memory inputs, uint256 deadline) = abi.decode(
+            poolActionParams.args,
+            (bytes, bytes[], uint256)
+        );
+        (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
+        spectraRouter.execute(commands, inputs, deadline);
+    }
+
     /// @notice Helper function to update the join parameters for a levered position
     /// @param poolActionParams The parameters for the join
     /// @param upFrontToken The upfront token for the levered position
@@ -315,6 +336,8 @@ contract PoolAction is TransferAction {
             retAmount = _pendleExit(poolActionParams);
         } else if (poolActionParams.protocol == Protocol.TRANCHESS) {
             retAmount = _tranchessExit(poolActionParams);
+        } else if (poolActionParams.protocol == Protocol.SPECTRA) {
+            retAmount = _spectraExit(poolActionParams);
         } else revert PoolAction__exit_unsupportedProtocol();
     }
 
@@ -391,5 +414,18 @@ contract PoolAction is TransferAction {
         if (poolActionParams.recipient != address(this)) {
             IERC20(stableSwap.quoteAddress()).safeTransfer(poolActionParams.recipient, retAmount);
         }
+    }
+
+    function _spectraExit(PoolActionParams memory poolActionParams) internal returns (uint256 retAmount) {
+        (bytes memory commands, bytes[] memory inputs, address tokenOut, uint256 deadline) = abi.decode(
+            poolActionParams.args,
+            (bytes, bytes[], address, uint256)
+        );
+
+        (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
+        uint256 balBefore = IERC20(tokenOut).balanceOf(address(this));
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
+        spectraRouter.execute(commands, inputs, deadline);
+        retAmount = IERC20(tokenOut).balanceOf(address(this)) - balBefore;
     }
 }

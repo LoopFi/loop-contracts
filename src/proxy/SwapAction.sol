@@ -17,6 +17,7 @@ import {toInt256, abs} from "../utils/Math.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouterTranchess.sol";
 import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
+import {ISpectraRouter} from "src/interfaces/ISpectraRouter.sol";
 
 interface ILiquidityGauge {
     function stableSwap() external view returns (address);
@@ -30,7 +31,8 @@ enum SwapProtocol {
     PENDLE_OUT,
     KYBER,
     TRANCHESS_IN,
-    TRANCHESS_OUT
+    TRANCHESS_OUT,
+    SPECTRA
 }
 
 /// @notice The type of swap to perform
@@ -77,6 +79,8 @@ contract SwapAction is TransferAction {
     address public immutable kyberRouter;
     /// @notice Tranchess Swap Router
     ISwapRouter public immutable tranchessRouter;
+    /// @notice Spectra Router
+    ISpectraRouter public immutable spectraRouter;
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -94,13 +98,15 @@ contract SwapAction is TransferAction {
         IUniswapV3Router uniRouter_,
         IPActionAddRemoveLiqV3 pendleRouter_,
         address kyberRouter_,
-        address tranchessRouter_
+        address tranchessRouter_,
+        address spectraRouter_
     ) {
         balancerVault = balancerVault_;
         uniRouter = uniRouter_;
         pendleRouter = pendleRouter_;
         kyberRouter = kyberRouter_;
         tranchessRouter = ISwapRouter(tranchessRouter_);
+        spectraRouter = ISpectraRouter(spectraRouter_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -166,6 +172,8 @@ contract SwapAction is TransferAction {
             retAmount = tranchessJoin(swapParams);
         } else if (swapParams.swapProtocol == SwapProtocol.TRANCHESS_OUT) {
             retAmount = tranchessExit(swapParams.recipient, swapParams.limit, swapParams.args);
+        } else if (swapParams.swapProtocol == SwapProtocol.SPECTRA) {
+            retAmount = spectra(swapParams);
         } else revert SwapAction__swap_notSupported();
         // Transfer any remaining tokens to the residualRecipient or recipient
         if (swapParams.swapType == SwapType.EXACT_OUT && swapParams.recipient != address(this)) {
@@ -318,11 +326,16 @@ contract SwapAction is TransferAction {
     /// @param payload tx calldata to use when calling the kyber router,
     /// this calldata can be generated using the kyber swap api
     /// @return _ Amount of tokens received from the swap
-    function kyberSwap(address assetIn, uint256 amountIn, uint256 minOut, bytes memory payload) internal returns (uint256) {
+    function kyberSwap(
+        address assetIn,
+        uint256 amountIn,
+        uint256 minOut,
+        bytes memory payload
+    ) internal returns (uint256) {
         IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);
         (bool success, bytes memory result) = kyberRouter.call(payload);
         if (!success) _revertBytes(result);
-        (uint256 returnAmount, /*uint256 gasUsed*/) = abi.decode(result, (uint256, uint256));
+        (uint256 returnAmount /*uint256 gasUsed*/, ) = abi.decode(result, (uint256, uint256));
         if (returnAmount < minOut) revert SwapAction__kyberSwap_slippageFailed();
         return returnAmount;
     }
@@ -474,6 +487,18 @@ contract SwapAction is TransferAction {
         if (recipient != address(this)) {
             IERC20(stableSwap.quoteAddress()).safeTransfer(recipient, retAmount);
         }
+    }
+
+    function spectra(SwapParams memory swapParams) internal returns (uint256 retAmount) {
+        (bytes memory commands, bytes[] memory inputs, address tokenOut, uint256 deadline) = abi.decode(
+            swapParams.args,
+            (bytes, bytes[], address, uint256)
+        );
+        uint256 balBefore = IERC20(tokenOut).balanceOf(swapParams.recipient);
+        (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
+        spectraRouter.execute(commands, inputs, deadline);
+        retAmount = IERC20(tokenOut).balanceOf(swapParams.recipient) - balBefore;
     }
 
     /// @notice Helper function that decodes the swap params and returns the token that will be swapped into

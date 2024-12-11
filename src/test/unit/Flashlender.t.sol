@@ -357,12 +357,6 @@ contract FlashlenderTest is TestBase {
         flashlender.flashFee(randomToken, 100 ether); // Any other address should fail
     }
 
-    function test_bad_token(address randomToken) public {
-        vm.assume(address(randomToken) != address(underlyingToken));
-        vm.expectRevert(Flashlender.Flash__flashLoan_unsupportedToken.selector);
-        flashlender.flashLoan(immediatePaybackReceiver, address(randomToken), 100 ether, "");
-    }
-
     function test_bad_return_hash1() public {
         vm.expectRevert(Flashlender.Flash__flashLoan_callbackFailed.selector);
         flashlender.flashLoan(badReturn, address(underlyingToken), 100 ether, "");

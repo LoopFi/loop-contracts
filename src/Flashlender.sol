@@ -38,7 +38,6 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     error Flash__flashFee_unsupportedToken();
-    error Flash__flashLoan_unsupportedToken();
     error Flash__flashLoan_callbackFailed();
     error Flash__creditFlashLoan_callbackFailed();
     error Flash__creditFlashLoan_unsupportedToken();
@@ -90,7 +89,6 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         uint256 amount,
         bytes calldata data
     ) external override nonReentrant returns (bool) {
-        if (token != address(underlyingToken)) revert Flash__flashLoan_unsupportedToken();
         uint256 fee = wmul(amount, protocolFee);
         uint256 total = amount + fee;
 

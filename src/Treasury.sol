@@ -28,6 +28,21 @@ contract Treasury is AccessControl, PaymentSplitter {
         _setupRole(FUNDS_ADMINISTRATOR_ROLE, fundsAdmin);
     }
 
+    /// @notice Releases the funds to the account
+    /// @param account The address of the account
+    /// @dev This function is only callable by the funds administrator
+    function release(address payable account) public override onlyRole(FUNDS_ADMINISTRATOR_ROLE) {
+        super.release(account);
+    }
+
+    /// @notice Releases the funds to the account
+    /// @param token The address of the token
+    /// @param account The address of the account
+    /// @dev This function is only callable by the funds administrator
+    function release(IERC20 token, address account) public override onlyRole(FUNDS_ADMINISTRATOR_ROLE) {
+        super.release(token, account);
+    }
+
     /// @notice Moves all the funds of the contract to a new treasury
     /// @param treasury The address of the new treasury
     /// @dev This function is only callable by the funds administrator

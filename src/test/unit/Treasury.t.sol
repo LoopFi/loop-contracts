@@ -45,6 +45,8 @@ contract TreasuryTest is TestBase {
     function test_release_scenario() public {
         uint256 amount = 1000 ether;
         mockWETH.mint(address(treasury), amount);
+
+        vm.prank(fundAdmin);
         treasury.release(IERC20(address(mockWETH)), payees[0]);
 
         uint256 expectedAmount = amount * 50 / 100; // 50% shares
@@ -59,6 +61,15 @@ contract TreasuryTest is TestBase {
         assertEq(mockWETH.balanceOf(payees[0]), expectedAmount);
         assertEq(mockWETH.balanceOf(payees[1]), 0);
     }
+
+    function test_release_revertIfNotAdmin() public {
+        uint256 amount = 1000 ether;
+        mockWETH.mint(address(treasury), amount);
+
+        vm.expectRevert();
+        treasury.release(IERC20(address(mockWETH)), payees[0]);
+    }
+
 
     function test_moveFunds_eth() public {
         uint256 amount = 1000 ether;

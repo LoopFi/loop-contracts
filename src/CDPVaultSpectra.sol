@@ -17,6 +17,8 @@ interface ICampaignManager {
     ) external;
 }
 
+bytes32 constant VAULT_REWARDS_ROLE = keccak256("VAULT_REWARDS_ROLE");
+
 contract CDPVaultSpectra is CDPVault {
     constructor(CDPVaultConstants memory constants, CDPVaultConfig memory config) CDPVault(constants, config) {}
 
@@ -25,7 +27,7 @@ contract CDPVaultSpectra is CDPVault {
         uint256 earnedAmount,
         uint256 claimAmount,
         bytes32[] calldata merkleProof
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyRole(VAULT_REWARDS_ROLE) {
         if (address(rewardManager) != address(0)) {
             ISpectraRewardManager spectraRewardManager = ISpectraRewardManager(address(rewardManager));
             ICampaignManager(spectraRewardManager.campaignManager()).claim(

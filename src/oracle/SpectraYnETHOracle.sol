@@ -30,14 +30,6 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     uint256[50] private __gap;
 
     /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error SpectraYnETHOracle__spot_invalidValue();
-    error SpectraYnETHOracle__authorizeUpgrade_validStatus();
-    error SpectraYnETHOracle__validatePtOracle_invalidValue();
-
-    /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
@@ -87,8 +79,7 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @dev reverts if the price is invalid
     function spot(address /* token */) external view virtual override returns (uint256 price) {
         uint256 spectraYnETHVirtualPrice = _fetchVirtualPrice();
-        uint256 lpPriceInYnETH = spectraYnETH.convertToAssets(spectraYnETHVirtualPrice);
-        return ynETH.convertToAssets(lpPriceInYnETH);
+        return spectraYnETH.convertToAssets(spectraYnETHVirtualPrice);
     }
 
     /// @notice LP token virtual price in Spectra ynETH

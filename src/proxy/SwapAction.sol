@@ -326,11 +326,16 @@ contract SwapAction is TransferAction {
     /// @param payload tx calldata to use when calling the kyber router,
     /// this calldata can be generated using the kyber swap api
     /// @return _ Amount of tokens received from the swap
-    function kyberSwap(address assetIn, uint256 amountIn, uint256 minOut, bytes memory payload) internal returns (uint256) {
+    function kyberSwap(
+        address assetIn,
+        uint256 amountIn,
+        uint256 minOut,
+        bytes memory payload
+    ) internal returns (uint256) {
         IERC20(assetIn).forceApprove(address(kyberRouter), amountIn);
         (bool success, bytes memory result) = kyberRouter.call(payload);
         if (!success) _revertBytes(result);
-        (uint256 returnAmount, /*uint256 gasUsed*/) = abi.decode(result, (uint256, uint256));
+        (uint256 returnAmount /*uint256 gasUsed*/, ) = abi.decode(result, (uint256, uint256));
         if (returnAmount < minOut) revert SwapAction__kyberSwap_slippageFailed();
         return returnAmount;
     }
@@ -491,7 +496,7 @@ contract SwapAction is TransferAction {
         );
         uint256 balBefore = IERC20(tokenOut).balanceOf(swapParams.recipient);
         (address tokenIn, uint256 amountIn) = abi.decode(inputs[0], (address, uint256));
-        IERC20(tokenIn).approve(address(spectraRouter), amountIn);
+        IERC20(tokenIn).forceApprove(address(spectraRouter), amountIn);
         spectraRouter.execute(commands, inputs, deadline);
         retAmount = IERC20(tokenOut).balanceOf(swapParams.recipient) - balBefore;
     }

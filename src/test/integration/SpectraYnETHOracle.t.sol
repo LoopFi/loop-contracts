@@ -47,8 +47,8 @@ contract SpectraYnETHOracleTest is Test {
 
     function test_spot() public {
         uint256 spectraYnETHVirtualPrice = ICurvePool(curvePool).lp_price();
-        uint256 lpPriceInYnETH = ERC4626(swYnETH).convertToAssets(spectraYnETHVirtualPrice);
-        assertEq(spectraOracle.spot(address(0)), ERC4626(ynETH).convertToAssets(lpPriceInYnETH));
+        uint256 lpPriceInETH = ERC4626(swYnETH).convertToAssets(spectraYnETHVirtualPrice);
+        assertEq(spectraOracle.spot(address(0)), lpPriceInETH);
     }
 
     function test_getStatus() public {

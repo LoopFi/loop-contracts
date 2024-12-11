@@ -62,6 +62,8 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     // ERC-4626 LENDING //
     // ---------------- //
 
+    function depositETH(address receiver) external payable returns (uint256 shares);
+
     function depositWithReferral(
         uint256 assets,
         address receiver,

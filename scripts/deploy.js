@@ -204,7 +204,7 @@ async function deployCore() {
 
   await deployContract('MockOracle');
 
-  const {PoolV3: pool, AddressProviderV3: addressProviderV3} = await deployGearbox();
+  const {PoolV3: pool, AddressProviderV3: addressProviderV3} = await deployLiquidityPool();
 
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
@@ -311,14 +311,14 @@ async function deployGauge() {
   console.log('Gauge and related configurations have been set.');
 }
 
-async function deployGearbox() {
+async function deployLiquidityPool() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING GEARBOX
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Deploy LinearInterestRateModelV3 contract
+  Deploy LinearInterestRateModelV3 contract
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
     'LinearInterestRateModelV3',
@@ -334,46 +334,43 @@ async function deployGearbox() {
 
   // Deploy ACL contract
   const ACL = await deployContract('ACL', 'ACL', false);
-  const underlierAddress = CONFIG.Pools.LiquidityPoolWETH.underlier;
+  
 
   // Deploy AddressProviderV3 contract and set addresses
   const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
-  await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), underlierAddress, false);
 
   // Deploy ContractsRegister and set its address in AddressProviderV3
   const ContractsRegister = await deployContract('ContractsRegister', 'ContractsRegister', false, AddressProviderV3.address);
   await AddressProviderV3.setAddress(toBytes32('CONTRACTS_REGISTER'), ContractsRegister.address, false);
 
+  const wrappedToken = CONFIG.Pools.LiquidityPool.wrappedToken;
+  const underlierAddress = CONFIG.Pools.LiquidityPool.underlier;
+  
   // Deploy PoolV3 contract
   const PoolV3 = await deployContract(
     'PoolV3',
     'PoolV3',
     false, // not a vault
-    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
-    AddressProviderV3.address, // addressProvider_
+    wrappedToken,
+    addressProviderV3, // addressProvider_
     underlierAddress, // underlyingToken_
-    LinearInterestRateModelV3.address, // interestRateModel_
+    linearInterestRateModelV3, // interestRateModel_
     CONFIG.Core.Gearbox.initialGlobalDebtCeiling, // Debt ceiling
-    CONFIG.Pools.LiquidityPoolWETH.name, // name_
-    CONFIG.Pools.LiquidityPoolWETH.symbol // symbol_
+    CONFIG.Pools.LiquidityPool.name, // name_
+    CONFIG.Pools.LiquidityPool.symbol // symbol_
   );
 
+  await PoolV3.setTreasury(CONFIG.Pools.LiquidityPool.treasury);
+
   console.log('Gearbox Contracts Deployed');
-  
-  await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
-  await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
-  
-  await verifyOnTenderly('ACL', ACL.address);
-  await storeContractDeployment(false, 'ACL', ACL.address, 'ACL');
-  
-  await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
-  await storeContractDeployment(false, 'AddressProviderV3', AddressProviderV3.address, 'AddressProviderV3');
-  
-  await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
-  await storeContractDeployment(false, 'ContractsRegister', ContractsRegister.address, 'ContractsRegister');
-  
-  await verifyOnTenderly('PoolV3', PoolV3.address);
-  await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
+
+  if (hre.network.name == 'tenderly') {
+    await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
+    await verifyOnTenderly('ACL', ACL.address);
+    await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
+    await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
+    await verifyOnTenderly('PoolV3', PoolV3.address);
+  }
 
   return { PoolV3, AddressProviderV3 };
 }
@@ -487,7 +484,7 @@ async function  deployBalancerPool() {
   console.log('Pool Tokens Addresses: ' + tokens.tokens);
   console.log('Pool Tokens balances: ' + tokens.balances);
 
-  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool'); */
+  await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
 }
 
 async function deployAuraVaults() {
@@ -937,12 +934,11 @@ async function createPositions() {
 
 ((async () => {
   await deployCore();
-  // await deployAuraVaults();
   await deployVaults();
   await registerVaults();
   await deployGauge();
   // await deployRadiant();
-  // await deployGearbox();
+  // await deployLiquidityPool();
   // await logVaults();
   // await createPositions();
   // await verifyAllDeployedContracts();

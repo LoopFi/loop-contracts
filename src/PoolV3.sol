@@ -264,6 +264,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         payable
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
+        override
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {

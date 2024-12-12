@@ -15,7 +15,8 @@ import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
 import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 import {console} from "forge-std/console.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
-import {MultiVote} from "lib/core-v3/contracts/interfaces/IGearStakingV3.sol";
+import {MultiVote} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
+
 contract MockTokenScaled is ERC20PresetMinterPauser {
     uint8 private _decimals;
 

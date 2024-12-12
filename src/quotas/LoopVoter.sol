@@ -9,7 +9,7 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {IVotingContractV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IVotingContractV3.sol";
-import {UserVoteLockData, MultiVote, VotingContractStatus, EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
+import {UserVoteLockData, MultiVote, VotingContractStatus, EPOCHS_TO_WITHDRAW} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
 
 import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts/traits/ACLNonReentrantTrait.sol";
 
@@ -36,16 +36,13 @@ contract LoopVoter is ACLNonReentrantTrait {
         firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
     }
 
-    function setVote(uint96 amount, address to) external controllerOnly {
+    /// @notice Sets the voting power for a user
+    /// @param amount The amount of voting power to set
+    /// @param to The address to set the voting power for
+    function setVotingPower(uint96 amount, address to) external controllerOnly {
         UserVoteLockData storage vld = voteLockData[to];
-        vld.totalStaked += amount;
-        vld.available += amount;
-    }
-
-    function removeVote(uint96 amount, address to) external controllerOnly {
-        UserVoteLockData storage vld = voteLockData[to];
-        vld.totalStaked -= amount;
-        vld.available -= amount;
+        vld.totalStaked = amount;
+        vld.available = amount;
     }
 
     /// @notice Performs a sequence of votes

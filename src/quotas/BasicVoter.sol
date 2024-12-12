@@ -3,6 +3,9 @@ pragma solidity ^0.8.19;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
+bytes32 constant CONFIGURATOR = keccak256("BASIC_VOTER_CONFIGURATOR");
+
+
 contract BasicVoter is AccessControl {
 
     uint256 public epochLength;
@@ -13,16 +16,17 @@ contract BasicVoter is AccessControl {
     //////////////////////////////////////////////////////////////*/
 
     error EpochParams__setEpochParams_lengthZero();
-    
+
     constructor(uint256 _firstEpochTimestamp, uint256 _epochLength) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(CONFIGURATOR, msg.sender);
         _setEpochParams(_firstEpochTimestamp, _epochLength);
     }
 
     /// @notice Sets the epoch parameters
     /// @param timestamp The timestamp of the first epoch
     /// @param length The length of the epoch in seconds
-    function setEpochParams(uint256 timestamp, uint256 length) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function setEpochParams(uint256 timestamp, uint256 length) onlyRole(CONFIGURATOR) external {
         _setEpochParams(timestamp, length);
     }
 

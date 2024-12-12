@@ -8,9 +8,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {AP_GEAR_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
 import {IVotingContractV3} from "@gearbox-protocol/core-v3/contracts/interfaces/IVotingContractV3.sol";
-import {IGearStakingV3, UserVoteLockData, WithdrawalData, MultiVote, VotingContractStatus, EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
+import {UserVoteLockData, MultiVote, VotingContractStatus, EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "@gearbox-protocol/core-v3/contracts/interfaces/IGearStakingV3.sol";
 
 import {ACLNonReentrantTrait} from "@gearbox-protocol/core-v3/contracts/traits/ACLNonReentrantTrait.sol";
 
@@ -25,6 +24,8 @@ contract LoopVoter is ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant version = 3_00;
 
+    uint256 public constant EPOCH_LENGTH = 1 days;
+
     /// @notice Timestamp of the first epoch of voting
     uint256 public immutable firstEpochTimestamp;
 
@@ -38,7 +39,7 @@ contract LoopVoter is ACLNonReentrantTrait {
     function setVote(uint96 amount, address to) external controllerOnly {
         UserVoteLockData storage vld = voteLockData[to];
         vld.totalStaked += amount;
-        vld.available = amount;
+        vld.available += amount;
     }
 
     function removeVote(uint96 amount, address to) external controllerOnly {

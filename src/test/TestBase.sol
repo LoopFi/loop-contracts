@@ -120,7 +120,9 @@ contract TestBase is Test {
         liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
 
         voter = new LoopVoter(address(addressProvider), block.timestamp);
-        //voter.setFirstEpochTimestamp(block.timestamp);
+        // Set voting power for 2 users
+        voter.setVote(100, address(0x2));
+        voter.setVote(100, address(0x3));
         gauge = new GaugeV3(address(liquidityPool), address(voter));
         quotaKeeper.setGauge(address(gauge));
     }

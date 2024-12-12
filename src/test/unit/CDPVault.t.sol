@@ -15,7 +15,7 @@ import {WAD, wmul, wdiv, wpow, toInt256} from "../../utils/Math.sol";
 import {CDPVault, VAULT_CONFIG_ROLE} from "../../CDPVault.sol";
 import {console} from "forge-std/console.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
-
+import {MultiVote} from "lib/core-v3/contracts/interfaces/IGearStakingV3.sol";
 contract MockTokenScaled is ERC20PresetMinterPauser {
     uint8 private _decimals;
 
@@ -367,11 +367,21 @@ contract CDPVaultTest is TestBase {
             liquidityPool.totalBorrowed() / 1000,
             "quotaRevenue after 100 days and updating rates (no rate change)"
         );
-        vm.prank(address(voter));
-        bytes memory data = abi.encode(address(token), true); // increase
-        gauge.vote(address(this), 10, data);
+
+        MultiVote[] memory votes = new MultiVote[](1);
+        votes[0] = MultiVote(address(gauge), 10, true, abi.encode(address(token), true));
+        vm.prank(address(0x2));
+        voter.multivote(votes);
+        vm.warp(block.timestamp + 1 days);
+        // votes[0] = MultiVote(address(gauge), 10, true, abi.encode(address(token), false));
+        // vm.prank(address(0x3));
+        // voter.multivote(votes);
+
         vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+        gauge.updateEpoch();
+
+        vm.warp(block.timestamp + 100 days);
+        (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
         assertEq(
             liquidityPool.quotaRevenue(),
             liquidityPool.totalBorrowed() / 100,
@@ -387,8 +397,7 @@ contract CDPVaultTest is TestBase {
             "quotaRevenue after 365 days and updating rates 265 days passed"
         );
         assertGt(virtualDebt, 150 ether);
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+
         console.log(liquidityPool.quotaRevenue(), "quotaRevenue after 365 days");
         (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
 
@@ -459,12 +468,12 @@ contract CDPVaultTest is TestBase {
         console.log(liquidityPool.quotaRevenue(), "quotaRevenue after 1 year before updating rates");
         console.log(vault.quotasInterest(address(this)), "quota interest user after 1 year before updating rates");
         // Rate is increased to 1%
-        vm.prank(address(voter));
-        bytes memory data = abi.encode(address(token), true); // increase
-        gauge.vote(address(this), 10, data);
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
-
+        MultiVote[] memory votes = new MultiVote[](1);
+        votes[0] = MultiVote(address(gauge), 10, true, abi.encode(address(token), true));
+        vm.prank(address(0x2));
+        voter.multivote(votes);
+        vm.warp(block.timestamp + 1 days);
+        gauge.updateEpoch();
         (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
         console.log(accruedInterest, "accruedInterest after 1 year after updating rates");
         console.log(cumulativeQuotaInterest, "cumulativeQuotaInterest after 1 year after updating rates");
@@ -496,8 +505,7 @@ contract CDPVaultTest is TestBase {
             vault.quotasInterest(address(this)),
             "quota interest user after 1 year after updating rates and repaying half debt"
         );
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+
         // console.log(liquidityPool.quotaRevenue(), "quotaRevenue after 365 days");
         vm.warp(block.timestamp + 365 days);
 
@@ -511,8 +519,8 @@ contract CDPVaultTest is TestBase {
         console.log(virtualDebt, "virtualDebt");
         console.log(liquidityPool.quotaRevenue(), "quotaRevenue after 365 days");
         assertGt(virtualDebt, 150 ether - amountToRepay);
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+
+        gauge.updateEpoch();
         console.log(liquidityPool.quotaRevenue(), "quotaRevenue after 365 days");
         (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
 
@@ -576,9 +584,6 @@ contract CDPVaultTest is TestBase {
             "total quota interest before updating rates after a borrow at time zero"
         );
 
-        // Update rates and quota revenue
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
         assertEq(
             liquidityPool.quotaRevenue(),
             liquidityPool.totalBorrowed() / 1000,
@@ -624,8 +629,10 @@ contract CDPVaultTest is TestBase {
         vm.prank(address(voter));
         bytes memory data = abi.encode(address(token), true); // increase
         gauge.vote(address(this), 10, data);
-        vm.prank(address(gauge));
-        quotaKeeper.updateRates();
+        // vm.prank(address(gauge));
+        // quotaKeeper.updateRates();
+        vm.warp(block.timestamp + 1 days);
+        gauge.updateEpoch();
 
         (, accruedInterest, cumulativeQuotaInterest) = vault.getDebtInfo(address(this));
         console.log(accruedInterest, "accruedInterest after 1 year after updating rates");
@@ -642,10 +649,11 @@ contract CDPVaultTest is TestBase {
             "quotaRevenue after 1 year after updating rates"
         );
 
-        assertEq(
+        assertApproxEqRel(
             vault.quotasInterest(address(this)),
-            150 ether / 1000, // still previous quota interest (0.1%)
-            "quota interest user after 1 year after updating rates"
+            150 ether / 1000,
+            0.01 ether, // still previous quota interest (0.1%)
+            "quota interest user after 1 year and 1 day after updating rates"
         );
         console.log("REPAY HALF DEBT AFTER 1 YEAR");
         // Repay half debt for user (not user2)

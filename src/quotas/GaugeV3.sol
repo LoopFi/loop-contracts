@@ -29,7 +29,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     uint256 public constant override version = 3_00;
 
     /// @notice Address of the pool this gauge is connected to
-    address public override pool;
+    address public immutable override pool;
 
     /// @notice Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public override quotaRateParams;
@@ -38,7 +38,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
 
     /// @notice GEAR staking and voting contract
-    address public immutable override voter;
+    address public override voter;
 
     /// @notice Epoch when the rates were last updated
     uint16 public override epochLastUpdate;
@@ -224,10 +224,10 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         }
     }
 
-    /// @notice Sets the pool address
-    /// @param _pool The new pool address
-    function setPool(address _pool) external configuratorOnly {
-        pool = _pool;
+    /// @notice Sets the voter contract address
+    /// @param _voter The new voter contract address
+    function setVoter(address _voter) external configuratorOnly {
+        voter = _voter;
     }
 
     /// @notice Adds a new quoted token to the gauge and sets the initial rate params

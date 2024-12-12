@@ -29,7 +29,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     uint256 public constant override version = 3_00;
 
     /// @notice Address of the pool this gauge is connected to
-    address public immutable override pool;
+    address public override pool;
 
     /// @notice Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public override quotaRateParams;
@@ -222,6 +222,12 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
             emit SetFrozenEpoch(status);
         }
+    }
+
+    /// @notice Sets the pool address
+    /// @param _pool The new pool address
+    function setPool(address _pool) external configuratorOnly {
+        pool = _pool;
     }
 
     /// @notice Adds a new quoted token to the gauge and sets the initial rate params

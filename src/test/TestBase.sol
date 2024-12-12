@@ -31,7 +31,7 @@ import "@gearbox-protocol/core-v3/contracts/interfaces/IAddressProviderV3.sol";
 import {PoolQuotaKeeperMock} from "src/test/PoolQuotaKeeperMock.sol";
 import {GaugeV3} from "src/quotas/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "src/quotas/PoolQuotaKeeperV3.sol";
-import {MockVoter} from "src/test/MockVoter.sol";
+import {LoopVoter} from "src/quotas/LoopVoter.sol";
 import {StakingLPEth} from "src/StakingLPEth.sol";
 import {Silo} from "src/Silo.sol";
 
@@ -53,7 +53,7 @@ contract TestBase is Test {
     MockOracle internal oracle;
     PoolQuotaKeeperV3 internal quotaKeeper;
     GaugeV3 internal gauge;
-    MockVoter internal voter;
+    LoopVoter internal voter;
     StakingLPEth internal stakingLpEth;
     Silo internal silo;
     uint256[] internal timestamps;
@@ -119,8 +119,8 @@ contract TestBase is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(liquidityPool));
         liquidityPool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        voter = new MockVoter();
-        voter.setFirstEpochTimestamp(block.timestamp);
+        voter = new LoopVoter(address(addressProvider), block.timestamp);
+        //voter.setFirstEpochTimestamp(block.timestamp);
         gauge = new GaugeV3(address(liquidityPool), address(voter));
         quotaKeeper.setGauge(address(gauge));
     }

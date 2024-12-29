@@ -24,6 +24,8 @@ interface IMasterPenpie {
     ) external;
 
     function tokenToPoolInfo(address _token) external view returns (PoolInfo memory);
+
+    function penpieOFT() external view returns (address);
 }
 interface IRewarder {
     function rewardTokenInfos() external view returns (address[] memory, string[] memory);
@@ -45,6 +47,8 @@ contract RewardManagerPenpie is RewardManagerAbstract {
     address public immutable stakingToken;
     IPRBProxyRegistry public immutable proxyRegistry;
     address public immutable rewarder;
+    address public immutable pnp;
+
     modifier onlyVault() {
         if (msg.sender != vault) revert OnlyVault();
         _;
@@ -55,6 +59,7 @@ contract RewardManagerPenpie is RewardManagerAbstract {
         vault = _vault;
         stakingToken = _stakingToken;
         IMasterPenpie.PoolInfo memory poolInfo = masterPenpie.tokenToPoolInfo(stakingToken);
+        pnp = masterPenpie.penpieOFT();
         rewarder = poolInfo.rewarder;
         proxyRegistry = IPRBProxyRegistry(_proxyRegistry);
     }
@@ -65,8 +70,7 @@ contract RewardManagerPenpie is RewardManagerAbstract {
         override
         returns (address[] memory tokens, uint256[] memory indexes)
     {
-        //  (, tokens, , ) = masterPenpie.allPendingTokens(stakingToken, vault);
-        (tokens, ) = IRewarder(rewarder).rewardTokenInfos();
+        tokens = _getRewardTokens();
         indexes = new uint256[](tokens.length);
 
         if (tokens.length == 0) return (tokens, indexes);
@@ -118,7 +122,7 @@ contract RewardManagerPenpie is RewardManagerAbstract {
     function _doTransferOutRewards(
         address user
     ) internal virtual override returns (address[] memory tokens, uint256[] memory rewardAmounts, address to) {
-        (tokens, ) = IRewarder(rewarder).rewardTokenInfos();
+        tokens = _getRewardTokens();
 
         rewardAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -126,7 +130,6 @@ contract RewardManagerPenpie is RewardManagerAbstract {
             if (rewardAmounts[i] != 0) {
                 userReward[tokens[i]][user].accrued = 0;
                 rewardState[tokens[i]].lastBalance -= rewardAmounts[i].Uint128();
-                //_transferOut(tokens[i], receiver, rewardAmounts[i]);
             }
         }
 
@@ -136,6 +139,16 @@ contract RewardManagerPenpie is RewardManagerAbstract {
             to = user;
         }
         return (tokens, rewardAmounts, to);
+    }
+
+    function _getRewardTokens() internal view virtual returns (address[] memory) {
+        (address[] memory pendingTokens, ) = IRewarder(rewarder).rewardTokenInfos();
+        address[] memory tokens = new address[](pendingTokens.length + 1);
+        tokens[0] = pnp;
+        for (uint256 i = 0; i < pendingTokens.length; ++i) {
+            tokens[i + 1] = pendingTokens[i];
+        }
+        return tokens;
     }
 
     function _rewardSharesTotal() internal view virtual returns (uint256) {

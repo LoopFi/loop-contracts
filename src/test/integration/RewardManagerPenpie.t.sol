@@ -27,6 +27,12 @@ import {console} from "forge-std/console.sol";
 interface IPendleDepositHelper {
     function harvest(address _market, uint256 minEth) external;
 }
+interface IMasterPenpie {
+    function updatePool(address _market) external;
+    function tokenToPoolInfo(
+        address _market
+    ) external view returns (address, address, uint256, uint256, uint256, uint256, address, bool);
+}
 contract RewardManagerPenpieTest is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
@@ -55,6 +61,7 @@ contract RewardManagerPenpieTest is IntegrationTestBase {
     address pendleToken = 0x808507121B80c02388fAd14726482e061B8da827;
     address pendleStEth = address(PENDLE_LP_STETH2);
     address pendleHolder = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
+    address penpieToken = 0x7DEdBce5a2E31E4c75f87FeA60bF796C17718715;
     function setUp() public virtual override {
         usePatchedDeal = true;
         super.setUp();
@@ -103,6 +110,7 @@ contract RewardManagerPenpieTest is IntegrationTestBase {
         vm.label(address(userProxy), "userProxy");
         vm.label(address(pendleVault_STETH), "pendleVault_STETH");
         vm.label(address(positionAction), "positionAction");
+        vm.label(address(penpieToken), "PENPIE");
     }
 
     function test_deposit_PENPIE_LP_stETH() public {
@@ -145,6 +153,10 @@ contract RewardManagerPenpieTest is IntegrationTestBase {
         _deposit(userProxy, address(pendleVault_STETH), initialDeposit);
 
         // Add reward and harvest
+        // Mock Penpie Reward
+        vm.prank(masterPenpie);
+        ERC20(penpieToken).transfer(address(pendleVault_STETH), 1000 ether);
+        // Harvest Pendle Reward
         vm.prank(pendleHolder);
         ERC20(pendleToken).transfer(address(pendleStEth), 10000 ether);
         vm.roll(block.number + 500);
@@ -175,7 +187,8 @@ contract RewardManagerPenpieTest is IntegrationTestBase {
         assertEq(collateral, 0);
         assertEq(normalDebt, 0);
         assertGt(ERC20(pendleToken).balanceOf(address(user)), 0);
-        console.log("balance of user", ERC20(pendleToken).balanceOf(address(user)));
+        assertEq(ERC20(penpieToken).balanceOf(address(pendleVault_STETH)), 0, "penpie in vault");
+        assertGt(ERC20(penpieToken).balanceOf(address(user)), 0, "penpie in user");
     }
 
     // HELPER FUNCTIONS

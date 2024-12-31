@@ -68,16 +68,16 @@ contract PositionActionPenpie is PositionAction {
 
     /// @notice Withdraw collateral from the vault
     /// @param vault Address of the vault
+    /// @param position Address of the position
+    /// @param dst Token the caller expects to receive
     /// @param amount Amount of collateral to withdraw [wad]
-    /// @param dst Pendle LP token address
-    /// @param minAmountOut The minimum amount out for the aux swap
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
         uint256 amount,
-        uint256 minAmountOut
+        uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
         address collateralToken = address(ICDPVault(vault).token());

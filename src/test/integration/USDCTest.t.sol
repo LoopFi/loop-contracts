@@ -52,22 +52,6 @@ contract UsdcTest is IntegrationTestBase {
     bytes32[] stablePoolIdArray;
     PoolActionParams emptyPoolActionParams;
 
-    modifier checkUser(address user) {
-        vm.assume(
-            user != address(0) &&
-            user != address(liquidityPool) &&
-            user != address(token) &&
-            user != address(vault) &&
-            user != address(positionAction) &&
-            user != address(swapAction) &&
-            user != address(poolAction) &&
-            user != address(flashlender) &&
-            user != address(vaultRegistry) &&
-            user != address(underlyingToken)
-        );
-        _;
-    }
-
     function setUp() public override {
         super.setUp();
 
@@ -263,16 +247,17 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(underlyingDecimals, 6);
     }
 
-    function test_deposit(address user) checkUser(user) public {
-
-        uint256 scaledDepositAmount = _deposit(user, 100 * 10 ** 6  );
+    function test_deposit() public {
+        address user = makeAddr("user");
+        uint256 scaledDepositAmount = _deposit(user, 100 * 10 ** 6);
 
         assertEq(scaledDepositAmount, 100 ether);
         (uint256 posCollateral, , , , , ) = vault.positions(address(user));
         assertEq(posCollateral, scaledDepositAmount);
     }
 
-    function test_withdraw(address user) checkUser(user) public {
+    function test_withdraw() public {
+        address user = makeAddr("user");
         uint256 amount = 100 * 10 ** 6;
         uint256 scaledDepositAmount = _deposit(user, amount);
 
@@ -283,10 +268,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(scaledWithdrawAmount, scaledDepositAmount);
         (uint256 posCollateral, , , , , ) = vault.positions(address(user));
         assertEq(posCollateral, 0);
-
     }
 
-    function test_action_deposit(address user) checkUser(user) public {
+    function test_action_deposit() public {
+        address user = makeAddr("user");
         uint256 depositAmount = 100 * 10 ** 6;
 
         deal(address(token), user, depositAmount);
@@ -323,8 +308,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(posDebt, 0);
     }
 
-    function test_action_withdraw(address user) checkUser(user) public {
+    function test_action_withdraw() public {
+        address user = makeAddr("user");
         uint256 initialDeposit = 100 * 10 ** 6;
+        
         PRBProxy userProxy = _deployProxyFor(user);
         _deposit(address(userProxy), initialDeposit);
 
@@ -354,8 +341,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(posDebt, 0);
     }
 
-    function test_borrow(address user) checkUser(user) public {
+    function test_borrow() public {
+        address user = makeAddr("user");
         uint256 initialDeposit = 100 * 10 ** 6;
+        
         _deposit(user, initialDeposit);
 
         uint256 borrowAmount = 50 * 10 ** 6;
@@ -371,8 +360,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(posDebt, scaledBorrowAmount);
     }
 
-    function test_repay(address user) checkUser(user) public {
+    function test_repay() public {
+        address user = makeAddr("user");
         uint256 initialDeposit = 100 * 10 ** 6;
+        
         uint256 scaledDepositAmount = _deposit(user, initialDeposit);
 
         uint256 borrowAmount = 50 * 10 ** 6;
@@ -386,7 +377,8 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(posDebt, scaledBorrowAmount - scaledRepayAmount);
     }
 
-    function test_action_borrow(address user) checkUser(user) public {
+    function test_action_borrow() public {
+        address user = makeAddr("user");
         uint256 initialDeposit = 100 * 10 ** 6;
         PRBProxy userProxy = _deployProxyFor(user);
         uint256 scaledDepositAmount = _deposit(address(userProxy), initialDeposit);
@@ -400,6 +392,8 @@ contract UsdcTest is IntegrationTestBase {
             auxSwap: emptySwap // no entry swap
         });
 
+        assertEq(underlyingToken.balanceOf(address(user)), 0);
+        
         vm.prank(user);
         userProxy.execute(
             address(positionAction),
@@ -421,8 +415,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(underlyingToken.balanceOf(address(user)), borrowAmount);
     }
 
-    function test_action_repay(address user) checkUser(user) public {
+    function test_action_repay() public {
+        address user = makeAddr("user");
         uint256 depositAmount = 100 * 10 ** 6;
+        
         uint256 borrowAmount = 50 * 10 ** 6;
         PRBProxy userProxy = _deployProxyFor(user);
         uint256 scaledDepositAmount = _deposit(address(userProxy), depositAmount);
@@ -457,8 +453,10 @@ contract UsdcTest is IntegrationTestBase {
         assertEq(posDebt, scaledBorrowAmount - scaledRepayAmount);
     }
 
-    function test_repay_withInterest(address user) checkUser(user) public {
+    function test_repay_withInterest() public {
+        address user = makeAddr("user");
         uint256 initialDeposit = 100 * 10 ** 6;
+        
         uint256 scaledDepositAmount = _deposit(user, initialDeposit);
 
         uint256 borrowAmount = 50 * 10 ** 6;
@@ -474,8 +472,10 @@ contract UsdcTest is IntegrationTestBase {
         assertGt(posDebt, scaledBorrowAmount - scaledRepayAmount);
     }
 
-    function test_action_repay_withInterest(address user) checkUser(user) public {
+    function test_action_repay_withInterest() public {
+        address user = makeAddr("user");
         uint256 depositAmount = 100 * 10 ** 6;
+        
         uint256 borrowAmount = 50 * 10 ** 6;
         PRBProxy proxy = _deployProxyFor(user);
         uint256 scaledDepositAmount = _deposit(address(proxy), depositAmount);

@@ -165,6 +165,123 @@ contract IntegrationTestBase is TestBase {
         retAmount = swapAction.swap(swapParams);
     }
 
+    function _createBalancerPool(address t1, address t2) internal returns (IComposableStablePool pool_) {
+        uint256 amount = 5_000_000_000 ether;
+        deal(t1, address(this), amount);
+        deal(t2, address(this), amount);
+
+        uint256[] memory maxAmountsIn = new uint256[](2);
+        address[] memory assets = new address[](2);
+        assets[0] = t1;
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 500000000000000000;
+        weights[1] = 500000000000000000;
+
+        bool tokenPlaced;
+        address tempAsset;
+        for (uint256 i; i < assets.length; i++) {
+            if (!tokenPlaced) {
+                if (uint160(assets[i]) > uint160(t2)) {
+                    tokenPlaced = true;
+                    tempAsset = assets[i];
+                    assets[i] = t2;
+                } else if (i == assets.length - 1) {
+                    assets[i] = t2;
+                }
+            } else {
+                address placeholder = assets[i];
+                assets[i] = tempAsset;
+                tempAsset = placeholder;
+            }
+        }
+
+        for (uint256 i; i < assets.length; i++) {
+            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
+            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+        }
+
+        pool_ = weightedPoolFactory.create(
+            "50WETH-50TOKEN",
+            "50WETH-50TOKEN",
+            assets,
+            weights,
+            3e14, // swapFee (0.03%)
+            address(this) // owner
+        );
+
+        balancerVault.joinPool(
+            pool_.getPoolId(),
+            address(this),
+            address(this),
+            JoinPoolRequest({
+                assets: assets,
+                maxAmountsIn: maxAmountsIn,
+                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
+                fromInternalBalance: false
+            })
+        );
+    }
+
+    function _createBalancerStablePool(address t1, address t2) internal returns (IComposableStablePool stablePool_) {
+        // mint the liquidity
+        uint256 t1Scale = 10 ** ERC20(t1).decimals();
+        uint256 t2Scale = 10 ** ERC20(t2).decimals();
+        deal(address(t1), address(this), 5_000_000 * t1Scale);
+        deal(address(t2), address(this), 5_000_000 * t2Scale);
+
+        uint256[] memory maxAmountsIn = new uint256[](2);
+        address[] memory assets = new address[](2);
+        assets[0] = address(t1);
+        assets[1] = address(t2);
+
+        bool tokenPlaced;
+        address tempAsset;
+        for (uint256 i; i < assets.length; i++) {
+            if (!tokenPlaced) {
+                if (uint160(assets[i]) > uint160(t2)) {
+                    tokenPlaced = true;
+                    tempAsset = assets[i];
+                    assets[i] = t2;
+                } else if (i == assets.length - 1) {
+                    assets[i] = t2;
+                }
+            } else {
+                address placeholder = assets[i];
+                assets[i] = tempAsset;
+                tempAsset = placeholder;
+            }
+        }
+
+        // set maxAmountIn and approve balancer vault
+        for (uint256 i; i < assets.length; i++) {
+            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
+            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+        }
+
+        // create the pool
+        stablePool_ = stablePoolFactory.create(
+            "Stable Token Pool",
+            "FUDT",
+            assets,
+            200,
+            3e14, // swapFee (0.03%)
+            address(this) // owner
+        );
+
+        // send liquidity to the stable pool
+        balancerVault.joinPool(
+            stablePool_.getPoolId(),
+            address(this),
+            address(this),
+            JoinPoolRequest({
+                assets: assets,
+                maxAmountsIn: maxAmountsIn,
+                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
+                fromInternalBalance: false
+            })
+        );
+    }
+
     /// @dev create a Stablecoin, USDC, DAI stable pool on Balancer with deep liquidity
     function _createBalancerTokenPool() internal returns (IComposableStablePool stablePool_) {
         // mint the liquidity

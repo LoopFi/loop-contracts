@@ -6,6 +6,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
+import {wmul} from "../utils/Math.sol";
 
 import {PositionAction, LeverParams, PoolActionParams} from "./PositionAction.sol";
 
@@ -46,7 +47,8 @@ contract PositionAction4626 is PositionAction {
         if (src != collateral) {
             address underlying = IERC4626(collateral).asset();
             IERC20(underlying).forceApprove(collateral, amount);
-            amount = IERC4626(collateral).deposit(amount, address(this));
+            uint256 depositAmount = IERC4626(collateral).deposit(amount, address(this));
+            amount = wmul(depositAmount, ICDPVault(vault).tokenScale());
         }
 
         IERC20(collateral).forceApprove(vault, amount);
@@ -68,11 +70,12 @@ contract PositionAction4626 is PositionAction {
         uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
         uint256 collateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
+        uint256 scaledAmount = wmul(collateralWithdrawn, ICDPVault(vault).tokenScale());
 
         // if collateral is not the dst token, we need to withdraw the underlying from the ERC4626 vault
         address collateral = address(ICDPVault(vault).token());
         if (dst != collateral) {
-            collateralWithdrawn = IERC4626(collateral).redeem(collateralWithdrawn, address(this), address(this));
+            collateralWithdrawn = IERC4626(collateral).redeem(scaledAmount, address(this), address(this));
         }
 
         return collateralWithdrawn;
@@ -146,6 +149,7 @@ contract PositionAction4626 is PositionAction {
     ) internal override returns (uint256 tokenOut) {
         // withdraw collateral from vault
         uint256 withdrawnCollateral = ICDPVault(leverParams.vault).withdraw(leverParams.position, subCollateral);
+        withdrawnCollateral = wmul(withdrawnCollateral, ICDPVault(leverParams.vault).tokenScale());
 
         // withdraw collateral from the ERC4626 vault and return underlying assets
         tokenOut = IERC4626(leverParams.collateralToken).redeem(withdrawnCollateral, address(this), address(this));

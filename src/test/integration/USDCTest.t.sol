@@ -26,16 +26,18 @@ import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAc
 import {PoolAction, PoolActionParams} from "../../proxy/PoolAction.sol";
 import {PositionAction, CollateralParams, CreditParams} from "../../proxy/PositionAction.sol";
 import {PositionAction20} from "../../proxy/PositionAction20.sol";
+import {LeverParams, PositionAction, CreditParams} from "../../proxy/PositionAction.sol";
 
-contract MockBTCCollateral is ERC20PresetMinterPauser {
-    constructor() ERC20PresetMinterPauser("Mock BTC Collateral", "mBTC") {}
+
+contract MockUSDCCollateral is ERC20PresetMinterPauser {
+    constructor() ERC20PresetMinterPauser("Mock USDC Collateral", "mUSDC") {}
 
     function decimals() public pure override returns (uint8) {
-        return 8;
+        return 6;
     }
 }
 
-contract BtcTest is IntegrationTestBase {
+contract UsdcTest is IntegrationTestBase {
     using SafeERC20 for ERC20;
 
     // cdp vaults
@@ -44,14 +46,11 @@ contract BtcTest is IntegrationTestBase {
     // actions
     PositionAction20 positionAction;
 
-    MockBTCCollateral collateral;
-
-    ERC20 WBTC = ERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
-
     // common variables as state variables to help with stack too deep
     PermitParams emptyPermitParams;
     SwapParams emptySwap;
     bytes32[] stablePoolIdArray;
+    PoolActionParams emptyPoolActionParams;
 
     modifier checkUser(address user) {
         vm.assume(
@@ -72,12 +71,17 @@ contract BtcTest is IntegrationTestBase {
     function setUp() public override {
         super.setUp();
 
-        token = new MockBTCCollateral();
+        token = new MockUSDCCollateral();
 
-        setOraclePrice(1 * 10 ** 18); // 1 BTC
+        setOraclePrice(1 * 10 ** 18);
 
         vault = createCDPVault(IERC20(address(token)), 100_000 ether, 0, 1.25 ether, 1 ether, 0);
         createGaugeAndSetGauge(address(vault));
+
+        bytes32 stablePoolId = _createBalancerStablePool(address(token), address(underlyingToken)).getPoolId();
+
+        oracle.updateSpot(address(token), 1 ether);
+        stablePoolIdArray.push(stablePoolId);
     }
 
     function createCore() internal override {
@@ -95,15 +99,15 @@ contract BtcTest is IntegrationTestBase {
         liquidityPool = new PoolV3({
             weth_: address(0),
             addressProvider_: address(addressProvider),
-            underlyingToken_: address(WBTC),
+            underlyingToken_: address(USDC),
             interestRateModel_: address(irm),
             totalDebtLimit_: initialGlobalDebtCeiling,
-            name_: "Loop Liquidity Pool",
-            symbol_: "lpWBTC "
+            name_: "Loop - USD",
+            symbol_: "lpUSD "
         });
         liquidityPool.setTreasury(mockTreasury);
 
-        underlyingToken = ERC20PresetMinterPauser(address(WBTC));
+        underlyingToken = ERC20PresetMinterPauser(address(USDC));
 
         flashlender = new Flashlender(IPoolV3(address(liquidityPool)), 0.01 ether);
         liquidityPool.setCreditManagerDebtLimit(address(flashlender), type(uint256).max);
@@ -134,10 +138,10 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function addLiquidity() internal override {
-        uint256 availableLiquidity = 1_000_000 * 10 ** 8;
-        deal(address(WBTC), address(this), availableLiquidity);
+        uint256 availableLiquidity = 1_000_000 * 10 ** 6;
+        deal(address(USDC), address(this), availableLiquidity);
         
-        WBTC.approve(address(liquidityPool), availableLiquidity);
+        USDC.approve(address(liquidityPool), availableLiquidity);
         liquidityPool.deposit(availableLiquidity, address(this));
     }
 
@@ -170,12 +174,83 @@ contract BtcTest is IntegrationTestBase {
         underlyingToken.approve(address(user), type(uint256).max);
     }
 
+    function _increaseLever(PRBProxy userProxy, uint256 upFrontUnderliers, uint256 borrowAmount, uint256 amountOutMin) internal {
+
+        address leverUser = userProxy.owner();
+        vm.prank(address(userProxy));
+        token.approve(address(userProxy), type(uint256).max);
+        vm.prank(address(userProxy));
+        USDC.approve(address(leverUser), type(uint256).max);
+
+        deal(address(token), leverUser, upFrontUnderliers);
+
+        // build increase lever params
+        address[] memory assets = new address[](2);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
+
+        LeverParams memory leverParams = LeverParams({
+            position: address(userProxy),
+            vault: address(vault),
+            collateralToken: address(token),
+            primarySwap: SwapParams({
+                swapProtocol: SwapProtocol.BALANCER,
+                swapType: SwapType.EXACT_IN,
+                assetIn: address(underlyingToken),
+                amount: borrowAmount,
+                limit: amountOutMin,
+                recipient: address(positionAction),
+                residualRecipient: address(0),
+                deadline: block.timestamp + 100,
+                args: abi.encode(stablePoolIdArray, assets)
+            }),
+            auxSwap: emptySwap,
+            auxAction: emptyPoolActionParams
+        });
+
+        uint256 expectedAmountOut = _simulateBalancerSwap(leverParams.primarySwap);
+
+        vm.prank(leverUser);
+        token.approve(address(userProxy), upFrontUnderliers);
+
+        // call increaseLever
+        vm.prank(leverUser);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.increaseLever.selector,
+                leverParams,
+                address(token),
+                upFrontUnderliers,
+                address(leverUser),
+                emptyPermitParams
+            )
+        );
+
+        (uint256 collateralWAD, uint256 normalDebtWAD, , , , ) = vault.positions(address(userProxy));
+
+        uint256 collateral = wmul(collateralWAD, vault.tokenScale());
+        uint256 normalDebt = wmul(normalDebtWAD, vault.poolUnderlyingScale());
+
+        // assert that collateral is now equal to the upFrontAmount + the amount of token received from the swap
+        assertEq(collateral, expectedAmountOut + upFrontUnderliers);
+
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), borrowAmount);
+        // assert normalDebt is the same as the amount of stablecoin borrowed
+        assertEq(normalDebt, borrowAmount + flashloanFee);
+
+        // assert leverAction position is empty
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
+        assertEq(lcollateral, 0);
+        assertEq(lnormalDebt, 0);
+    }
+
     function test_deploy() public {
         assertNotEq(address(token), address(0));
         assertNotEq(address(vault), address(0));
 
         uint256 collateralDecimals = token.decimals();
-        assertEq(collateralDecimals, 8);
+        assertEq(collateralDecimals, 6);
 
         assertEq(address(vault.token()), address(token));
         uint256 collateralScale = 10 ** collateralDecimals;
@@ -185,12 +260,12 @@ contract BtcTest is IntegrationTestBase {
         uint256 poolUnderlyingScale = 10 ** underlyingToken.decimals();
         assertEq(vault.poolUnderlyingScale(), poolUnderlyingScale);
         uint256 underlyingDecimals = underlyingToken.decimals();
-        assertEq(underlyingDecimals, 8);
+        assertEq(underlyingDecimals, 6);
     }
 
     function test_deposit(address user) checkUser(user) public {
 
-        uint256 scaledDepositAmount = _deposit(user, 100 * 10 ** 8);
+        uint256 scaledDepositAmount = _deposit(user, 100 * 10 ** 6  );
 
         assertEq(scaledDepositAmount, 100 ether);
         (uint256 posCollateral, , , , , ) = vault.positions(address(user));
@@ -198,7 +273,7 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_withdraw(address user) checkUser(user) public {
-        uint256 amount = 100 * 10 ** 8;
+        uint256 amount = 100 * 10 ** 6;
         uint256 scaledDepositAmount = _deposit(user, amount);
 
         vm.startPrank(user);
@@ -212,7 +287,7 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_action_deposit(address user) checkUser(user) public {
-        uint256 depositAmount = 100 * 10 ** 8;
+        uint256 depositAmount = 100 * 10 ** 6;
 
         deal(address(token), user, depositAmount);
         PRBProxy userProxy = _deployProxyFor(user);
@@ -249,7 +324,7 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_action_withdraw(address user) checkUser(user) public {
-        uint256 initialDeposit = 100 * 10 ** 8;
+        uint256 initialDeposit = 100 * 10 ** 6;
         PRBProxy userProxy = _deployProxyFor(user);
         _deposit(address(userProxy), initialDeposit);
 
@@ -280,10 +355,10 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_borrow(address user) checkUser(user) public {
-        uint256 initialDeposit = 100 * 10 ** 8;
+        uint256 initialDeposit = 100 * 10 ** 6;
         _deposit(user, initialDeposit);
 
-        uint256 borrowAmount = 50 * 10 ** 8;
+        uint256 borrowAmount = 50 * 10 ** 6;
         uint256 scaledBorrowAmount = _borrow(user, borrowAmount);
 
         (uint256 posCollateral, uint256 posDebt, , , , ) = vault.positions(address(user));
@@ -297,13 +372,13 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_repay(address user) checkUser(user) public {
-        uint256 initialDeposit = 100 * 10 ** 8;
+        uint256 initialDeposit = 100 * 10 ** 6;
         uint256 scaledDepositAmount = _deposit(user, initialDeposit);
 
-        uint256 borrowAmount = 50 * 10 ** 8;
+        uint256 borrowAmount = 50 * 10 ** 6;
         uint256 scaledBorrowAmount = _borrow(user, borrowAmount);
 
-        uint256 repayAmount = 25 * 10 ** 8;
+        uint256 repayAmount = 25 * 10 ** 6;
         uint256 scaledRepayAmount = _repay(user, repayAmount);
 
         (uint256 posCollateral, uint256 posDebt, , , , ) = vault.positions(address(user));
@@ -312,12 +387,12 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_action_borrow(address user) checkUser(user) public {
-        uint256 initialDeposit = 100 * 10 ** 8;
+        uint256 initialDeposit = 100 * 10 ** 6;
         PRBProxy userProxy = _deployProxyFor(user);
         uint256 scaledDepositAmount = _deposit(address(userProxy), initialDeposit);
 
         // borrow against deposit
-        uint256 borrowAmount = 50 * 10 ** 8;
+        uint256 borrowAmount = 50 * 10 ** 6;
         // build borrow params
         CreditParams memory creditParams = CreditParams({
             amount: borrowAmount,
@@ -347,8 +422,8 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_action_repay(address user) checkUser(user) public {
-        uint256 depositAmount = 100 * 10 ** 8;
-        uint256 borrowAmount = 50 * 10 ** 8;
+        uint256 depositAmount = 100 * 10 ** 6;
+        uint256 borrowAmount = 50 * 10 ** 6;
         PRBProxy userProxy = _deployProxyFor(user);
         uint256 scaledDepositAmount = _deposit(address(userProxy), depositAmount);
         uint256 scaledBorrowAmount = _borrow(address(userProxy), borrowAmount);
@@ -383,15 +458,15 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_repay_withInterest(address user) checkUser(user) public {
-        uint256 initialDeposit = 100 * 10 ** 8;
+        uint256 initialDeposit = 100 * 10 ** 6;
         uint256 scaledDepositAmount = _deposit(user, initialDeposit);
 
-        uint256 borrowAmount = 50 * 10 ** 8;
+        uint256 borrowAmount = 50 * 10 ** 6;
         uint256 scaledBorrowAmount = _borrow(user, borrowAmount);
 
         vm.warp(block.timestamp + 365 days);
 
-        uint256 repayAmount = 25 * 10 ** 8;
+        uint256 repayAmount = 25 * 10 ** 6;
         uint256 scaledRepayAmount = _repay(user, repayAmount);
 
         (uint256 posCollateral, uint256 posDebt, , , , ) = vault.positions(address(user));
@@ -400,11 +475,11 @@ contract BtcTest is IntegrationTestBase {
     }
 
     function test_action_repay_withInterest(address user) checkUser(user) public {
-        uint256 depositAmount = 100 * 10 ** 8;
-        uint256 borrowAmount = 50 * 10 ** 8;
-        PRBProxy userProxy = _deployProxyFor(user);
-        uint256 scaledDepositAmount = _deposit(address(userProxy), depositAmount);
-        uint256 scaledBorrowAmount = _borrow(address(userProxy), borrowAmount);
+        uint256 depositAmount = 100 * 10 ** 6;
+        uint256 borrowAmount = 50 * 10 ** 6;
+        PRBProxy proxy = _deployProxyFor(user);
+        uint256 scaledDepositAmount = _deposit(address(proxy), depositAmount);
+        uint256 scaledBorrowAmount = _borrow(address(proxy), borrowAmount);
         uint256 scaledRepayAmount = scaledBorrowAmount;
 
         vm.warp(block.timestamp + 365 days);
@@ -413,18 +488,18 @@ contract BtcTest is IntegrationTestBase {
         SwapParams memory auxSwap;
         CreditParams memory creditParams = CreditParams({
             amount: borrowAmount,
-            creditor: address(userProxy),
+            creditor: address(proxy),
             auxSwap: auxSwap // no entry swap
         });
 
         vm.startPrank(user);
-        underlyingToken.approve(address(userProxy), borrowAmount);
+        underlyingToken.approve(address(proxy), borrowAmount);
 
-        userProxy.execute(
+        proxy.execute(
             address(positionAction),
             abi.encodeWithSelector(
                 positionAction.repay.selector,
-                address(userProxy), // user proxy is the position
+                address(proxy), // user proxy is the position
                 address(vault),
                 creditParams,
                 emptyPermitParams
@@ -432,8 +507,100 @@ contract BtcTest is IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (uint256 posCollateral, uint256 posDebt, , , , ) = vault.positions(address(userProxy));
+        (uint256 posCollateral, uint256 posDebt, , , , ) = vault.positions(address(proxy));
         assertEq(posCollateral, scaledDepositAmount);
         assertGt(posDebt, scaledBorrowAmount - scaledRepayAmount);
+    }
+
+     function test_increaseLever() public {
+        address leverUser = vm.addr(0x12341234);
+        PRBProxy userProxy = _deployProxyFor(leverUser);
+
+        uint256 upFrontUnderliers = 20_000 * 10 ** 6;
+        uint256 borrowAmount = 70_000 * 10 ** 6;
+        uint256 amountOutMin = 69_000 * 10 ** 6;
+        
+        _increaseLever(userProxy, upFrontUnderliers, borrowAmount, amountOutMin);
+    }
+
+    function test_decreaseLever() public {
+        // lever up first and record the current collateral and normalized debt
+        address leverUser = vm.addr(0x12341234);
+        PRBProxy userProxy = _deployProxyFor(leverUser);
+
+        {
+            uint256 upFrontUnderliers = 20_000 * 10 ** 6;
+            uint256 borrowAmount = 40_000 * 10 ** 6;
+            uint256 amountOutMin = 39_000 * 10 ** 6;
+            
+            _increaseLever(userProxy, upFrontUnderliers, borrowAmount, amountOutMin);
+        }
+
+        (uint256 initialCollateral, uint256 initialNormalDebt, , , , ) = vault.positions(address(userProxy));
+
+        // build decrease lever params
+        uint256 amountOut = 5_000 * 10 ** 6;
+        uint256 maxAmountIn = 5_100 * 10 ** 6;
+
+        address[] memory assets = new address[](2);
+        assets[0] = address(underlyingToken);
+        assets[1] = address(token);
+
+        uint256 flashloanFee = flashlender.flashFee(address(flashlender.underlyingToken()), amountOut);
+
+        LeverParams memory leverParams = LeverParams({
+            position: address(userProxy),
+            vault: address(vault),
+            collateralToken: address(token),
+            primarySwap: SwapParams({
+                swapProtocol: SwapProtocol.BALANCER,
+                swapType: SwapType.EXACT_OUT,
+                assetIn: address(token),
+                amount: amountOut, // exact amount of stablecoin to receive
+                limit: maxAmountIn, // max amount of token to pay
+                recipient: address(positionAction),
+                residualRecipient: address(0),
+                deadline: block.timestamp + 100,
+                args: abi.encode(stablePoolIdArray, assets)
+            }),
+            auxSwap: emptySwap,
+            auxAction: emptyPoolActionParams
+        });
+
+        uint256 expectedAmountIn = _simulateBalancerSwap(leverParams.primarySwap);
+
+        // call decreaseLever
+        vm.prank(leverUser);
+        userProxy.execute(
+            address(positionAction),
+            abi.encodeWithSelector(
+                positionAction.decreaseLever.selector, // function
+                leverParams, // lever params
+                maxAmountIn, // collateral to decrease by
+                address(userProxy) // residualRecipient
+            )
+        );
+
+        (uint256 collateral, uint256 normalDebt, , , , ) = vault.positions(address(userProxy));
+        // assert new collateral amount is the same as initialCollateral minus the amount of token we swapped for stablecoin
+        {
+            uint256 maxAmountInScaled = wdiv(maxAmountIn, vault.tokenScale());
+            assertEq(collateral, initialCollateral - maxAmountInScaled);
+        }
+
+        // assert new normalDebt is the same as initialNormalDebt minus the amount of stablecoin we received from swapping token
+        {
+            uint256 amountOutScaled = wdiv(amountOut, vault.poolUnderlyingScale());
+            uint256 flashloanFeeScaled = wdiv(flashloanFee, vault.poolUnderlyingScale());
+            assertEq(normalDebt, initialNormalDebt - amountOutScaled + flashloanFeeScaled);
+        }
+
+        // assert that the left over was transfered to the user proxy
+        assertEq(maxAmountIn - expectedAmountIn, token.balanceOf(address(userProxy)));
+
+        // ensure there isn't any left over debt or collateral from using leverAction
+        (uint256 lcollateral, uint256 lnormalDebt, , , , ) = vault.positions(address(positionAction));
+        assertEq(lcollateral, 0);
+        assertEq(lnormalDebt, 0);
     }
 }

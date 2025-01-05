@@ -259,63 +259,6 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
         }
     }
 
-    function _createBalancerPool(address t1, address t2) internal returns (IComposableStablePool pool_) {
-        uint256 amount = 5_000_000_000 ether;
-        deal(t1, address(this), amount);
-        deal(t2, address(this), amount);
-
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        address[] memory assets = new address[](2);
-        assets[0] = t1;
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 500000000000000000;
-        weights[1] = 500000000000000000;
-
-        bool tokenPlaced;
-        address tempAsset;
-        for (uint256 i; i < assets.length; i++) {
-            if (!tokenPlaced) {
-                if (uint160(assets[i]) > uint160(t2)) {
-                    tokenPlaced = true;
-                    tempAsset = assets[i];
-                    assets[i] = t2;
-                } else if (i == assets.length - 1) {
-                    assets[i] = t2;
-                }
-            } else {
-                address placeholder = assets[i];
-                assets[i] = tempAsset;
-                tempAsset = placeholder;
-            }
-        }
-
-        for (uint256 i; i < assets.length; i++) {
-            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
-            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
-        }
-
-        pool_ = weightedPoolFactory.create(
-            "50WETH-50TOKEN",
-            "50WETH-50TOKEN",
-            assets,
-            weights,
-            3e14, // swapFee (0.03%)
-            address(this) // owner
-        );
-
-        balancerVault.joinPool(
-            pool_.getPoolId(),
-            address(this),
-            address(this),
-            JoinPoolRequest({
-                assets: assets,
-                maxAmountsIn: maxAmountsIn,
-                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
-                fromInternalBalance: false
-            })
-        );
-    }
-
     function getForkBlockNumber() internal pure virtual override(IntegrationTestBase) returns (uint256) {
         return 17870449; // Aug-08-2023 01:17:35 PM +UTC
     }

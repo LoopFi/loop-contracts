@@ -102,7 +102,9 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         // reverts if not enough Stablecoin have been send back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
         pool.repayCreditAccount(total - fee, 0, 0);
-        pool.mintProfit(fee);
+        if (fee > 0) {
+            pool.mintProfit(fee);
+        }
 
         return true;
     }
@@ -131,7 +133,10 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
         // reverts if not enough Stablecoin have been send back
         underlyingToken.transferFrom(address(receiver), address(pool), total);
         pool.repayCreditAccount(total - fee, 0, 0);
-        pool.mintProfit(fee);
+
+        if (fee > 0) {
+            pool.mintProfit(fee);
+        }
 
         return true;
     }

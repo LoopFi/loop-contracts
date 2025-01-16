@@ -30,7 +30,7 @@ contract Combined4626AggregatorV3Oracle {
         return (wdiv(uint256(answer), aggregatorScale), uint256(updatedAt));
     }
 
-    /// @notice Return the latest price 
+    /// @notice Return the latest price and the timestamp from the AggregatorV3 oracle
     function latestRoundData()
         public
         view

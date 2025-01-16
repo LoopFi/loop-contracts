@@ -1,18 +1,20 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import {Api3FeedChainlink, IApi3ReaderProxy, AggregatorV3Interface} from "src/oracle/api3/Api3FeedChainlink.sol";
+import {Api3Feed, IApi3ReaderProxy} from "src/oracle/api3/Api3Feed.sol";
+import {CombinedAggregatorV3Oracle, AggregatorV3Interface} from "src/oracle/CombinedAggregatorV3Oracle.sol";
 
 contract AgETHFeedTest is Test {
     IApi3ReaderProxy api3AgETHrsETHFeed = IApi3ReaderProxy(0xd645b27054434e53798798907Bf41815446Ec2ea);
     AggregatorV3Interface rsETHCl = AggregatorV3Interface(0x03c68933f7a3F76875C0bc670a58e69294cDFD01);
     uint256 api3Heartbeat = 24 hours;
     uint256 clHeartbeat = 24 hours;
-    Api3FeedChainlink feed;
-
+    CombinedAggregatorV3Oracle feed;
+    Api3Feed api3Feed;
     function setUp() public {
         vm.createSelectFork("mainnet");
-        feed = new Api3FeedChainlink(address(api3AgETHrsETHFeed), api3Heartbeat, address(rsETHCl), clHeartbeat);
+        api3Feed = new Api3Feed(address(api3AgETHrsETHFeed), api3Heartbeat);
+        feed = new CombinedAggregatorV3Oracle(address(api3AgETHrsETHFeed), api3Heartbeat, address(rsETHCl), clHeartbeat);
     }
 
     function test_deploy() public {

@@ -17,7 +17,7 @@ contract WstUSRFeedTest is Test {
         vm.createSelectFork("mainnet");
        
         aggregator = new PythAggregatorV3(pythPriceFeedsContract,feedIdUSRUSD);
-        feed = new Combined4626AggregatorV3Oracle(address(aggregator), 12 days, address(vault));
+        feed = new Combined4626AggregatorV3Oracle(address(aggregator), 15 days, address(vault));
     }
 
     function test_deploy() public {

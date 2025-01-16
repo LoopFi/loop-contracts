@@ -4,7 +4,9 @@ interface IApi3ReaderProxy {
     function read() external view returns (int224, uint32);
 }
 /// @title API3 Price Feed
-contract Api3 {
+/// @notice This contract reads the price from an API3ReaderProxy and validates it, 
+/// returning the latest price conforming `latestRoundData` from Chainlink
+contract Api3Feed {
     error Api3Chainlink__invalidApi3Value();
 
     IApi3ReaderProxy public immutable proxy;
@@ -14,7 +16,7 @@ contract Api3 {
         api3Heartbeat = _api3Heartbeat;
     }
 
-    function read() public view returns (int256, uint256) {
+    function read() internal view returns (int256, uint256) {
         (int224 value, uint32 timestamp) = proxy.read();
         bool isValid = (value > 0 && block.timestamp - timestamp <= api3Heartbeat);
         if (!isValid) revert Api3Chainlink__invalidApi3Value();

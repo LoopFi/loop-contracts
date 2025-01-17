@@ -13,7 +13,7 @@ contract Combined4626AggregatorV3Oracle {
     uint256 public immutable aggregatorHeartbeat;
     uint256 public immutable aggregatorScale;
     IERC4626 public immutable vault;
-  
+    uint256 public immutable vaultScale;
 
     constructor(address _aggregator, uint256 _aggregatorHeartbeat, address _vault) {        
         aggregator = AggregatorV3Interface(_aggregator);
@@ -21,6 +21,7 @@ contract Combined4626AggregatorV3Oracle {
         aggregatorHeartbeat = _aggregatorHeartbeat;
 
         vault = IERC4626(_vault);
+        vaultScale = 10 ** uint256(vault.decimals());
     }
     
     function getAggregatorData() public view returns (uint256, uint256) {
@@ -38,6 +39,7 @@ contract Combined4626AggregatorV3Oracle {
     {
         (uint256 value, uint256 timestamp) = getAggregatorData();
         uint256 redemptionRate = vault.convertToAssets(1e18);
+        redemptionRate = wdiv(redemptionRate, vaultScale);
         value = wmul(redemptionRate, value);
         return (0, int256(value), 0, timestamp, 0);
     }

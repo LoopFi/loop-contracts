@@ -6,6 +6,7 @@ interface IApi3ReaderProxy {
 /// @title API3 Price Feed
 /// @notice This contract reads the price from an API3ReaderProxy and validates it, 
 /// returning the latest price conforming `latestRoundData` from Chainlink
+/// @dev API3 feeds always use 18 decimals
 contract Api3Feed {
     error Api3Chainlink__invalidApi3Value();
 

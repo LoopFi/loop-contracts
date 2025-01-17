@@ -38,7 +38,7 @@ contract Combined4626AggregatorV3Oracle {
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
         (uint256 value, uint256 timestamp) = getAggregatorData();
-        uint256 redemptionRate = vault.convertToAssets(1e18);
+        uint256 redemptionRate = vault.convertToAssets(vaultScale);
         redemptionRate = wdiv(redemptionRate, vaultScale);
         value = wmul(redemptionRate, value);
         return (0, int256(value), 0, timestamp, 0);

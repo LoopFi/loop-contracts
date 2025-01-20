@@ -451,13 +451,15 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         // derive the amount of normal debt from the swap amount out
         uint256 addDebt = amount + fee;
 
+        uint256 scaledCollateral = wdiv(collateral, ICDPVault(leverParams.vault).tokenScale());
+        uint256 scaledDebt = wdiv(addDebt, ICDPVault(leverParams.vault).poolUnderlyingScale());
         // add collateral and debt
         ICDPVault(leverParams.vault).modifyCollateralAndDebt(
             leverParams.position,
             address(this),
             address(this),
-            toInt256(collateral),
-            toInt256(addDebt)
+            toInt256(scaledCollateral),
+            toInt256(scaledDebt)
         );
 
         underlyingToken.forceApprove(address(flashlender), addDebt);
@@ -486,12 +488,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             vars.subDebt = min(vars.totalDebt + fee, leverParams.primarySwap.limit);
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
+            uint256 scaledDebt = wdiv(vars.subDebt - fee, ICDPVault(leverParams.vault).poolUnderlyingScale());
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt - fee)
+                -toInt256(scaledDebt)
             );
 
             vars.estimatedSwapInAmount = leverParams.primarySwap.amount;
@@ -510,12 +513,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             if (vars.residualDestAmount > 0) {
                 if (vars.subDebt < vars.totalDebt) {
                     underlyingToken.forceApprove(address(leverParams.vault), vars.residualDestAmount);
+                    uint256 scaledAmount = wdiv(vars.residualDestAmount, ICDPVault(leverParams.vault).poolUnderlyingScale());
                     ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                         leverParams.position,
                         address(this),
                         address(this),
                         0,
-                        -toInt256(vars.residualDestAmount)
+                        -toInt256(scaledAmount)
                     );
                 } else if (
                     leverParams.auxSwap.assetIn != address(0) && leverParams.auxSwap.swapType == SwapType.EXACT_IN
@@ -540,12 +544,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             vars.subDebt = leverParams.primarySwap.amount;
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
+            uint256 scaledAmount = wdiv(vars.subDebt - fee, ICDPVault(leverParams.vault).poolUnderlyingScale());
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
                 address(this),
                 0,
-                -toInt256(vars.subDebt - fee)
+                -toInt256(scaledAmount)
             );
 
             vars.withdrawnCollateral = _onDecreaseLever(leverParams, subCollateral);
@@ -555,7 +560,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
                 abi.encodeWithSelector(swapAction.swap.selector, leverParams.primarySwap)
             );
             uint256 swapAmountIn = abi.decode(swapData, (uint256));
-
+            
             vars.residualSrcAmount = vars.withdrawnCollateral - swapAmountIn;
 
             if (vars.residualSrcAmount > 0) {

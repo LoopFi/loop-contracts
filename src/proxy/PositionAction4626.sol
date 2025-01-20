@@ -78,7 +78,7 @@ contract PositionAction4626 is PositionAction {
             collateralWithdrawn = IERC4626(collateral).redeem(scaledAmount, address(this), address(this));
         }
 
-        return collateralWithdrawn;
+        return scaledAmount;
     }
 
     /// @notice Hook to decrease lever by depositing collateral into the Yearn Vault and the Yearn Vault

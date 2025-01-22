@@ -5,8 +5,6 @@ import "src/pendle-rewards/RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
 
-
-
 contract RewardManagerSpectra is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];
@@ -183,36 +181,67 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         return rewardTokens.length;
     }
 
+    /// Helper functions to allow migration to a new reward manager
+
+    /// @notice Set the last reward block
+    /// @dev Only owner can call this method
+    /// @param blockNumber The block number to set as the last reward block
+    /// @dev This is used to allow migration to a new reward manager
     function setLastRewardBlock(uint256 blockNumber) external onlyOwner {
         lastRewardBlock = blockNumber;
     }
 
+    /// @notice Set the total shares
+    /// @dev Only owner can call this method
+    /// @param totalShares The total shares to set
+    /// @dev This is used to allow migration to a new reward manager
     function setTotalShares(uint256 totalShares) external onlyOwner {
         _totalShares = totalShares;
     }
 
+    /// @notice Bulk set the reward state
+    /// @dev Only owner can call this method
+    /// @param params The reward state parameters to set
+    /// @dev This is used to allow migration to a new reward manager
     function bulkSetRewardState(RewardStateParams calldata params) external onlyOwner {
         _bulkSetRewardState(params);
     }
 
+    /// @notice Bulk set the user reward
+    /// @dev Only owner can call this method
+    /// @param params The user reward parameters to set
+    /// @dev This is used to allow migration to a new reward manager
     function _bulkSetRewardState(RewardStateParams calldata params) internal {
         for (uint256 i = 0; i < params.tokens.length; i++) {
             rewardState[params.tokens[i]] = params.states[i];
         }
     }
 
+    /// @notice Bulk set the user reward
+    /// @dev Only owner can call this method
+    /// @param params The user reward parameters to set
+    /// @dev This is used to allow migration to a new reward manager
     function bulkSetUserReward(UserRewardParams[] calldata params) external onlyOwner {
         for (uint256 i = 0; i < params.length; i++) {
             _bulkSetUserReward(params[i]);
         }
     }
 
+    /// @notice Bulk set the user reward
+    /// @dev Only owner can call this method
+    /// @param params The user reward parameters to set
+    /// @dev This is used to allow migration to a new reward manager
     function _bulkSetUserReward(UserRewardParams calldata params) internal {
         for (uint256 i = 0; i < params.users.length; i++) {
             userReward[params.token][params.users[i]] = params.rewards[i];
         }
     }
 
+    /// @notice Bulk set the reward state and user reward
+    /// @dev Only owner can call this method
+    /// @param params The reward state parameters to set
+    /// @param userRewardParams The user reward parameters to set
+    /// @dev This is used to allow migration to a new reward manager
     function bulkSetState(RewardStateParams calldata params, UserRewardParams[] calldata userRewardParams) external onlyOwner {
         _bulkSetRewardState(params);
         for (uint256 i = 0; i < userRewardParams.length; i++) {

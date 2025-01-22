@@ -155,9 +155,14 @@ async function migrateRewardManager() {
   }
 
   const data = JSON.parse(fs.readFileSync(latestFile));
-
   const [owner] = await ethers.getSigners();
-  
+
+  // Get vault instance and pause it
+  const vault = await ethers.getContractAt("CDPVaultSpectra", "0x9BfCD3788f923186705259ae70A1192F601BeB47");
+  console.log('\nPausing vault...');
+  await vault.pause();
+  console.log('Vault paused ✓');
+
   // Deploy new RewardManagerSpectra with all original parameters except campaignManager
   const RewardManagerSpectra = await ethers.getContractFactory("RewardManagerSpectra");
   const newRewardManager = await RewardManagerSpectra.deploy(
@@ -293,6 +298,16 @@ async function migrateRewardManager() {
   // After bulkSetState, add validation
   await validateMigration(oldRewardManager, newRewardManager, data);
   
+    // Unpause vault
+    console.log('\nUnpausing vault...');
+    await vault.unpause();
+    console.log('Vault unpaused ✓');
+
+    // After validation succeeds, update vault's reward manager
+    console.log('\nUpdating vault reward manager...');
+    await vault["setParameter(bytes32,address)"](toBytes32("rewardManager"), newRewardManager.address);
+    console.log('Vault reward manager updated ✓');
+  
   // Save deployment info
   const deploymentInfo = {
     timestamp: new Date().toISOString(),
@@ -307,6 +322,11 @@ async function migrateRewardManager() {
     `reward-manager-deployment.json`,
     JSON.stringify(deploymentInfo, null, 2)
   );
+}
+
+// Helper function to convert string to bytes32
+function toBytes32(str) {
+  return ethers.utils.formatBytes32String(str);
 }
 
 main()

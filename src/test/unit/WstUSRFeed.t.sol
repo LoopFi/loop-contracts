@@ -1,12 +1,11 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import { PythAggregatorV3, IPyth, PythStructs } from "@pythnetwork/pyth-sdk-solidity/PythAggregatorV3.sol";
+import {PythAggregatorV3, IPyth, PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythAggregatorV3.sol";
 import {Combined4626AggregatorV3Oracle, IERC4626} from "src/oracle/Combined4626AggregatorV3Oracle.sol";
 contract WstUSRFeedTest is Test {
-    
     PythAggregatorV3 aggregator;
-   
+
     Combined4626AggregatorV3Oracle feed;
 
     address pythPriceFeedsContract = 0x4305FB66699C3B2702D4d05CF36551390A4c69C6;
@@ -15,9 +14,9 @@ contract WstUSRFeedTest is Test {
 
     function setUp() public {
         vm.createSelectFork("mainnet");
-       
-        aggregator = new PythAggregatorV3(pythPriceFeedsContract,feedIdUSRUSD);
-        feed = new Combined4626AggregatorV3Oracle(address(aggregator), 15 days, address(vault));
+
+        aggregator = new PythAggregatorV3(pythPriceFeedsContract, feedIdUSRUSD);
+        feed = new Combined4626AggregatorV3Oracle(address(aggregator), 30 days, address(vault));
     }
 
     function test_deploy() public {
@@ -29,11 +28,11 @@ contract WstUSRFeedTest is Test {
             .latestRoundData();
         PythStructs.Price memory pyth = IPyth(pythPriceFeedsContract).getPriceUnsafe(feedIdUSRUSD);
         uint256 pythPrice = uint256(int256(pyth.price));
-        assertEq(roundId,  0);
-        assertEq(uint(price), pythPrice * vault.convertToAssets(1e18) * 10 ** (18 -aggregator.decimals()) / 1e18); 
-        assertEq(startedAt,  0);
+        assertEq(roundId, 0);
+        assertEq(uint(price), (pythPrice * vault.convertToAssets(1e18) * 10 ** (18 - aggregator.decimals())) / 1e18);
+        assertEq(startedAt, 0);
         assertEq(updatedAt, pyth.publishTime);
-        assertEq(answeredInRound,  0);
+        assertEq(answeredInRound, 0);
         console.log("price", uint(price));
     }
 }

@@ -9,3 +9,4 @@ aave-address-book/=lib/aave-address-book/src/
 @gearbox-protocol/core-v2/contracts/=lib/core-v2/contracts/
 pendle/=lib/pendle/contracts/
 tranchess/=lib/contract-core/contracts
+@pythnetwork/pyth-sdk-solidity/=node_modules/@pythnetwork/pyth-sdk-solidity

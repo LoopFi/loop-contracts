@@ -56,6 +56,10 @@ module.exports = {
     scroll: {
       url: process.env.SCROLL_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    },
+    fork: {
+      url: 'http://127.0.0.1:8545',
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     }
   }
 };

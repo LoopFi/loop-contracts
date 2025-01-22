@@ -83,6 +83,67 @@ async function main() {
   await migrateRewardManager();
 }
 
+async function validateMigration(oldRewardManager, newRewardManager, data) {
+  console.log('\nValidating migration...');
+
+  // Validate reward states
+  console.log('\nValidating reward states:');
+  for (const token of data.rewardTokens) {
+    const oldState = await oldRewardManager.rewardState(token);
+    const newState = await newRewardManager.rewardState(token);
+
+    const statesMatch = 
+      oldState.index.toString() === newState.index.toString() &&
+      oldState.lastBalance.toString() === newState.lastBalance.toString();
+
+    console.log(`\nToken: ${token}`);
+    console.log('Old state:', {
+      index: oldState.index.toString(),
+      lastBalance: oldState.lastBalance.toString()
+    });
+    console.log('New state:', {
+      index: newState.index.toString(),
+      lastBalance: newState.lastBalance.toString()
+    });
+    console.log('States match:', statesMatch);
+
+    if (!statesMatch) {
+      throw new Error(`Reward state mismatch for token ${token}`);
+    }
+  }
+
+  // Validate user rewards
+  console.log('\nValidating user rewards:');
+  for (const token of data.rewardTokens) {
+    for (const position of data.positions) {
+      const oldReward = await oldRewardManager.userReward(token, position);
+      const newReward = await newRewardManager.userReward(token, position);
+
+      const rewardsMatch = 
+        oldReward.index.toString() === newReward.index.toString() &&
+        oldReward.accrued.toString() === newReward.accrued.toString();
+
+      console.log(`\nToken: ${token}`);
+      console.log(`Position: ${position}`);
+      console.log('Old reward:', {
+        index: oldReward.index.toString(),
+        accrued: oldReward.accrued.toString()
+      });
+      console.log('New reward:', {
+        index: newReward.index.toString(),
+        accrued: newReward.accrued.toString()
+      });
+      console.log('Rewards match:', rewardsMatch);
+
+      if (!rewardsMatch) {
+        throw new Error(`User reward mismatch for token ${token} and position ${position}`);
+      }
+    }
+  }
+
+  console.log('\nMigration validation completed successfully!');
+}
+
 async function migrateRewardManager() {
   // Read the data from the previous step
   const files = fs.readdirSync('.');
@@ -108,7 +169,44 @@ async function migrateRewardManager() {
   );
   
   await newRewardManager.deployed();
-  console.log('New RewardManager deployed at:', newRewardManager.address);
+  console.log('New RewardManager deployed at:', newRewardManager.address, ' with owner:', owner.address);
+
+  const oldRewardManager = await ethers.getContractAt(
+    "RewardManagerSpectra",
+    "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852"
+  );
+
+  // Get and set totalShares
+  const totalShares = await ethers.provider.getStorageAt(oldRewardManager.address, 0);
+  console.log('Original total shares:', totalShares);
+
+  await newRewardManager.setTotalShares(totalShares);
+  console.log('Total shares set');
+
+  // Validate totalShares
+  const newTotalShares = await ethers.provider.getStorageAt(newRewardManager.address, 0);
+  console.log('New total shares:', newTotalShares);
+  
+  if (totalShares !== newTotalShares) {
+    throw new Error('Total shares mismatch after setting');
+  }
+  console.log('Total shares validated ✓');
+
+  // Get and set lastRewardBlock
+  const lastRewardBlock = await oldRewardManager.lastRewardBlock();
+  console.log('Original last reward block:', lastRewardBlock.toString());
+
+  await newRewardManager.setLastRewardBlock(lastRewardBlock);
+  console.log('Last reward block set');
+
+  // Validate lastRewardBlock
+  const newLastRewardBlock = await newRewardManager.lastRewardBlock();
+  console.log('New last reward block:', newLastRewardBlock.toString());
+  
+  if (lastRewardBlock.toString() !== newLastRewardBlock.toString()) {
+    throw new Error('Last reward block mismatch after setting');
+  }
+  console.log('Last reward block validated ✓');
 
   // Add reward tokens
   for (const token of data.rewardTokens) {
@@ -191,6 +289,9 @@ async function migrateRewardManager() {
   await newRewardManager.bulkSetState(rewardStateParams, userRewardParams);
   
   console.log('User rewards migration completed successfully');
+  
+  // After bulkSetState, add validation
+  await validateMigration(oldRewardManager, newRewardManager, data);
   
   // Save deployment info
   const deploymentInfo = {

@@ -23,7 +23,7 @@ const gasTracker = {
     console.log('\nTotal Summary:');
     console.log(`Total Gas Used: ${totalGas.toString()}`);
     console.log(`Total Cost at 9 gwei: ${totalCostEth.toFixed(6)} ETH`);
-    console.log(`Approximate USD Cost: $${(totalCostEth * 2200).toFixed(2)} (at $2200/ETH)`);
+    console.log(`Approximate USD Cost: $${(totalCostEth * 3300).toFixed(2)} (at $3300/ETH)`);
     console.log('\n============================');
   }
 };
@@ -150,6 +150,45 @@ async function main() {
 
 async function validateMigration(oldRewardManager, newRewardManager, data) {
   console.log('\nValidating migration...');
+
+  // Validate constructor parameters
+  console.log('\nValidating constructor parameters:');
+  
+  const oldMarket = await oldRewardManager.market();
+  const newMarket = await newRewardManager.market();
+  console.log('Market addresses:', {
+    old: oldMarket,
+    new: newMarket,
+    match: oldMarket === newMarket
+  });
+  if (oldMarket !== newMarket) throw new Error('Market address mismatch');
+
+  const oldVault = await oldRewardManager.vault();
+  const newVault = await newRewardManager.vault();
+  console.log('Vault addresses:', {
+    old: oldVault,
+    new: newVault,
+    match: oldVault === newVault
+  });
+  if (oldVault !== newVault) throw new Error('Vault address mismatch');
+
+  const oldProxyRegistry = await oldRewardManager.proxyRegistry();
+  const newProxyRegistry = await newRewardManager.proxyRegistry();
+  console.log('Proxy Registry addresses:', {
+    old: oldProxyRegistry,
+    new: newProxyRegistry,
+    match: oldProxyRegistry === newProxyRegistry
+  });
+  if (oldProxyRegistry !== newProxyRegistry) throw new Error('Proxy Registry address mismatch');
+
+  const oldOwner = await oldRewardManager.owner();
+  const newOwner = await newRewardManager.owner();
+  console.log('Owner addresses:', {
+    old: oldOwner,
+    new: newOwner,
+    match: oldOwner === newOwner
+  });
+  if (oldOwner !== newOwner) throw new Error('Owner address mismatch');
 
   // Validate reward states
   console.log('\nValidating reward states:');

@@ -9,6 +9,8 @@ contract RewardManagerSpectra is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];
 
+    event RewardStateUpdated(address[] tokens, RewardState[] states);
+
     error OnlyVault();
     error OnlyOwner();
     error InvalidCampaignManager();
@@ -247,5 +249,7 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         for (uint256 i = 0; i < userRewardParams.length; i++) {
             _bulkSetUserReward(userRewardParams[i]);
         }
+
+        emit RewardStateUpdated(params.tokens, params.states);
     }
 }

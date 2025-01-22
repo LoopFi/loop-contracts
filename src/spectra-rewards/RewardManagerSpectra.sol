@@ -5,13 +5,15 @@ import "src/pendle-rewards/RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
 
+
+
 contract RewardManagerSpectra is RewardManagerAbstract {
     using PMath for uint256;
     using ArrayLib for uint256[];
 
     error OnlyVault();
     error OnlyOwner();
-
+    error InvalidCampaignManager();
     uint256 public lastRewardBlock;
 
     mapping(address => RewardState) public rewardState;
@@ -20,7 +22,7 @@ contract RewardManagerSpectra is RewardManagerAbstract {
     address public immutable vault;
     IPRBProxyRegistry public immutable proxyRegistry;
 
-    address public immutable campaignManager;
+    address public campaignManager;
     address public owner;
     address[] public rewardTokens;
 
@@ -32,6 +34,17 @@ contract RewardManagerSpectra is RewardManagerAbstract {
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
         _;
+    }
+
+    struct RewardStateParams {
+        address[] tokens;
+        RewardState[] states;
+    }
+
+    struct UserRewardParams {
+        address token;
+        address[] users;
+        UserReward[] rewards;
     }
 
     constructor(address _vault, address _market, address _proxyRegistry, address _owner, address _campaignManager) {
@@ -157,11 +170,49 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         owner = _owner;
     }
 
+    function setCampaignManager(address _campaignManager) external onlyOwner {
+        if (_campaignManager == address(0)) revert InvalidCampaignManager();
+        campaignManager = _campaignManager;
+    }
+
     function updateIndexRewards() external onlyVault {
         _updateRewardIndex();
     }
 
     function rewardTokensLength() external view returns (uint256) {
         return rewardTokens.length;
+    }
+
+    function setLastRewardBlock(uint256 blockNumber) external onlyOwner {
+        lastRewardBlock = blockNumber;
+    }
+
+    function setTotalShares(uint256 totalShares) external onlyOwner {
+        _totalShares = totalShares;
+    }
+
+    function bulkSetRewardState(RewardStateParams calldata params) external onlyOwner {
+        _bulkSetRewardState(params);
+    }
+
+    function _bulkSetRewardState(RewardStateParams calldata params) internal {
+        for (uint256 i = 0; i < params.tokens.length; i++) {
+            rewardState[params.tokens[i]] = params.states[i];
+        }
+    }
+
+    function bulkSetUserReward(UserRewardParams calldata params) external onlyOwner {
+        _bulkSetUserReward(params);
+    }
+
+    function _bulkSetUserReward(UserRewardParams calldata params) internal {
+        for (uint256 i = 0; i < params.users.length; i++) {
+            userReward[params.token][params.users[i]] = params.rewards[i];
+        }
+    }
+
+    function bulkSetState(RewardStateParams calldata params, UserRewardParams calldata userRewardParams) external onlyOwner {
+        _bulkSetRewardState(params);
+        _bulkSetUserReward(userRewardParams);
     }
 }

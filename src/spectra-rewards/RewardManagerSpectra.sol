@@ -201,8 +201,10 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         }
     }
 
-    function bulkSetUserReward(UserRewardParams calldata params) external onlyOwner {
-        _bulkSetUserReward(params);
+    function bulkSetUserReward(UserRewardParams[] calldata params) external onlyOwner {
+        for (uint256 i = 0; i < params.length; i++) {
+            _bulkSetUserReward(params[i]);
+        }
     }
 
     function _bulkSetUserReward(UserRewardParams calldata params) internal {
@@ -211,8 +213,10 @@ contract RewardManagerSpectra is RewardManagerAbstract {
         }
     }
 
-    function bulkSetState(RewardStateParams calldata params, UserRewardParams calldata userRewardParams) external onlyOwner {
+    function bulkSetState(RewardStateParams calldata params, UserRewardParams[] calldata userRewardParams) external onlyOwner {
         _bulkSetRewardState(params);
-        _bulkSetUserReward(userRewardParams);
+        for (uint256 i = 0; i < userRewardParams.length; i++) {
+            _bulkSetUserReward(userRewardParams[i]);
+        }
     }
 }

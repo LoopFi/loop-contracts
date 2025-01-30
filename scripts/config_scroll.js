@@ -46,8 +46,8 @@ module.exports = {
     },
   },
   "Pools": {
-    "LiquidityPoolWETH": {
-      "WETH": "0x5300000000000000000000000000000000000004",
+    "LiquidityPool": {
+      "wrappedToken": "0x5300000000000000000000000000000000000004",
       "name": "Loop ETH - lpETH",
       "symbol": "lpETH",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",

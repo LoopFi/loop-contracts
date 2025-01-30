@@ -343,7 +343,7 @@ async function deployGearbox() {
 
   // Deploy ACL contract
   const ACL = await deployContract('ACL', 'ACL', false);
-  const underlierAddress = CONFIG.Pools.LiquidityPoolWETH.underlier;
+  const underlierAddress = CONFIG.Pools.LiquidityPool.underlier;
 
   // Deploy AddressProviderV3 contract and set addresses
   const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
@@ -358,13 +358,13 @@ async function deployGearbox() {
     'PoolV3',
     'PoolV3',
     false, // not a vault
-    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
+    CONFIG.Pools.LiquidityPool.wrappedToken, // wrapped native token
     AddressProviderV3.address, // addressProvider_
     underlierAddress, // underlyingToken_
     LinearInterestRateModelV3.address, // interestRateModel_
     CONFIG.Core.Gearbox.initialGlobalDebtCeiling, // Debt ceiling
-    CONFIG.Pools.LiquidityPoolWETH.name, // name_
-    CONFIG.Pools.LiquidityPoolWETH.symbol // symbol_
+    CONFIG.Pools.LiquidityPool.name, // name_
+    CONFIG.Pools.LiquidityPool.symbol // symbol_
   );
 
   console.log('Gearbox Contracts Deployed');

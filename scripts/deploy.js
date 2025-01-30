@@ -111,6 +111,12 @@ async function storeVaultMetadata(address, metadata) {
   fs.writeFileSync(metadataFilePath, JSON.stringify(metadataFile, null, 2));
 }
 
+async function getVaultMetadata(address) {
+  const metadataFilePath = path.join(__dirname, '.', `metadata-${hre.network.name}.json`);
+  const metadataFile = fs.existsSync(metadataFilePath) ? JSON.parse(fs.readFileSync(metadataFilePath)) : {};
+  return metadataFile.vaults[address];
+}
+
 async function loadDeployedContracts() {
   const deploymentFilePath = await getDeploymentFilePath();
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
@@ -202,8 +208,6 @@ async function deployCore() {
     await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
   }
 
-  await deployContract('MockOracle');
-
   const {PoolV3: pool, AddressProviderV3: addressProviderV3} = await deployGearbox();
 
   console.log('PoolV3 deployed to:', pool.address);
@@ -266,17 +270,15 @@ async function deployGauge() {
     PoolV3: liquidityPool,
   } = await loadDeployedContracts();
 
-  // Deploy MockVoter contract
-  const mockVoter = await deployContract('MockVoter', 'MockVoter', false);
-  console.log(`MockVoter deployed to: ${mockVoter.address}`);
-
-  // Set the first epoch timestamp in the MockVoter
-  const firstEpochTimestamp = Math.floor(Date.now() / 1000); // current timestamp in seconds
-  await mockVoter.setFirstEpochTimestamp(firstEpochTimestamp);
-  console.log(`Set first epoch timestamp to: ${firstEpochTimestamp}`);
+  const latestBlock = await ethers.provider.getBlock('latest');
+  const blockTimestamp = latestBlock.timestamp;
+  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
+  
+  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
+  console.log(`Voter deployed to: ${voter.address}`);
 
   // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, mockVoter.address);
+  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
   console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
 
   // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
@@ -289,22 +291,29 @@ async function deployGauge() {
 
   const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+    const vaultMetadata = await getVaultMetadata(vault.address);
+    if (!vaultMetadata) {
+      console.log(`No metadata found for vault: ${vault.address}`);
+      continue;
+    }
 
     const tokenAddress = await vault.token();
+
     await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
     console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
 
-    const quotaAmount = 10; // Replace with actual quota amount if needed
-    const maxQuota = 100;   // Replace with actual max quota if needed
-    await gaugeV3.addQuotaToken(tokenAddress, quotaAmount, maxQuota);
+    const minRate = vaultMetadata.quotas.minRate;
+    const maxRate = vaultMetadata.quotas.maxRate;
+
+    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+
     console.log('Added quota token to GaugeV3 for token:', tokenAddress);
   }
 
   // Unfreeze the epoch in Gauge
   await gaugeV3.setFrozenEpoch(false);
   console.log('Set frozen epoch to false in GaugeV3');
-
-
 
   //await quotaKeeper.updateRates();
   
@@ -634,12 +643,13 @@ async function deployVaults() {
         lrt: config.lrt,
         lrtName: config.lrtName,
         pool: pool.address,
-        oracle: oracle.address,
+        oracle: oracleAddress,
         token: tokenAddress,
         tokenScale: tokenScale,
         tokenSymbol: tokenSymbol,
         tokenName: config.tokenName,
-        tokenIcon: config.tokenIcon
+        tokenIcon: config.tokenIcon,
+        quotas: config.quotas
       }
     );
 

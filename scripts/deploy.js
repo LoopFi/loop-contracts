@@ -6,9 +6,9 @@ const { BigNumber } = require('ethers');
 const { BalancerSDK, Network, PoolType } = require('@balancer-labs/sdk');
 
 const network = process.env.CONFIG_NETWORK || process.argv.find(arg => arg.startsWith('--network='))?.split('=')[1] || 'mainnet';
-
 const CONFIG = (() => {
   try {
+    console.log(`Using config_${network}.js`);
     return require(`./config_${network}.js`);
   } catch (e) {
     console.log(`Config file for network ${network} not found, using default config.js`);
@@ -268,6 +268,7 @@ async function deployGauge() {
 
   const {
     PoolV3: liquidityPool,
+    AddressProviderV3: addressProviderV3,
   } = await loadDeployedContracts();
 
   const latestBlock = await ethers.provider.getBlock('latest');
@@ -326,6 +327,19 @@ async function deployGearbox() {
                         DEPLOYING GEARBOX
 //////////////////////////////////////////////////////////////*/
   `);
+
+  const {
+    PoolV3: deployedPool,
+    AddressProviderV3: deployedAddressProvider,
+  } = await loadDeployedContracts();
+
+  console.log('deployedPool', deployedPool);
+  console.log('deployedAddressProvider', deployedAddressProvider);
+
+  // Return deployed contracts if they already exist
+  if (deployedPool != null && deployedAddressProvider != null) {
+    return { PoolV3: deployedPool, AddressProviderV3: deployedAddressProvider };
+  }
 
   // Deploy LinearInterestRateModelV3 contract
   const LinearInterestRateModelV3 = await deployContract(
@@ -554,7 +568,7 @@ async function deployVaults() {
     console.log('deploying vault ', vaultName);
 
     // Deploy oracle for the vault if defined in the config
-    let oracleAddress = oracle.address;
+    let oracleAddress = null;
     if (config.oracle) {
       console.log('Deploying oracle for', key);
       const oracleConfig = config.oracle.deploymentArguments;
@@ -566,6 +580,13 @@ async function deployVaults() {
       );
       oracleAddress = deployedOracle.address;
       console.log(`Oracle deployed for ${key} at ${oracleAddress}`);
+    } else {
+      oracleAddress = config.oracleAddress;
+    }
+
+    if (oracleAddress == null) {
+      console.log('No oracle found for', key);
+      continue;
     }
 
     var token;

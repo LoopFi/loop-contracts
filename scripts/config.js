@@ -94,6 +94,10 @@ module.exports = {
             "pauseAdmin": "deployer",
         },
         "debtCeiling": toWad('100000000')
+      },
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
       }
     },
   },

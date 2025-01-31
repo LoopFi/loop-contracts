@@ -1,0 +1,230 @@
+{
+  "core": {
+    "LinearInterestRateModelV3": {
+      "address": "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArguments": [
+        7000,
+        9000,
+        0,
+        2000,
+        2500,
+        60000,
+        false
+      ]
+    },
+    "ACL": {
+      "address": "0xB2150334139721625004b40a1A5664207365e444",
+      "artifactName": "ACL",
+      "constructorArguments": []
+    },
+    "AddressProviderV3": {
+      "address": "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+      "artifactName": "AddressProviderV3",
+      "constructorArguments": [
+        "0xB2150334139721625004b40a1A5664207365e444"
+      ]
+    },
+    "ContractsRegister": {
+      "address": "0xb7F795609659C38ABC657B38750F5dC1299d06D9",
+      "artifactName": "ContractsRegister",
+      "constructorArguments": [
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b"
+      ]
+    },
+    "PoolV3": {
+      "address": "0x252d4187A570a212A186f6d18beB6F2C14500961",
+      "artifactName": "PoolV3",
+      "constructorArguments": [
+        "0x5300000000000000000000000000000000000004",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0x5300000000000000000000000000000000000004",
+        "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop ETH - lpETH",
+        "lpETH"
+      ]
+    },
+    "StakingLPEth": {
+      "address": "0x35B4449521750a376C35AF8aA1794b88fbBa5052",
+      "artifactName": "StakingLPEth",
+      "constructorArguments": [
+        "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+        "StakingLPEth",
+        "slpETH"
+      ]
+    },
+    "LockingLPEth": {
+      "address": "0xE818c6F84a33CC8062C866d28e0b966401D733A4",
+      "artifactName": "StakingLPEth",
+      "constructorArguments": [
+        "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+        "LockLPEth",
+        "llpETH"
+      ]
+    },
+    "Treasury": {
+      "address": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+      "artifactName": "Treasury",
+      "constructorArguments": [
+        [
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x35B4449521750a376C35AF8aA1794b88fbBa5052"
+        ],
+        [
+          20,
+          80
+        ],
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+      ]
+    },
+    "VaultRegistry": {
+      "address": "0xa7286fbB7c029914109C470Ca5F2D3460Ad1c7cc",
+      "artifactName": "VaultRegistry",
+      "constructorArguments": []
+    },
+    "Flashlender": {
+      "address": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+      "artifactName": "Flashlender",
+      "constructorArguments": [
+        "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+        "0"
+      ]
+    },
+    "PRBProxyRegistry": {
+      "address": "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+      "artifactName": "PRBProxyRegistry",
+      "constructorArguments": []
+    },
+    "SwapAction": {
+      "address": "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+      "artifactName": "SwapAction",
+      "constructorArguments": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc"
+      ]
+    },
+    "PoolAction": {
+      "address": "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+      "artifactName": "PoolAction",
+      "constructorArguments": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc"
+      ]
+    },
+    "ERC165Plugin": {
+      "address": "0xb4b083d1f9f5294F50C5118C6e8994369AcB6e51",
+      "artifactName": "ERC165Plugin",
+      "constructorArguments": []
+    },
+    "PositionAction20": {
+      "address": "0xbdb4C89F197E2D82e80D8Cb212E6e0Bb2AA9FeCE",
+      "artifactName": "PositionAction20",
+      "constructorArguments": [
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+        "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+        "0xa7286fbB7c029914109C470Ca5F2D3460Ad1c7cc",
+        "0x0000000000000000000000000000000000000000"
+      ]
+    },
+    "PositionAction4626": {
+      "address": "0xe1987f6cD0b8823a033c29d640596757492479BD",
+      "artifactName": "PositionAction4626",
+      "constructorArguments": [
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+        "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+        "0xa7286fbB7c029914109C470Ca5F2D3460Ad1c7cc",
+        "0x0000000000000000000000000000000000000000"
+      ]
+    },
+    "PositionActionPendle": {
+      "address": "0x0D7909318B497Da3060BcD371448E4629be2705D",
+      "artifactName": "PositionActionPendle",
+      "constructorArguments": [
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+        "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+        "0xa7286fbB7c029914109C470Ca5F2D3460Ad1c7cc",
+        "0x0000000000000000000000000000000000000000"
+      ]
+    },
+    "PositionActionTranchess": {
+      "address": "0x7fC6f72E895F1ed110799f5d6594149e4A0B7Ff3",
+      "artifactName": "PositionActionTranchess",
+      "constructorArguments": [
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+        "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+        "0xa7286fbB7c029914109C470Ca5F2D3460Ad1c7cc",
+        "0x0000000000000000000000000000000000000000"
+      ]
+    },
+    "TranchessLPOracle": {
+      "address": "0x1e81A9Da007975fE9c00e1c61813726E56631Abc",
+      "artifactName": "TranchessLPOracle",
+      "constructorArguments": [
+        "0xEC8bFa1D15842D6B670d11777A08c39B09A5FF00",
+        "0x0E4d8D665dA14D35444f0eCADc82F78a804A5F95",
+        86400
+      ]
+    },
+    "RewardManager": {
+      "address": "0xFB43717E1ea0C10a6cd893B00Baa0fF2482838bE",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArguments": [
+        "0x9979b23151B9E6b71ef16647F9481344c8C172F2",
+        "0xD48Cc42e154775f8a65EEa1D6FA1a11A31B09B65",
+        "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46"
+      ]
+    },
+    "MockVoter": {
+      "address": "0x3cc6e65d333DadD9113f227F4da07cF4F9D0eeF9",
+      "artifactName": "MockVoter",
+      "constructorArguments": []
+    },
+    "GaugeV3": {
+      "address": "0xAB86d3bd8370e6c37D37Afb3eB183b2cDA9dca8f",
+      "artifactName": "GaugeV3",
+      "constructorArguments": [
+        "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+        "0x3cc6e65d333DadD9113f227F4da07cF4F9D0eeF9"
+      ]
+    },
+    "PoolQuotaKeeperV3": {
+      "address": "0x1902D1Af51defE677aa779D81140585E9EfDB24C",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArguments": [
+        "0x4F7280739Ba53591dE300277262CF7f7E038F24F"
+      ]
+    }
+  },
+  "vaults": {
+    "CDPVault_VaultSTONE2LP": {
+      "address": "0x9979b23151B9E6b71ef16647F9481344c8C172F2",
+      "artifactName": "CDPVault",
+      "constructorArguments": [
+        [
+          "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+          "0x1e81A9Da007975fE9c00e1c61813726E56631Abc",
+          "0xD48Cc42e154775f8a65EEa1D6FA1a11A31B09B65",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1050000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ]
+    }
+  }
+}

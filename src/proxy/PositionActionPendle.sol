@@ -115,7 +115,7 @@ contract PositionActionPendle is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
+        tokenOut = _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
 
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(

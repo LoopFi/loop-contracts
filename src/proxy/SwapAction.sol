@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IUniswapV3Router, ExactInputParams, ExactOutputParams, decodeLastToken} from "../vendor/IUniswapV3Router.sol";
 import {IVault, SwapKind, BatchSwapStep, FundManagement} from "../vendor/IBalancerVault.sol";
-import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
+import {TokenInput, LimitOrderData, TokenOutput} from "pendle/interfaces/IPAllActionTypeV3.sol";
 import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 import {IPPrincipalToken} from "pendle/interfaces/IPPrincipalToken.sol";
@@ -39,6 +39,12 @@ enum SwapProtocol {
 enum SwapType {
     EXACT_IN,
     EXACT_OUT
+}
+
+/// @notice The type of Pendle exit to perform
+enum PendleExitType {
+    SY_REDEEM,
+    ROUTER_EXIT
 }
 
 /// @notice The parameters for a swap
@@ -88,6 +94,7 @@ contract SwapAction is TransferAction {
     error SwapAction__swap_notSupported();
     error SwapAction__revertBytes_emptyRevertBytes();
     error SwapAction__kyberSwap_slippageFailed();
+    error SwapAction__pendleExit_invalidExitType();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -418,9 +425,29 @@ contract SwapAction is TransferAction {
         );
     }
 
-    function pendleExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 retAmount) {
-        (address market, uint256 netLpIn, address tokenOut) = abi.decode(data, (address, uint256, address));
+    function pendleExit(address recipient, uint256 minOut, bytes memory data) internal returns (uint256 netTokenOut) {
+        (PendleExitType exitType, bytes memory args) = abi.decode(data, (PendleExitType, bytes));
 
+        if (exitType == PendleExitType.SY_REDEEM) {
+            (address market, uint256 netLpIn, address tokenOut) = abi.decode(args, (address, uint256, address));
+            netTokenOut = _syRedeem(market, netLpIn, tokenOut, recipient, minOut);
+        } else if (exitType == PendleExitType.ROUTER_EXIT) {
+            (
+                address market, 
+                uint256 netLpToRemove, 
+                TokenOutput memory output, 
+                LimitOrderData memory limit
+            ) = abi.decode(args, (address, uint256, TokenOutput, LimitOrderData));
+
+            IERC20(market).forceApprove(address(pendleRouter), netLpToRemove);
+
+            (netTokenOut, , ) = pendleRouter.removeLiquiditySingleToken(recipient, market, netLpToRemove, output, limit);
+        } else {
+            revert SwapAction__pendleExit_invalidExitType();
+        }
+    }
+
+    function _syRedeem(address market, uint256 netLpIn, address tokenOut, address recipient, uint256 minOut) internal returns (uint256 netTokenOut) {
         (IStandardizedYield SY, IPPrincipalToken PT, IPYieldToken YT) = IPMarket(market).readTokens();
 
         if (recipient != address(this)) {

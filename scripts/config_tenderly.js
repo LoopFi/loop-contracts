@@ -49,10 +49,10 @@ module.exports = {
     },
   },
   "Pools": {
-    "LiquidityPoolWETH": {
+    "LiquidityPool": {
       "name": "Loop Liquidity Pool - WETH",
       "symbol": "lpETH",
-      "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "wrappedToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
       "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" //WETH
     }

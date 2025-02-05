@@ -56,6 +56,10 @@ module.exports = {
     scroll: {
       url: process.env.SCROLL_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    },
+    bsc: {
+      url: process.env.BNB_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     }
   }
 };

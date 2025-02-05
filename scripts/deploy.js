@@ -592,7 +592,7 @@ async function deployVaults() {
     console.log('Token address:', tokenAddress);
     
     const cdpVault = await deployContract(
-      'CDPVault',
+      'CDPVaultSpectra',
       vaultName,
       true,
       [
@@ -615,12 +615,14 @@ async function deployVaults() {
     // deploy reward manager
     
     const rewardManager = await deployContract(
-      "src/pendle-rewards/RewardManager.sol:RewardManager",
-      "RewardManager",
-      false,
+      "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "RewardManagerSpectra",
+      false, 
       cdpVault.address,
       tokenAddress,
-      prbProxyRegistry.address
+      prbProxyRegistry.address,
+      signer,
+      "0x335d354e8551086F780285FF886216af3f8aca9a"
     );
 
     console.log('Deployed RewardManager for', vaultName, 'at', rewardManager.address);
@@ -638,7 +640,7 @@ async function deployVaults() {
         contractName: vaultName,
         name: config.name,
         description: config.description,
-        artifactName: 'CDPVault',
+        artifactName: 'CDPVaultSpectra',
         collateralType: config.collateralType,
         lrt: config.lrt,
         lrtName: config.lrtName,

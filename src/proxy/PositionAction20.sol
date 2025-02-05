@@ -3,10 +3,9 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-
 import {PositionAction, LeverParams} from "./PositionAction.sol";
+import {wmul} from "../utils/Math.sol";
 
 /// @title PositionAction20
 /// @notice ERC20 implementation of PositionAction base contract
@@ -45,7 +44,9 @@ contract PositionAction20 is PositionAction {
     ) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(position, amount);
+        uint256 depositAmount = ICDPVault(vault).deposit(position, amount);
+        uint256 scaledAmount = wmul(depositAmount, ICDPVault(vault).tokenScale());
+        return scaledAmount;
     }
 
     /// @notice Withdraw collateral from the vault
@@ -60,7 +61,10 @@ contract PositionAction20 is PositionAction {
         uint256 amount,
         uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(position, amount);
+        // Convert from wad to tokenScale using wdiv
+        uint256 withdrawAmount = ICDPVault(vault).withdraw(position, amount);
+        uint256 scaledAmount = wmul(withdrawAmount, ICDPVault(vault).tokenScale());
+        return scaledAmount;
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault

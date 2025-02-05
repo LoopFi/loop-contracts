@@ -22,7 +22,7 @@ import {PositionAction4626} from "../../proxy/PositionAction4626.sol";
 import {IVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/interfaces/IPAllActionTypeV3.sol";
 
 import {TestBase} from "src/test/TestBase.sol";
 import {Test} from "forge-std/Test.sol";

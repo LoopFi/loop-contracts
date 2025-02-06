@@ -57,7 +57,7 @@ module.exports = {
       url: process.env.SCROLL_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     },
-    bnb: {
+    bnc: {
       url: process.env.BNB_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     }

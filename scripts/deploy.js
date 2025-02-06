@@ -215,7 +215,7 @@ async function deployCore() {
 
   const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "slpETH");
   console.log('StakingLPEth deployed to:', stakingLpEth.address);
-  const lockLpEth = await deployContract('StakingLPEth', 'LockingLPEth', false, pool.address, "LockLPEth", "llpETH");
+  const lockLpEth = await deployContract('Locking', 'Locking', false, pool.address, "LockLPEth", "llpETH");
   console.log('LockLPEth deployed to:', lockLpEth.address);
 
   const treasuryReplaceParams = {

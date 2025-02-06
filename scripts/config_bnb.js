@@ -57,6 +57,7 @@ module.exports = {
             description: "This vault allows for borrowing and lending of assets",
             type: "CDPVault",
             collateralType: "ERC20",
+            poolAddress: "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
             oracle: {
                 type: "ListaOracle",
                 deploymentArguments: {

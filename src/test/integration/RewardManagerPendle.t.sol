@@ -20,7 +20,7 @@ import {PositionAction, CollateralParams, CreditParams} from "../../proxy/Positi
 import {PositionAction20} from "../../proxy/PositionAction20.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/interfaces/IPAllActionTypeV3.sol";
 import {RewardManager} from "src/pendle-rewards/RewardManager.sol";
 import {console} from "forge-std/console.sol";
 

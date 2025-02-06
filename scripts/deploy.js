@@ -144,6 +144,13 @@ async function attachContract(name, address) {
 }
 
 async function deployContract(name, artifactName, isVault, ...args) {
+  // Check if contract is already deployed
+  const existing = await getDeployedContract(artifactName || name);
+  if (existing) {
+    console.log(`${artifactName || name} already deployed at: ${existing.address}`);
+    return existing.contract;
+  }
+
   console.log(`Deploying ${artifactName || name}... {${args.map((v) => v.toString()).join(', ')}}}`);
   const Contract = await ethers.getContractFactory(name);
   console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
@@ -152,10 +159,17 @@ async function deployContract(name, artifactName, isVault, ...args) {
   console.log(`${artifactName || name} deployed to: ${contract.address}`);
   await verifyOnTenderly(name, contract.address);
   await storeContractDeployment(isVault, artifactName || name, contract.address, name, args);
-  return contract; 
+  return contract;
 }
 
 async function deployProxy(name, implementationArgs, proxyArgs) {
+  // Check if proxy is already deployed
+  const existing = await getDeployedContract(name);
+  if (existing) {
+    console.log(`${name} proxy already deployed at: ${existing.address}`);
+    return existing.contract;
+  }
+
   console.log(`Deploying ${name}... {${proxyArgs.map((v) => v.toString()).join(', ')}}}`);
   const ProxyAdmin = await ethers.getContractFactory('ProxyAdmin');
   const proxyAdmin = await ProxyAdmin.deploy();
@@ -195,129 +209,88 @@ async function deployPRBProxy(prbProxyRegistry) {
   return proxy;
 }
 
-async function deployCore() {
+async function deployGearboxCore() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                         DEPLOYING CORE
+                      DEPLOYING GEARBOX CORE
 //////////////////////////////////////////////////////////////*/
   `);
 
-  const signer = await getSignerAddress();
+  // Deploy ACL contract
+  const ACL = await deployContract('ACL', 'ACL', false);
+  
+  // Deploy AddressProviderV3 contract and set addresses
+  const AddressProviderV3 = await deployContract('AddressProviderV3', 'AddressProviderV3', false, ACL.address);
+  await AddressProviderV3.setAddress(toBytes32('WETH_TOKEN'), CONFIG.Core.WETH, false);
 
-  if (hre.network.name == 'tenderly') {
-    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
-  }
+  // Deploy ContractsRegister and set its address in AddressProviderV3
+  const ContractsRegister = await deployContract('ContractsRegister', 'ContractsRegister', false, AddressProviderV3.address);
+  await AddressProviderV3.setAddress(toBytes32('CONTRACTS_REGISTER'), ContractsRegister.address, false);
 
-  const {PoolV3: pool, AddressProviderV3: addressProviderV3} = await deployGearbox();
+  console.log('Gearbox Core Contracts Deployed');
+  
+  await verifyOnTenderly('ACL', ACL.address);
+  await storeContractDeployment(false, 'ACL', ACL.address, 'ACL');
+  
+  await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
+  await storeContractDeployment(false, 'AddressProviderV3', AddressProviderV3.address, 'AddressProviderV3');
+  
+  await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
+  await storeContractDeployment(false, 'ContractsRegister', ContractsRegister.address, 'ContractsRegister');
 
-  console.log('PoolV3 deployed to:', pool.address);
-  console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
-
-  const stakingLpEth = await deployContract('StakingLPEth', 'StakingLPEth', false, pool.address, "StakingLPEth", "slpETH");
-  console.log('StakingLPEth deployed to:', stakingLpEth.address);
-  const lockLpEth = await deployContract('StakingLPEth', 'LockingLPEth', false, pool.address, "LockLPEth", "llpETH");
-  console.log('LockLPEth deployed to:', lockLpEth.address);
-
-  const treasuryReplaceParams = {
-    'deployer': signer,
-    'stakingLpEth': stakingLpEth.address
-  };
-
-  const { payees, shares, admin } = replaceParams(CONFIG.Core.Treasury.constructorArguments, treasuryReplaceParams);
-  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
-  console.log('Treasury deployed to:', treasury.address);
-
-  await addressProviderV3.setAddress(toBytes32('TREASURY'), treasury.address, false);
-  await pool.setTreasury(treasury.address);
-
-  // Deploy Vault Registry
-  const vaultRegistry = await deployContract('VaultRegistry');
-  console.log('Vault Registry deployed to:', vaultRegistry.address);
-
-  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
-
-  const UINT256_MAX = ethers.constants.MaxUint256;
-  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
-  console.log('Set credit manager debt limit for flashlender to max');
-
-  const proxyRegistry = await deployContract('PRBProxyRegistry');
-  console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
-  // storeEnvMetadata({PRBProxyRegistry: CONFIG.Core.PRBProxyRegistry});
-
-  const swapAction = await deployContract(
-   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
-  );
-  const poolAction = await deployContract(
-   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG.Core.Actions.PoolAction.constructorArguments)
-  );
-
-  await deployContract('ERC165Plugin');
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  console.log('------------------------------------');
+  return { ACL, AddressProviderV3, ContractsRegister };
 }
 
-async function deployGauge() {
+async function deployPools(addressProviderV3) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                        DEPLOYING GAUGE
+                        DEPLOYING POOLS
 //////////////////////////////////////////////////////////////*/
   `);
 
-  const {
-    PoolV3: liquidityPool,
-  } = await loadDeployedContracts();
-
-  const latestBlock = await ethers.provider.getBlock('latest');
-  const blockTimestamp = latestBlock.timestamp;
-  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
+  const pools = [];
   
-  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
-  console.log(`Voter deployed to: ${voter.address}`);
+  for (const [poolKey, poolConfig] of Object.entries(CONFIG.Pools)) {
+    // Deploy LinearInterestRateModelV3 for this pool
+    const LinearInterestRateModelV3 = await deployContract(
+      'LinearInterestRateModelV3',
+      `LinearInterestRateModelV3_${poolKey}`,
+      false,
+      poolConfig.interestRateModel.U_1,
+      poolConfig.interestRateModel.U_2,
+      poolConfig.interestRateModel.R_base,
+      poolConfig.interestRateModel.R_slope1,
+      poolConfig.interestRateModel.R_slope2,
+      poolConfig.interestRateModel.R_slope3,
+      poolConfig.interestRateModel.isBorrowingMoreU2Forbidden || false
+    );
 
-  // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
-  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
+    // Deploy PoolV3 contract
+    const PoolV3 = await deployContract(
+      'PoolV3',
+      `PoolV3_${poolKey}`,
+      false,
+      poolConfig.wrappedToken,
+      addressProviderV3.address,
+      poolConfig.underlier,
+      LinearInterestRateModelV3.address,
+      poolConfig.initialDebtCeiling || CONFIG.Core.Gearbox.initialGlobalDebtCeiling,
+      poolConfig.name,
+      poolConfig.symbol
+    );
 
-  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
-  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
+    console.log(`Pool ${poolKey} Deployed at ${PoolV3.address}`);
+    
+    await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
+    await storeContractDeployment(false, `LinearInterestRateModelV3_${poolKey}`, LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
+    
+    await verifyOnTenderly('PoolV3', PoolV3.address);
+    await storeContractDeployment(false, `PoolV3_${poolKey}`, PoolV3.address, 'PoolV3');
 
-  // Set Gauge in QuotaKeeper
-  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  console.log('Set gauge in QuotaKeeper');
-
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
-  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
-    const vaultMetadata = await getVaultMetadata(vault.address);
-    if (!vaultMetadata) {
-      console.log(`No metadata found for vault: ${vault.address}`);
-      continue;
-    }
-
-    const tokenAddress = await vault.token();
-
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
-
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+    pools.push(PoolV3);
   }
 
-  // Unfreeze the epoch in Gauge
-  await gaugeV3.setFrozenEpoch(false);
-  console.log('Set frozen epoch to false in GaugeV3');
-
-  //await quotaKeeper.updateRates();
-  
-  console.log('Gauge and related configurations have been set.');
+  return pools;
 }
 
 async function deployGearbox() {
@@ -543,8 +516,6 @@ async function deployVaults() {
 
   const signer = await getSignerAddress();
   const {
-    MockOracle: oracle,
-    PoolV3: pool,
     PRBProxyRegistry: prbProxyRegistry,
     ...contracts
   } = await loadDeployedContracts();
@@ -554,7 +525,7 @@ async function deployVaults() {
     console.log('deploying vault ', vaultName);
 
     // Deploy oracle for the vault if defined in the config
-    let oracleAddress = oracle.address;
+    let oracleAddress = "";
     if (config.oracle) {
       console.log('Deploying oracle for', key);
       const oracleConfig = config.oracle.deploymentArguments;
@@ -566,6 +537,9 @@ async function deployVaults() {
       );
       oracleAddress = deployedOracle.address;
       console.log(`Oracle deployed for ${key} at ${oracleAddress}`);
+    } else {
+      console.log('No oracle defined for', key);
+      return;
     }
 
     var token;
@@ -574,7 +548,6 @@ async function deployVaults() {
     let tokenSymbol = config.tokenSymbol;
 
     // initialize the token
-    console.log('Token address:', tokenAddress);
     if (tokenAddress == undefined || tokenAddress == null) {
       console.log('Deploying token for', key);
       token = await deployContract(
@@ -588,15 +561,20 @@ async function deployVaults() {
       tokenScale = new ethers.BigNumber.from(10).pow(await token.decimals());
       tokenSymbol = "MCT";
     }
-    
-    console.log('Token address:', tokenAddress);
+
+    const poolAddress = config.poolAddress;
+    if (poolAddress == undefined || poolAddress == null) {
+      console.log('No pool address defined for', key);
+      return;
+    }
+    console.log('poolAddress', poolAddress);
     
     const cdpVault = await deployContract(
-      'CDPVault',
+      config.type,
       vaultName,
       true,
       [
-        pool.address,
+        poolAddress,
         oracleAddress,
         tokenAddress,
         tokenScale
@@ -604,7 +582,10 @@ async function deployVaults() {
       [...Object.values(config.deploymentArguments.configs).map((v) => v === "deployer" ? signer : v)]
     );
 
+    console.log('CDPVault deployed for', vaultName, 'at', cdpVault.address);
+
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
+    const pool = await attachContract('PoolV3', poolAddress);
     await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
     // await cdm["setParameter(address,bytes32,uint256)"](cdpVault.address, toBytes32("debtCeiling"), config.deploymentArguments.debtCeiling);
     
@@ -639,16 +620,10 @@ async function deployVaults() {
         name: config.name,
         description: config.description,
         artifactName: 'CDPVault',
-        collateralType: config.collateralType,
-        lrt: config.lrt,
-        lrtName: config.lrtName,
         pool: pool.address,
         oracle: oracleAddress,
         token: tokenAddress,
         tokenScale: tokenScale,
-        tokenSymbol: tokenSymbol,
-        tokenName: config.tokenName,
-        tokenIcon: config.tokenIcon,
         quotas: config.quotas
       }
     );
@@ -945,12 +920,227 @@ async function createPositions() {
   }
 }
 
+async function isContractDeployed(name) {
+  const deploymentFilePath = await getDeploymentFilePath();
+  if (!fs.existsSync(deploymentFilePath)) return false;
+  
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+  
+  // Check in both core and vaults
+  return (deployment.core && deployment.core[name]) || 
+         (deployment.vaults && deployment.vaults[name]);
+}
+
+async function getDeployedContract(name) {
+  const deploymentFilePath = await getDeploymentFilePath();
+  if (!fs.existsSync(deploymentFilePath)) return null;
+  
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+  
+  const contractData = (deployment.core && deployment.core[name]) || 
+                      (deployment.vaults && deployment.vaults[name]);
+
+  if (!contractData) return null;
+  
+  return {
+    contract: await ethers.getContractFactory(contractData.artifactName).then(f => f.attach(contractData.address)),
+    address: contractData.address
+  };
+}
+
+async function deployCore() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                         DEPLOYING CORE
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  const signer = await getSignerAddress();
+
+  if (hre.network.name == 'tenderly') {
+    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
+  }
+
+  const { AddressProviderV3: addressProviderV3 } = await deployGearboxCore();
+  const pools = await deployPools(addressProviderV3);
+  
+  // Use the first pool as the main pool for remaining setup
+  const pool = pools[0];
+
+  console.log('PoolV3 deployed to:', pool.address);
+  console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
+
+  const { stakingLpEth, lockLpEth } = await deployStakingAndLockingLP(pool);
+
+  const treasuryReplaceParams = {
+    'deployer': signer,
+    'stakingLpEth': stakingLpEth.address
+  };
+
+  const { payees, shares, admin } = replaceParams(CONFIG.Core.Treasury.constructorArguments, treasuryReplaceParams);
+  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
+  console.log('Treasury deployed to:', treasury.address);
+  
+  await addressProviderV3.setAddress(toBytes32('TREASURY'), treasury.address, false);
+  await pool.setTreasury(treasury.address);
+
+  // Deploy Vault Registry
+  const vaultRegistry = await deployContract('VaultRegistry');
+  console.log('Vault Registry deployed to:', vaultRegistry.address);
+
+  // Deploy actions with the vault registry
+  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry);
+  
+  console.log('------------------------------------');
+}
+
+async function deployStakingAndLockingLP(pool) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                  DEPLOYING STAKING & LOCKING LP
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  const stakingLpEth = await deployContract(
+    'StakingLPEth', 
+    'StakingLPEth', 
+    false, 
+    pool.address, 
+    "StakingLPEth", 
+    "slpETH"
+  );
+  console.log('StakingLPEth deployed to:', stakingLpEth.address);
+
+  const lockLpEth = await deployContract(
+    'StakingLPEth', 
+    'LockingLPEth', 
+    false, 
+    pool.address, 
+    "LockLPEth", 
+    "llpETH"
+  );
+  console.log('LockLPEth deployed to:', lockLpEth.address);
+
+  await verifyOnTenderly('StakingLPEth', stakingLpEth.address);
+  await storeContractDeployment(false, 'StakingLPEth', stakingLpEth.address, 'StakingLPEth');
+
+  await verifyOnTenderly('LockingLPEth', lockLpEth.address);
+  await storeContractDeployment(false, 'LockingLPEth', lockLpEth.address, 'StakingLPEth');
+
+  return { stakingLpEth, lockLpEth };
+}
+
+async function deployActions(pool, vaultRegistry) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                      DEPLOYING ACTIONS
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Deploy Flashlender
+  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
+  
+  const UINT256_MAX = ethers.constants.MaxUint256;
+  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
+  console.log('Set credit manager debt limit for flashlender to max');
+  
+  // Deploy PRBProxyRegistry
+  const proxyRegistry = await deployContract('PRBProxyRegistry');
+  console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
+  
+  // Deploy Actions
+  const swapAction = await deployContract(
+   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
+  );
+  const poolAction = await deployContract(
+   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG.Core.Actions.PoolAction.constructorArguments)
+  );
+
+  // Deploy ERC165Plugin and Position Actions
+  await deployContract('ERC165Plugin');
+  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  
+  console.log('------------------------------------');
+
+  return { flashlender, proxyRegistry, swapAction, poolAction };
+}
+
+async function deployGauge(poolAddress) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        DEPLOYING GAUGE
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  if (poolAddress == undefined || poolAddress == null) {
+    console.log('No pool address defined for gauge');
+    return;
+  }
+
+  const liquidityPool = await attachContract('PoolV3', poolAddress);
+  const latestBlock = await ethers.provider.getBlock('latest');
+  const blockTimestamp = latestBlock.timestamp;
+  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
+  
+  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
+  console.log(`Voter deployed to: ${voter.address}`);
+
+  // Deploy GaugeV3 contract
+  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
+  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
+  
+  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
+  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
+  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
+
+  // Set Gauge in QuotaKeeper
+  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
+  console.log('Set gauge in QuotaKeeper');
+
+  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
+  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+    const vaultMetadata = await getVaultMetadata(vault.address);
+    if (!vaultMetadata) {
+      console.log(`No metadata found for vault: ${vault.address}`);
+      continue;
+    }
+
+    if (vaultMetadata.pool.toLowerCase() != poolAddress.toLowerCase()) {
+      console.log(`Vault ${vault.address} is not associated with pool ${poolAddress}`);
+      continue;
+    }
+
+    const tokenAddress = await vault.token();
+    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+    
+    const minRate = vaultMetadata.quotas.minRate;
+    const maxRate = vaultMetadata.quotas.maxRate;
+    
+    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+
+    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+  }
+
+  // Unfreeze the epoch in Gauge
+  await gaugeV3.setFrozenEpoch(false);
+  console.log('Set frozen epoch to false in GaugeV3');
+
+  //await quotaKeeper.updateRates();
+  
+  console.log('Gauge and related configurations have been set.');
+}
+
 ((async () => {
   await deployCore();
   // await deployAuraVaults();
   await deployVaults();
   await registerVaults();
-  await deployGauge();
+  // await deployGauge();
   // await deployRadiant();
   // await deployGearbox();
   // await logVaults();

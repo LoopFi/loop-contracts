@@ -109,9 +109,7 @@ contract ListaOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     function spot(address /* token */) external view virtual override returns (uint256 price) {
         bool isValidPtOracle = _validatePtOracle();
         if (!isValidPtOracle) revert ListaOracle__validatePtOracle_invalidValue();
-        uint256 lpRate = market.getLpToAssetRate(twapWindow);
-        price = listaStakeManager.convertSnBnbToBnb(lpRate);
-
+        price = market.getLpToAssetRate(twapWindow);
         if (price == 0) revert ListaOracle__spot_invalidValue();
     }
 

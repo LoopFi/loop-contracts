@@ -6,9 +6,9 @@ const { BigNumber } = require('ethers');
 const { BalancerSDK, Network, PoolType } = require('@balancer-labs/sdk');
 
 const network = process.env.CONFIG_NETWORK || process.argv.find(arg => arg.startsWith('--network='))?.split('=')[1] || 'mainnet';
-
 const CONFIG = (() => {
   try {
+    console.log(`Using config_${network}.js`);
     return require(`./config_${network}.js`);
   } catch (e) {
     console.log(`Config file for network ${network} not found, using default config.js`);
@@ -300,6 +300,19 @@ async function deployGearbox() {
 //////////////////////////////////////////////////////////////*/
   `);
 
+  const {
+    PoolV3: deployedPool,
+    AddressProviderV3: deployedAddressProvider,
+  } = await loadDeployedContracts();
+
+  console.log('deployedPool', deployedPool);
+  console.log('deployedAddressProvider', deployedAddressProvider);
+
+  // Return deployed contracts if they already exist
+  if (deployedPool != null && deployedAddressProvider != null) {
+    return { PoolV3: deployedPool, AddressProviderV3: deployedAddressProvider };
+  }
+
   // Deploy LinearInterestRateModelV3 contract
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
@@ -472,41 +485,6 @@ async function  deployBalancerPool() {
   await storeContractDeployment(false, 'lpETH-WETH-Balancer', poolAddress, 'src/reward/interfaces/balancer/IWeightedPoolFactory.sol:IWeightedPool');
 }
 
-async function deployAuraVaults() {
-  console.log(`
-/*//////////////////////////////////////////////////////////////
-                        DEPLOYING AURA VAULTS
-//////////////////////////////////////////////////////////////*/
-  `);
-
-  const {
-    MockOracle: oracle,
-  } = await loadDeployedContracts();
-
-  for (const [key, config] of Object.entries(CONFIG.Vendors.AuraVaults)) {
-    const vaultName = key;
-    const constructorArguments = [
-      config.rewardPool,
-      config.asset,
-      oracle.address,
-      config.auraPriceOracle,
-      config.maxClaimerIncentive,
-      config.maxLockerIncentive,
-      config.tokenName,
-      config.tokenSymbol
-    ];
-    await oracle.updateSpot(config.asset, config.feed.defaultPrice);
-    console.log('Updated default price for', config.asset, 'to', fromWad(config.feed.defaultPrice), 'USD');
-
-    const auraVault = await deployContract("AuraVault", vaultName, false, ...Object.values(constructorArguments));
-
-    console.log('------------------------------------');
-    console.log('Deployed ', vaultName, 'at', auraVault.address);
-    console.log('------------------------------------');
-    console.log('');
-  }
-}
-
 async function deployVaults() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
@@ -525,7 +503,7 @@ async function deployVaults() {
     console.log('deploying vault ', vaultName);
 
     // Deploy oracle for the vault if defined in the config
-    let oracleAddress = "";
+    let oracleAddress = null;
     if (config.oracle) {
       console.log('Deploying oracle for', key);
       const oracleConfig = config.oracle.deploymentArguments;
@@ -538,8 +516,12 @@ async function deployVaults() {
       oracleAddress = deployedOracle.address;
       console.log(`Oracle deployed for ${key} at ${oracleAddress}`);
     } else {
-      console.log('No oracle defined for', key);
-      return;
+      oracleAddress = config.oracleAddress;
+    }
+
+    if (oracleAddress == null) {
+      console.log('No oracle found for', key);
+      continue;
     }
 
     var token;
@@ -956,16 +938,18 @@ async function deployCore() {
   `);
 
   const signer = await getSignerAddress();
+  console.log('Signer:', signer);
 
   if (hre.network.name == 'tenderly') {
     await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
   }
 
   const { AddressProviderV3: addressProviderV3 } = await deployGearboxCore();
-  const pools = await deployPools(addressProviderV3);
+  // const pools = await deployPools(addressProviderV3);
   
   // Use the first pool as the main pool for remaining setup
-  const pool = pools[0];
+  const poolAddress = "0xED166436559Fd3d7f44cb00CACDA96EB999D789e";
+  const pool = await attachContract('PoolV3', poolAddress); 
 
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
@@ -981,8 +965,11 @@ async function deployCore() {
   const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
   console.log('Treasury deployed to:', treasury.address);
   
+  console.log('Set treasury');
   await addressProviderV3.setAddress(toBytes32('TREASURY'), treasury.address, false);
-  await pool.setTreasury(treasury.address);
+  console.log('Set treasury in pool', treasury.address);
+  // await pool.setTreasury(treasury.address);
+  // console.log('Set pool treasury');
 
   // Deploy Vault Registry
   const vaultRegistry = await deployContract('VaultRegistry');
@@ -1006,26 +993,24 @@ async function deployStakingAndLockingLP(pool) {
     'StakingLPEth', 
     false, 
     pool.address, 
-    "StakingLPEth", 
-    "slpETH"
+    "StakingLpBNB", 
+    "slpBNB"
   );
   console.log('StakingLPEth deployed to:', stakingLpEth.address);
 
   const lockLpEth = await deployContract(
-    'StakingLPEth', 
-    'LockingLPEth', 
+    'Locking', 
+    'Locking', 
     false, 
-    pool.address, 
-    "LockLPEth", 
-    "llpETH"
+    pool.address
   );
   console.log('LockLPEth deployed to:', lockLpEth.address);
 
-  await verifyOnTenderly('StakingLPEth', stakingLpEth.address);
-  await storeContractDeployment(false, 'StakingLPEth', stakingLpEth.address, 'StakingLPEth');
+  // await verifyOnTenderly('StakingLPEth', stakingLpEth.address);
+  // await storeContractDeployment(false, 'StakingLPEth', stakingLpEth.address, 'StakingLPEth');
 
-  await verifyOnTenderly('LockingLPEth', lockLpEth.address);
-  await storeContractDeployment(false, 'LockingLPEth', lockLpEth.address, 'StakingLPEth');
+  // await verifyOnTenderly('LockingLPEth', lockLpEth.address);
+  // await storeContractDeployment(false, 'LockingLPEth', lockLpEth.address, 'StakingLPEth');
 
   return { stakingLpEth, lockLpEth };
 }

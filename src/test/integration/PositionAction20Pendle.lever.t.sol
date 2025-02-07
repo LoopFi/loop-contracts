@@ -20,7 +20,7 @@ import {PositionAction, CollateralParams, CreditParams, LeverParams} from "../..
 import {PositionActionPendle} from "../../proxy/PositionActionPendle.sol";
 import {PoolAction, Protocol, PoolActionParams} from "../../proxy/PoolAction.sol";
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/interfaces/IPAllActionTypeV3.sol";
 import {SwapData, SwapType as SwapTypePendle} from "pendle/router/swap-aggregator/IPSwapAggregator.sol";
 import {console} from "forge-std/console.sol";
 

@@ -4,6 +4,7 @@ const toWad = ethers.utils.parseEther;
 
 module.exports = {
   "Core": {
+    "WETH": "0x5300000000000000000000000000000000000004",
     "Flashlender": {
       "constructorArguments": {
         "protocolFee_": toWad('0')

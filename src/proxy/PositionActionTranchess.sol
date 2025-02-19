@@ -34,7 +34,7 @@ contract PositionActionTranchess is PositionAction {
     /// @notice Deposit collateral into the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
@@ -70,7 +70,7 @@ contract PositionActionTranchess is PositionAction {
     /// @param /*upFrontToken*/ the address of the token passed up front
     /// @param /*upFrontAmount*/ the amount of tokens passed up front [CDPVault.tokenScale()]
     /// @param /*swapAmountOut*/ the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
-    /// @return addCollateralAmount Amount of collateral added to CDPVault position [wad]
+    /// @return addCollateralAmount Amount of collateral added to CDPVault position [CDPVault.tokenScale()]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address /*upFrontToken*/,

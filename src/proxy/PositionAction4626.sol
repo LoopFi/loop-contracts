@@ -39,7 +39,7 @@ contract PositionAction4626 is PositionAction {
     /// @param vault Address of the vault
     /// @param src Token passed in by the caller
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(address vault, address position, address src, uint256 amount) internal override returns (uint256) {
         address collateral = address(ICDPVault(vault).token());
 
@@ -47,12 +47,13 @@ contract PositionAction4626 is PositionAction {
         if (src != collateral) {
             address underlying = IERC4626(collateral).asset();
             IERC20(underlying).forceApprove(collateral, amount);
-            uint256 depositAmount = IERC4626(collateral).deposit(amount, address(this));
-            amount = wmul(depositAmount, ICDPVault(vault).tokenScale());
+            amount = IERC4626(collateral).deposit(amount, address(this));
         }
 
         IERC20(collateral).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(position, amount);
+        uint256 depositAmount = ICDPVault(vault).deposit(position, amount);
+        uint256 scaledAmount = wmul(depositAmount, ICDPVault(vault).tokenScale());
+        return scaledAmount;
     }
 
     /// @notice Withdraw collateral from the vault
@@ -74,11 +75,11 @@ contract PositionAction4626 is PositionAction {
 
         // if collateral is not the dst token, we need to withdraw the underlying from the ERC4626 vault
         address collateral = address(ICDPVault(vault).token());
-        if (dst != collateral) {
-            collateralWithdrawn = IERC4626(collateral).redeem(scaledAmount, address(this), address(this));
+        if (dst == collateral) {
+            return scaledAmount;
+        } else {
+            return IERC4626(collateral).redeem(scaledAmount, address(this), address(this));
         }
-
-        return scaledAmount;
     }
 
     /// @notice Hook to decrease lever by depositing collateral into the Yearn Vault and the Yearn Vault
@@ -142,7 +143,7 @@ contract PositionAction4626 is PositionAction {
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault and the ERC4626 Vault
     /// @param leverParams LeverParams struct
     /// @param subCollateral Amount of collateral to withdraw in CDPVault decimals [wad]
-    /// @return tokenOut Amount of underlying token withdrawn from the ERC4626 vault [CDPVault.tokenScale()]
+    /// @return tokenOut Amount of underlying token withdrawn from the ERC4626 vault [10 ** IERC4626(collateralToken).asset().decimals()]
     function _onDecreaseLever(
         LeverParams memory leverParams,
         uint256 subCollateral

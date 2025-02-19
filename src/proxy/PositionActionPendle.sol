@@ -36,7 +36,7 @@ contract PositionActionPendle is PositionAction {
     /// @notice Deposit collateral into the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
@@ -62,8 +62,8 @@ contract PositionActionPendle is PositionAction {
         uint256 amount,
         uint256 minAmountOut
     ) internal override returns (uint256) {
-        uint256 collateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
-        uint256 scaledAmount = wmul(collateralWithdrawn, ICDPVault(vault).tokenScale());
+        uint256 scaledCollateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
+        uint256 collateralWithdrawn = wmul(scaledCollateralWithdrawn, ICDPVault(vault).tokenScale());
         address collateralToken = address(ICDPVault(vault).token());
 
         if (dst != collateralToken && dst != address(0)) {
@@ -73,7 +73,7 @@ contract PositionActionPendle is PositionAction {
                 recipient: address(this),     
                 args: abi.encode(
                     collateralToken,          
-                    scaledAmount,       
+                    collateralWithdrawn,       
                     dst                        
                 )
             });
@@ -85,6 +85,7 @@ contract PositionActionPendle is PositionAction {
 
             collateralWithdrawn = abi.decode(exitData, (uint256));
         }
+        
         return collateralWithdrawn;
     }
 
@@ -93,7 +94,7 @@ contract PositionActionPendle is PositionAction {
     /// @param /*upFrontToken*/ the address of the token passed up front
     /// @param /*upFrontAmount*/ the amount of tokens passed up front [CDPVault.tokenScale()]
     /// @param /*swapAmountOut*/ the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
-    /// @return addCollateralAmount Amount of collateral added to CDPVault position [wad]
+    /// @return addCollateralAmount Amount of collateral added to CDPVault position [CDPVault.tokenScale()]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address /*upFrontToken*/,

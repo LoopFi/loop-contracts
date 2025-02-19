@@ -170,7 +170,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param position The CDP Vault position
     /// @param src Token passed in by the caller
     /// @param amount The amount of collateral to deposit [CDPVault.tokenScale()]
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
@@ -198,7 +198,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @param upFrontToken the token passed up front
     /// @param upFrontAmount the amount of `upFrontToken` (or amount received from the aux swap)[CDPVault.tokenScale()]
     /// @param swapAmountOut the amount of tokens received from the underlying token flash loan swap [CDPVault.tokenScale()]
-    /// @return Amount of collateral added to CDPVault [wad]
+    /// @return Amount of collateral added to CDPVault [CDPVault.tokenScale()]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address upFrontToken,
@@ -587,7 +587,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     /// @notice Deposits collateral into CDPVault (optionally transfer and swaps an arbitrary token to collateral)
     /// @param vault The CDP Vault
     /// @param collateralParams The collateral parameters
-    /// @return The amount of collateral deposited [wad]
+    /// @return The amount of collateral deposited [token.decimals()]
     function _deposit(
         address vault,
         address position,
@@ -624,14 +624,13 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         address position,
         CollateralParams calldata collateralParams
     ) internal returns (uint256) {
-        uint256 collateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount, collateralParams.minAmountOut);
-        uint256 scaledCollateral = wmul(collateral, ICDPVault(vault).tokenScale());
+        uint256 withdrawnCollateral = _onWithdraw(vault, position, collateralParams.targetToken, collateralParams.amount, collateralParams.minAmountOut);
 
         // perform swap from collateral to arbitrary token
         if (collateralParams.auxSwap.assetIn != address(0)) {
             SwapParams memory auxSwap = collateralParams.auxSwap;
             if (auxSwap.swapType == SwapType.EXACT_IN) {
-               auxSwap.amount = scaledCollateral;
+               auxSwap.amount = withdrawnCollateral;
             }
             
             _delegateCall(
@@ -640,9 +639,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             );
         } else {
             // otherwise just send the collateral to `collateralizer`
-            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, scaledCollateral);
+            IERC20(collateralParams.targetToken).safeTransfer(collateralParams.collateralizer, withdrawnCollateral);
         }
-        return scaledCollateral;
+        return withdrawnCollateral;
     }
 
     /// @notice Borrows underlying token and optionally swaps underlying token to an arbitrary token

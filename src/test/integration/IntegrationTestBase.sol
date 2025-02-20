@@ -35,9 +35,11 @@ contract IntegrationTestBase is TestBase {
     ERC20 internal constant OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
     ERC20 internal constant WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
     ERC20 internal constant PENDLE_LP_STETH = ERC20(0xC374f7eC85F8C7DE3207a10bB1978bA104bdA3B2); // st-ETH 25DEC25
+    ERC20 internal constant PENDLE_LP_STETH2 = ERC20(0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2); // st-ETH 26DEC25
     ERC4626 internal constant YN_ETH = ERC4626(0x09db87A538BD693E9d08544577d5cCfAA6373A48);
 
     address internal constant pendleLP_STETH_Holder = 0x3300eebeEA8239b90a435e403B130a853A0d7DfF;
+    address internal constant pendleLP_STETH2_Holder = 0x9C20135Df70f17c5C0b3024B48D17ed63E791B40;
     address internal constant USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address internal constant USDT_CHAINLINK_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
     address internal constant DAI_CHAINLINK_FEED = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;

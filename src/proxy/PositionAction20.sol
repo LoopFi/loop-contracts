@@ -3,10 +3,9 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-
 import {PositionAction, LeverParams} from "./PositionAction.sol";
+import {wmul} from "../utils/Math.sol";
 
 /// @title PositionAction20
 /// @notice ERC20 implementation of PositionAction base contract
@@ -36,7 +35,7 @@ contract PositionAction20 is PositionAction {
     /// @notice Deposit collateral into the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
@@ -45,7 +44,9 @@ contract PositionAction20 is PositionAction {
     ) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
         IERC20(collateralToken).forceApprove(vault, amount);
-        return ICDPVault(vault).deposit(position, amount);
+        uint256 scaledDepositAmount = ICDPVault(vault).deposit(position, amount);
+        uint256 amountDeposited = wmul(scaledDepositAmount, ICDPVault(vault).tokenScale());
+        return amountDeposited;
     }
 
     /// @notice Withdraw collateral from the vault
@@ -60,14 +61,16 @@ contract PositionAction20 is PositionAction {
         uint256 amount,
         uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
-        return ICDPVault(vault).withdraw(position, amount);
+        uint256 scaledWithdrawAmount = ICDPVault(vault).withdraw(position, amount);
+        uint256 amountWithdrawn = wmul(scaledWithdrawAmount, ICDPVault(vault).tokenScale());
+        return amountWithdrawn;
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault
     /// @param leverParams LeverParams struct
     /// @param upFrontAmount the amount of tokens passed up front [CDPVault.tokenScale()]
     /// @param swapAmountOut the amount of tokens received from the stablecoin flash loan swap [CDPVault.tokenScale()]
-    /// @return Amount of collateral added to CDPVault position [wad]
+    /// @return Amount of collateral added to CDPVault position [CDPVault.tokenScale()]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address /*upFrontToken*/,

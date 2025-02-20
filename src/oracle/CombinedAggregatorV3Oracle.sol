@@ -17,8 +17,9 @@ contract CombinedAggregatorV3Oracle {
     AggregatorV3Interface public immutable aggregator2;
     uint256 public immutable aggregator2Heartbeat;
     uint256 public immutable aggregator2Scale;
-
-    constructor(address _aggregator, uint256 _aggregatorHeartbeat, address _aggregator2, uint256 _aggregator2Heartbeat) {        
+    bool public immutable isMul;
+    
+    constructor(address _aggregator, uint256 _aggregatorHeartbeat, address _aggregator2, uint256 _aggregator2Heartbeat, bool _isMul) {        
         aggregator = AggregatorV3Interface(_aggregator);
         aggregatorScale = 10 ** uint256(aggregator.decimals());
         aggregatorHeartbeat = _aggregatorHeartbeat;
@@ -26,6 +27,7 @@ contract CombinedAggregatorV3Oracle {
         aggregator2 = AggregatorV3Interface(_aggregator2);
         aggregator2Scale = 10 ** uint256(aggregator2.decimals());
         aggregator2Heartbeat = _aggregator2Heartbeat;
+        isMul = _isMul;
     }
 
     function getAggregatorData(AggregatorV3Interface _aggregator, uint256 _aggregatorScale, uint256 _aggregatorHeartbeat) public view returns (uint256, uint256) {
@@ -43,7 +45,8 @@ contract CombinedAggregatorV3Oracle {
     {
         (uint256 value, uint256 timestamp) = getAggregatorData(aggregator, aggregatorScale, aggregatorHeartbeat);
         (uint256 value2, ) = getAggregatorData(aggregator2, aggregator2Scale, aggregator2Heartbeat);
-        uint256 price = wmul(value, value2);
+        uint256 price;
+        if(isMul) price = wmul(value, value2); else price = wdiv(value, value2);
         return (0, int256(price), 0, timestamp, 0);
     }
 

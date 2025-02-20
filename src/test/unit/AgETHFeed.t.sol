@@ -12,9 +12,9 @@ contract AgETHFeedTest is Test {
     CombinedAggregatorV3Oracle feed;
     Api3Feed api3Feed;
     function setUp() public {
-        vm.createSelectFork("mainnet");
+        vm.createSelectFork("mainnet", 21838517);
         api3Feed = new Api3Feed(address(api3AgETHrsETHFeed), api3Heartbeat);
-        feed = new CombinedAggregatorV3Oracle(address(api3AgETHrsETHFeed), api3Heartbeat, address(rsETHCl), clHeartbeat);
+        feed = new CombinedAggregatorV3Oracle(address(api3AgETHrsETHFeed), api3Heartbeat, address(rsETHCl), clHeartbeat, true);
     }
 
     function test_deploy() public {

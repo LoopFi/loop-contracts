@@ -60,9 +60,9 @@ contract PositionActionTranchess is PositionAction {
         uint256 amount,
         uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
-        uint256 collateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
-        uint256 scaledAmount = wmul(collateralWithdrawn, ICDPVault(vault).tokenScale());
-        return scaledAmount;
+        uint256 scaledCollateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
+        uint256 collateralWithdrawn = wmul(scaledCollateralWithdrawn, ICDPVault(vault).tokenScale());
+        return collateralWithdrawn;
     }
 
     /// @notice Hook to increase lever by depositing collateral into the CDPVault

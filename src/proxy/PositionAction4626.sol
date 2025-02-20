@@ -70,15 +70,15 @@ contract PositionAction4626 is PositionAction {
         uint256 amount,
         uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
-        uint256 collateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
-        uint256 scaledAmount = wmul(collateralWithdrawn, ICDPVault(vault).tokenScale());
+        uint256 scaledCollateralWithdrawn = ICDPVault(vault).withdraw(position, amount);
+        uint256 collateralWithdrawn = wmul(scaledCollateralWithdrawn, ICDPVault(vault).tokenScale());
 
         // if collateral is not the dst token, we need to withdraw the underlying from the ERC4626 vault
         address collateral = address(ICDPVault(vault).token());
         if (dst == collateral) {
-            return scaledAmount;
+            return collateralWithdrawn;
         } else {
-            return IERC4626(collateral).redeem(scaledAmount, address(this), address(this));
+            return IERC4626(collateral).redeem(collateralWithdrawn, address(this), address(this));
         }
     }
 
@@ -149,8 +149,8 @@ contract PositionAction4626 is PositionAction {
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
         // withdraw collateral from vault
-        uint256 withdrawnCollateral = ICDPVault(leverParams.vault).withdraw(leverParams.position, subCollateral);
-        withdrawnCollateral = wmul(withdrawnCollateral, ICDPVault(leverParams.vault).tokenScale());
+        uint256 scaledWithdrawnCollateral = ICDPVault(leverParams.vault).withdraw(leverParams.position, subCollateral);
+        uint256 withdrawnCollateral = wmul(scaledWithdrawnCollateral, ICDPVault(leverParams.vault).tokenScale());
 
         // withdraw collateral from the ERC4626 vault and return underlying assets
         tokenOut = IERC4626(leverParams.collateralToken).redeem(withdrawnCollateral, address(this), address(this));

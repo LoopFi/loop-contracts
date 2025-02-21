@@ -64,8 +64,8 @@ module.exports = {
     //     "R_slope2": 2500, // R_slope2
     //     "R_slope3": 60000, // R_slope3
     //   }, 
-      "Pool LpUSD": {
-      "name": "PoolV3_Pool LpUSD",
+      "LpUSD": {
+      "name": "LpUSD",
       "symbol": "lpUSD",
       "wrappedToken": "0x0000000000000000000000000000000000000000",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
@@ -93,7 +93,7 @@ module.exports = {
         deploymentArguments: {},
       },
       token: "0xcdd26eb5eb2ce0f203a84553853667ae69ca29ce",
-      poolAddress: "PoolV3_Pool LpUSD",
+      poolAddress: "LpUSD",
       tokenSymbol: "LOOP-sUSDe",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
@@ -137,7 +137,7 @@ module.exports = {
         },
       },
       token: "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
-      poolAddress: "PoolV3_Pool LpUSD",
+      poolAddress: "LpUSD",
       tokenSymbol: "LOOP-wstUSR",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
@@ -178,7 +178,7 @@ module.exports = {
       },
       token: "0x580e40c15261f7baf18ea50f562118ae99361096",
       tokenSymbol: "LOOP-syrupUSDC",
-      poolAddress: "PoolV3_Pool LpUSD",
+      poolAddress: "LpUSD",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
       deploymentArguments: {

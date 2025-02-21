@@ -60,18 +60,23 @@ async function getDeploymentFilePath() {
   return path.join(__dirname, '.', `deployment-${hre.network.name}.json`);
 }
 
-async function storeContractDeployment(isVault, name, address, artifactName, constructorArguments) {
+async function storeContractDeployment(isVault, artifactName, address, name, constructorArgs = []) {
   const deploymentFilePath = await getDeploymentFilePath();
-  const deploymentFile = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
-  if (constructorArguments) constructorArguments = convertBigNumberToString(constructorArguments);
+  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : { core: {}, vaults: {} };
+  
+  const contractData = {
+    address,
+    artifactName: name,
+    constructorArguments: constructorArgs
+  };
+
   if (isVault) {
-    if (deploymentFile.vaults == undefined) deploymentFile.vaults = {};
-    deploymentFile.vaults[name] = { address, artifactName, constructorArguments: constructorArguments || []};
+    deployment.vaults[artifactName] = contractData;
   } else {
-    if (deploymentFile.core == undefined) deploymentFile.core = {};
-    deploymentFile.core[name] = { address, artifactName, constructorArguments: constructorArguments || []};
+    deployment.core[artifactName] = contractData;
   }
-  fs.writeFileSync(deploymentFilePath, JSON.stringify(deploymentFile, null, 2));
+
+  fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
 }
 
 async function verifyAllDeployedContracts() {
@@ -151,7 +156,16 @@ async function deployContract(name, artifactName, isVault, ...args) {
   await contract.deployed();
   console.log(`${artifactName || name} deployed to: ${contract.address}`);
   await verifyOnTenderly(name, contract.address);
-  await storeContractDeployment(isVault, artifactName || name, contract.address, name, args);
+  
+  // Store contract deployment with constructor arguments
+  await storeContractDeployment(
+    isVault, 
+    artifactName || name, 
+    contract.address, 
+    name, 
+    args.map(arg => arg.toString()) // Convert arguments to strings to ensure they're JSON-serializable
+  );
+  
   return contract;
 }
 
@@ -1102,13 +1116,18 @@ async function deployActions(pool, vaultRegistry) {
   return { flashlender, proxyRegistry, swapAction, poolAction };
 }
 
-async function deployGauge(poolAddress) {
+async function deployGauge() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING GAUGE
 //////////////////////////////////////////////////////////////*/
   `);
 
+  const {
+    AddressProviderV3: addressProviderV3,
+  } = await loadDeployedContracts();
+
+  const poolAddress = await getPoolAddress("LpUSD");
   if (poolAddress == undefined || poolAddress == null) {
     console.log('No pool address defined for gauge');
     return;
@@ -1170,8 +1189,10 @@ async function deployGauge(poolAddress) {
 }
 
 async function getPoolAddress(poolName) {
+  poolName = "PoolV3_" + poolName;
   const deploymentFilePath = await getDeploymentFilePath();
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+
   
   // Look for pool directly in core section
   if (deployment.core && deployment.core[poolName]) {
@@ -1240,7 +1261,7 @@ async function deployWstUSROracle(key, config) {
   // await deployAuraVaults();
   await deployVaults();
   await registerVaults();
-  // await deployGauge();
+  await deployGauge();
   // await deployRadiant();
   // await deployGearbox();
   // await logVaults();

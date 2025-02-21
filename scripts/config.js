@@ -49,13 +49,27 @@ module.exports = {
     },
   },
   "Pools": {
-    "Pool LpETH": {
-      "name": "Loop Liquidity Pool - WETH",
-      "symbol": "lpETH",
-      "poolAddress": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
-      "wrappedToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    // "Pool LpETH": {
+    //   "name": "Loop Liquidity Pool - WETH",
+    //   "symbol": "lpETH",
+    //   "poolAddress": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+    //   "wrappedToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    //   "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+    //   "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", //WETH
+    //   "interestRateModel": {
+    //     "U_1": 7000, // U_1
+    //     "U_2": 9000, // U_2
+    //     "R_base": 0, // R_base
+    //     "R_slope1": 2000, // R_slope1
+    //     "R_slope2": 2500, // R_slope2
+    //     "R_slope3": 60000, // R_slope3
+    //   }, 
+      "Pool LpUSD": {
+      "name": "PoolV3_Pool LpUSD",
+      "symbol": "lpUSD",
+      "wrappedToken": "0x0000000000000000000000000000000000000000",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-      "underlier": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", //WETH
+      "underlier": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", //USDC
       "interestRateModel": {
         "U_1": 7000, // U_1
         "U_2": 9000, // U_2
@@ -63,42 +77,129 @@ module.exports = {
         "R_slope1": 2000, // R_slope1
         "R_slope2": 2500, // R_slope2
         "R_slope3": 60000, // R_slope3
-      }, 
+      },
     }
   },
   "Vendors": {
   },
   "Vaults": {
-    "SpectraVault": {
-      "name": "Spectra-PT/IBT",
-      "description": "This vault allows for borrowing and lending of assets",
-      "poolAddress": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
-      "type": "CDPVaultSpectra",
-      "oracle": {
-        "type": "SpectraYnETHOracle",
-        "deploymentArguments": {
-          "curvePool": "0x08DA2b1EA8f2098D44C8690dDAdCa3d816c7C0d5",
-          "ynETH": "0x09db87A538BD693E9d08544577d5cCfAA6373A48",
-          "spectraYnETH": "0x6e0dccf49D095F8ea8920A8aF03D236FA167B7E0",
-        }
+    "Vaults_sUSDe": {
+      name: "Vaults_sUSDe",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "MockOracle",
+        deploymentArguments: {},
       },
-      "token": "0x85F05383f7Cb67f35385F7bF3B74E68F4795CbB9",
-      "tokenScale": toWad('1.0'),
-      "deploymentArguments": {
-        "constants": {
-          "protocolFee": toWad('0.01'),
+      token: "0xcdd26eb5eb2ce0f203a84553853667ae69ca29ce",
+      poolAddress: "PoolV3_Pool LpUSD",
+      tokenSymbol: "LOOP-sUSDe",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+    },
+    "Vaults_wstUSR": {
+      name: "Vaults_wstUSR",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "WstUSR",
+        deploymentArguments: {
+          "pythPriceFeedsContract": "0x4305FB66699C3B2702D4d05CF36551390A4c69C6",
+          "feedIdUSRUSD": "0x10b013adec14c0fe839ca0fe54cec9e4d0b6c1585ac6d7e70010dac015e57f9c",
+          "wstUSRVault": "0x1202F5C7b4B9E47a1A484E8B270be34dbbC75055",
+          "chainlinkUSDCFeed": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+          "usdcHeartbeat": 86400, // 24 hours
+          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+          "market": "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+          "twap": 180,
+          "stalePeriod": 3600,
         },
-        "configs": {
-            "debtFloor": toWad('1'),
-            "liquidationRatio": toWad('1.1'),
-            "liquidationPenalty": toWad('0.99'),
-            "liquidationDiscount": toWad('0.98'),
-            "roleAdmin": "deployer",
-            "vaultAdmin": "deployer",
-            "pauseAdmin": "deployer",
-        },
-        "debtCeiling": toWad('100000000')
-      }
+      },
+      token: "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+      poolAddress: "PoolV3_Pool LpUSD",
+      tokenSymbol: "LOOP-wstUSR",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+    },
+    "Vaults_syrupUSDC": {
+      name: "Vaults_syrupUSDC",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+          type: "syrupUSDC",
+          deploymentArguments: {
+            "vault": "0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b",
+            "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+            "market": "0x580e40c15261f7baf18ea50f562118ae99361096",
+            "twap": 180,
+            "stalePeriod": 3600,
+          },
+      },
+      token: "0x580e40c15261f7baf18ea50f562118ae99361096",
+      tokenSymbol: "LOOP-syrupUSDC",
+      poolAddress: "PoolV3_Pool LpUSD",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
     },
   },
  

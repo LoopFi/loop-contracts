@@ -144,13 +144,6 @@ async function attachContract(name, address) {
 }
 
 async function deployContract(name, artifactName, isVault, ...args) {
-  // Check if contract is already deployed
-  const existing = await getDeployedContract(artifactName || name);
-  if (existing) {
-    console.log(`${artifactName || name} already deployed at: ${existing.address}`);
-    return existing.contract;
-  }
-
   console.log(`Deploying ${artifactName || name}... {${args.map((v) => v.toString()).join(', ')}}}`);
   const Contract = await ethers.getContractFactory(name);
   console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
@@ -507,7 +500,62 @@ async function deployAuraVaults() {
   }
 }
 
-async function deployVaults() {
+async function deployVaultOracle(key, config) {
+  if (!config.oracle) {
+    console.log('No oracle defined for', key);
+    return null;
+  }
+
+  if(config.oracle.type == "WstUSR") {
+    return await deployWstUSROracle(key, config);
+  }
+
+  if(config.oracle.type == "syrupUSDC") {
+    return await deploySyrupUSDCOracle(key, config);
+  }
+
+  console.log('Deploying oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+  const deployedOracle = await deployContract(
+    config.oracle.type,
+    config.oracle.type,
+    false,
+    ...Object.values(oracleConfig)
+  );
+  console.log(`Oracle deployed for ${key} at ${deployedOracle.address}`);
+  return deployedOracle.address;
+}
+
+async function deploySyrupUSDCOracle(key, config) {
+  console.log('Deploying syrupUSDC oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  // Deploy Combined4626AggregatorV3Oracle
+  const aggregator4626 = await deployContract(
+    'AggregatorV3Oracle4626',
+    'AggregatorV3Oracle4626',
+    false,
+    oracleConfig.vault,
+  );
+  console.log(`AggregatorV3Oracle4626 deployed for ${key} at ${aggregator4626.address}`);
+
+  // Deploy PendleLPOracle
+  const pendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    aggregator4626.address,
+    oracleConfig.stalePeriod
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  return pendleLPOracle.address;
+}
+
+async function deployVaults(pool) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING VAULTS
@@ -524,23 +572,9 @@ async function deployVaults() {
     const vaultName = `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
-    // Deploy oracle for the vault if defined in the config
-    let oracleAddress = "";
-    if (config.oracle) {
-      console.log('Deploying oracle for', key);
-      const oracleConfig = config.oracle.deploymentArguments;
-      const deployedOracle = await deployContract(
-        config.oracle.type,
-        config.oracle.type,
-        false,
-        ...Object.values(oracleConfig)
-      );
-      oracleAddress = deployedOracle.address;
-      console.log(`Oracle deployed for ${key} at ${oracleAddress}`);
-    } else {
-      console.log('No oracle defined for', key);
-      return;
-    }
+    // Deploy oracle using the new function
+    const oracleAddress = await deployVaultOracle(key, config);
+    if (!oracleAddress) return;
 
     var token;
     var tokenAddress = config.token;
@@ -562,7 +596,7 @@ async function deployVaults() {
       tokenSymbol = "MCT";
     }
 
-    const poolAddress = config.poolAddress;
+    const poolAddress = await getPoolAddress(config.poolAddress);
     if (poolAddress == undefined || poolAddress == null) {
       console.log('No pool address defined for', key);
       return;
@@ -596,14 +630,12 @@ async function deployVaults() {
     // deploy reward manager
     
     const rewardManager = await deployContract(
-      "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
-      "RewardManagerSpectra",
+      "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "RewardManager",
       false, 
       cdpVault.address,
       tokenAddress,
-      prbProxyRegistry.address,
-      signer,
-      "0x335d354e8551086F780285FF886216af3f8aca9a"
+      prbProxyRegistry.address
     );
 
     console.log('Deployed RewardManager for', vaultName, 'at', rewardManager.address);
@@ -1135,6 +1167,72 @@ async function deployGauge(poolAddress) {
   //await quotaKeeper.updateRates();
   
   console.log('Gauge and related configurations have been set.');
+}
+
+async function getPoolAddress(poolName) {
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+  
+  // Look for pool directly in core section
+  if (deployment.core && deployment.core[poolName]) {
+    return deployment.core[poolName].address;
+  }
+  
+  throw new Error(`Pool ${poolName} not found in deployment file`);
+}
+
+async function deployWstUSROracle(key, config) {
+  console.log('Deploying WstUSR oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  // Deploy PythAggregatorV3
+  const pythAggregator = await deployContract(
+    'PythAggregatorV3',
+    'PythAggregatorV3',
+    false,
+    oracleConfig.pythPriceFeedsContract,
+    oracleConfig.feedIdUSRUSD
+  );
+  console.log(`PythAggregatorV3 deployed for ${key} at ${pythAggregator.address}`);
+
+  // Deploy Combined4626AggregatorV3Oracle
+  const combined4626Oracle = await deployContract(
+    'Combined4626AggregatorV3Oracle',
+    'Combined4626AggregatorV3Oracle',
+    false,
+    pythAggregator.address,
+    3600, // heartbeat
+    oracleConfig.wstUSRVault
+  );
+  console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626Oracle.address}`);
+
+  // Deploy CombinedAggregatorV3Oracle
+  const combinedOracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle',
+    false,
+    combined4626Oracle.address,
+    3600, // heartbeat
+    oracleConfig.chainlinkUSDCFeed,
+    oracleConfig.usdcHeartbeat,
+    false // invertPrice
+  );
+  console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${combinedOracle.address}`);
+
+  // Deploy PendleLPOracle
+  const pendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    pythAggregator.address,
+    oracleConfig.stalePeriod
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  return pendleLPOracle.address;
 }
 
 ((async () => {

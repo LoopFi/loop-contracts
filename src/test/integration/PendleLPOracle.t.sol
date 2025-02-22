@@ -20,10 +20,9 @@ contract PendleLPOracleTest is IntegrationTestBase {
     PendleLPOracle internal pendleOracle;
 
     uint256 internal staleTime = 10 days;
-    address market = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8; // Ether.fi PT/SY
+    address market = 0xcbA3B226cA62e666042Cb4a1e6E4681053885F75; // weETHs
     address weETHChainlink = 0x5c9C449BbC9a6075A2c061dF312a35fd1E05fF22; // weETH/ETH chainlink feed
-    address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee; // etherfi staked eth (underlying)
-    address ptOracle = 0x66a1096C6366b2529274dF4f5D8247827fe4CEA8; // pendle PT oracle
+    address ptOracle = 0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2; // pendle PT oracle
 
     function setUp() public override {
         usePatchedDeal = true;
@@ -42,7 +41,7 @@ contract PendleLPOracleTest is IntegrationTestBase {
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
-        return 19564014;
+        return 21739729;
     }
 
     function test_deployOracle() public {

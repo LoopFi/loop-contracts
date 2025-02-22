@@ -35,9 +35,11 @@ contract IntegrationTestBase is TestBase {
     ERC20 internal constant OHM = ERC20(0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5); // needed for eth to dai swap
     ERC20 internal constant WSTETH = ERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
     ERC20 internal constant PENDLE_LP_STETH = ERC20(0xC374f7eC85F8C7DE3207a10bB1978bA104bdA3B2); // st-ETH 25DEC25
+    ERC20 internal constant PENDLE_LP_STETH2 = ERC20(0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2); // st-ETH 26DEC25
     ERC4626 internal constant YN_ETH = ERC4626(0x09db87A538BD693E9d08544577d5cCfAA6373A48);
 
     address internal constant pendleLP_STETH_Holder = 0x3300eebeEA8239b90a435e403B130a853A0d7DfF;
+    address internal constant pendleLP_STETH2_Holder = 0x9C20135Df70f17c5C0b3024B48D17ed63E791B40;
     address internal constant USDC_CHAINLINK_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address internal constant USDT_CHAINLINK_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
     address internal constant DAI_CHAINLINK_FEED = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;
@@ -163,6 +165,123 @@ contract IntegrationTestBase is TestBase {
         deal(swapParams.assetIn, address(swapAction), amount);
 
         retAmount = swapAction.swap(swapParams);
+    }
+
+    function _createBalancerPool(address t1, address t2) internal returns (IComposableStablePool pool_) {
+        uint256 amount = 5_000_000_000 ether;
+        deal(t1, address(this), amount);
+        deal(t2, address(this), amount);
+
+        uint256[] memory maxAmountsIn = new uint256[](2);
+        address[] memory assets = new address[](2);
+        assets[0] = t1;
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 500000000000000000;
+        weights[1] = 500000000000000000;
+
+        bool tokenPlaced;
+        address tempAsset;
+        for (uint256 i; i < assets.length; i++) {
+            if (!tokenPlaced) {
+                if (uint160(assets[i]) > uint160(t2)) {
+                    tokenPlaced = true;
+                    tempAsset = assets[i];
+                    assets[i] = t2;
+                } else if (i == assets.length - 1) {
+                    assets[i] = t2;
+                }
+            } else {
+                address placeholder = assets[i];
+                assets[i] = tempAsset;
+                tempAsset = placeholder;
+            }
+        }
+
+        for (uint256 i; i < assets.length; i++) {
+            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
+            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+        }
+
+        pool_ = weightedPoolFactory.create(
+            "50WETH-50TOKEN",
+            "50WETH-50TOKEN",
+            assets,
+            weights,
+            3e14, // swapFee (0.03%)
+            address(this) // owner
+        );
+
+        balancerVault.joinPool(
+            pool_.getPoolId(),
+            address(this),
+            address(this),
+            JoinPoolRequest({
+                assets: assets,
+                maxAmountsIn: maxAmountsIn,
+                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
+                fromInternalBalance: false
+            })
+        );
+    }
+
+    function _createBalancerStablePool(address t1, address t2) internal returns (IComposableStablePool stablePool_) {
+        // mint the liquidity
+        uint256 t1Scale = 10 ** ERC20(t1).decimals();
+        uint256 t2Scale = 10 ** ERC20(t2).decimals();
+        deal(address(t1), address(this), 5_000_000 * t1Scale);
+        deal(address(t2), address(this), 5_000_000 * t2Scale);
+
+        uint256[] memory maxAmountsIn = new uint256[](2);
+        address[] memory assets = new address[](2);
+        assets[0] = address(t1);
+        assets[1] = address(t2);
+
+        bool tokenPlaced;
+        address tempAsset;
+        for (uint256 i; i < assets.length; i++) {
+            if (!tokenPlaced) {
+                if (uint160(assets[i]) > uint160(t2)) {
+                    tokenPlaced = true;
+                    tempAsset = assets[i];
+                    assets[i] = t2;
+                } else if (i == assets.length - 1) {
+                    assets[i] = t2;
+                }
+            } else {
+                address placeholder = assets[i];
+                assets[i] = tempAsset;
+                tempAsset = placeholder;
+            }
+        }
+
+        // set maxAmountIn and approve balancer vault
+        for (uint256 i; i < assets.length; i++) {
+            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
+            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
+        }
+
+        // create the pool
+        stablePool_ = stablePoolFactory.create(
+            "Stable Token Pool",
+            "FUDT",
+            assets,
+            200,
+            3e14, // swapFee (0.03%)
+            address(this) // owner
+        );
+
+        // send liquidity to the stable pool
+        balancerVault.joinPool(
+            stablePool_.getPoolId(),
+            address(this),
+            address(this),
+            JoinPoolRequest({
+                assets: assets,
+                maxAmountsIn: maxAmountsIn,
+                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
+                fromInternalBalance: false
+            })
+        );
     }
 
     /// @dev create a Stablecoin, USDC, DAI stable pool on Balancer with deep liquidity

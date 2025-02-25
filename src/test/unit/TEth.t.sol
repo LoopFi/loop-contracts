@@ -2,7 +2,7 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 
-import {PendleLPOracleRate, AggregatorV3Interface} from "src/oracle/PendleLPOracleRate.sol";
+import {PendleLPOracleRate} from "src/oracle/PendleLPOracleRate.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
 import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";

@@ -4,15 +4,10 @@ pragma solidity ^0.8.19;
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "pendle/oracles/PendleLpOracleLib.sol";
-
-import {AggregatorV3Interface} from "../vendor/AggregatorV3Interface.sol";
-
-import {wdiv, wmul} from "../utils/Math.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
 import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
-import {console} from "forge-std/console.sol";
 
 /// The oracle is upgradable if the current implementation does not return a valid price
 contract PendleLPOracleRate is IOracle, AccessControlUpgradeable, UUPSUpgradeable {

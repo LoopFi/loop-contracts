@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "src/pendle-rewards/RewardManagerAbstract.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "../prb-proxy/interfaces/IPRBProxyRegistry.sol";
+import {ICDPVault} from "src/interfaces/ICDPVault.sol";
 
 interface IMasterPenpie {
     struct PoolInfo {
@@ -87,6 +88,8 @@ contract RewardManagerPenpie is RewardManagerAbstract {
             masterPenpie.multiclaimFor(stakingTokens, rewardTokens, vault);
             for (uint256 i = 0; i < tokens.length; ++i) {
                 address token = tokens[i];
+
+                if(token == address(ICDPVault(vault).token())) continue;
 
                 // the entire token balance of the contract must be the rewards of the contract
                 RewardState memory _state = rewardState[token];

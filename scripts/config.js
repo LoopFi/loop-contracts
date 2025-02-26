@@ -38,7 +38,7 @@ module.exports = {
       "constructorArguments": {
         "payees":[
           "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-          "stakingLpEth"
+          "stakingLpUsdc"
         ],
         "shares":[
           200,
@@ -83,6 +83,40 @@ module.exports = {
   "Vendors": {
   },
   "Vaults": {
+    "Vaults_deUSD": {
+      name: "Vaults_deUSD",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "MockOracle",
+        deploymentArguments: {},
+      },
+      token: "0x09d484b738dd85ce3953102453e91507982121d0",
+      poolAddress: "LpUSD",
+      tokenSymbol: "LOOP-deUSD",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+    },
     "Vaults_sUSDe": {
       name: "Vaults_sUSDe",
       description: "This vault allows for borrowing and lending of assets",

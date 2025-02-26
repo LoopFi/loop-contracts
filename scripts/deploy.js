@@ -14,79 +14,29 @@ const {
   getDeployedContract,
   attachContract,
   loadDeployedContracts,
-  loadDeployedVaults
+  loadDeployedVaults,
+  verifyOnTenderly,
+  convertBigNumberToString,
+  replaceParams,
+  storeEnvMetadata,
+  storeVaultMetadata,
+  getVaultMetadata,
+  getPoolAddress
 } = require('./utils/deployUtils');
-const CONFIG = require('./config.js');
+const { 
+  getNetworkName, 
+  getConfigType, 
+  getDeploymentType, 
+  loadConfig 
+} = require('./utils/configUtils');
 
-const network = process.env.CONFIG_NETWORK || process.argv.find(arg => arg.startsWith('--network='))?.split('=')[1] || 'mainnet';
-
-const CONFIG_NETWORK = (() => {
-  try {
-    return require(`./config_${network}.js`);
-  } catch (e) {
-    console.log(`Config file for network ${network} not found, using default config.js`);
-    return require('./config.js');
-  }
-})();
+// Load the network-specific and/or token-specific config
+const CONFIG_NETWORK = loadConfig();
 
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
 const fromWad = ethers.utils.formatEther;
 const toBytes32 = ethers.utils.formatBytes32String;
-
-function convertBigNumberToString(value) {
-  if (ethers.BigNumber.isBigNumber(value)) return value.toString();
-  if (value instanceof Array) return value.map((v) => convertBigNumberToString(v));
-  if (value instanceof Object) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, convertBigNumberToString(v)]));
-  return value;
-}
-
-function replaceParams(obj, replacements) {
-  if (Array.isArray(obj)) {
-      return obj.map(v => replacements[v] !== undefined ? replacements[v] : v);
-  } else if (typeof obj === 'object' && obj !== null) {
-      return Object.fromEntries(
-          Object.entries(obj).map(([k, v]) => [k, replaceParams(v, replacements)])
-      );
-  } else {
-      return replacements[obj] !== undefined ? replacements[obj] : obj;
-  }
-}
-
-async function verifyOnTenderly(name, address) {
-  if (hre.network.name != 'tenderly') return;
-  console.log('Verifying on Tenderly...');
-  try {
-    await hre.tenderly.verify({ name, address });
-    console.log('Verified on Tenderly');
-  } catch (error) {
-    console.log('Failed to verify on Tenderly');
-  }
-}
-
-async function storeEnvMetadata(metadata) {
-  const metadataFilePath = path.join(__dirname, '.', `metadata-${hre.network.name}.json`);
-  const metadataFile = fs.existsSync(metadataFilePath) ? JSON.parse(fs.readFileSync(metadataFilePath)) : {};
-  if (metadataFile.environment == undefined) metadataFile.environment = {};
-  metadata = convertBigNumberToString(metadata);
-  metadataFile.environment = { ...metadata };
-  fs.writeFileSync(metadataFilePath, JSON.stringify(metadataFile, null, 2));
-}
-
-async function storeVaultMetadata(address, metadata) {
-  const metadataFilePath = path.join(__dirname, '.', `metadata-${hre.network.name}.json`);
-  const metadataFile = fs.existsSync(metadataFilePath) ? JSON.parse(fs.readFileSync(metadataFilePath)) : {};
-  if (metadataFile.vaults == undefined) metadataFile.vaults = {};
-  metadata = convertBigNumberToString(metadata);
-  metadataFile.vaults[address] = { ...metadata };
-  fs.writeFileSync(metadataFilePath, JSON.stringify(metadataFile, null, 2));
-}
-
-async function getVaultMetadata(address) {
-  const metadataFilePath = path.join(__dirname, '.', `metadata-${hre.network.name}.json`);
-  const metadataFile = fs.existsSync(metadataFilePath) ? JSON.parse(fs.readFileSync(metadataFilePath)) : {};
-  return metadataFile.vaults[address];
-}
 
 async function deployCore() {
   console.log(`
@@ -110,14 +60,16 @@ async function deployCore() {
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
 
-  const { stakingLpEth, lockLpEth } = await deployStakingAndLockingLP(pool);
+  const { stakingLpUsdc, lockLpUsdc } = await deployStakingAndLockingLP(pool);
+  console.log('StakingLPUsdc deployed to:', stakingLpUsdc.address);
+  console.log('LockingLpUsdc deployed to:', lockLpUsdc.address);
 
   const treasuryReplaceParams = {
     'deployer': signer,
-    'stakingLpEth': stakingLpEth.address
+    'stakingLpUsdc': stakingLpUsdc.address
   };
 
-  const { payees, shares, admin } = replaceParams(CONFIG.Core.Treasury.constructorArguments, treasuryReplaceParams);
+  const { payees, shares, admin } = replaceParams(CONFIG_NETWORK.Core.Treasury.constructorArguments, treasuryReplaceParams);
   const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
   console.log('Treasury deployed to:', treasury.address);
   
@@ -141,33 +93,30 @@ async function deployStakingAndLockingLP(pool) {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  const minShares = toWad("0.01").toString();
-  const stakingLpEth = await deployContract(
+  const minShares = "10000"; // 0.01 * 10^6
+  const stakingLpUsdc = await deployContract(
     'StakingLPEth', 
-    'StakingLPEth', 
+    'StakingLPUsdc', 
     false, 
     pool.address, 
-    "StakingLPEth", 
-    "slpETH",
+    "StakingLPUsdc", 
+    "slpUSDC",
     minShares
   );
-  console.log('StakingLPEth deployed to:', stakingLpEth.address);
+  console.log('StakingLPUsdc deployed to:', stakingLpUsdc.address);
 
-  const lockLpEth = await deployContract(
+  const lockLpUsdc = await deployContract(
     'Locking', 
-    'LockingLpEth', 
+    'LockingLpUsdc', 
     false, 
     pool.address
   );
-  console.log('LockLPEth deployed to:', lockLpEth.address);
+  console.log('lockLpUsdc deployed to:', lockLpUsdc.address);
 
-  await verifyOnTenderly('StakingLPEth', stakingLpEth.address);
-  await storeContractDeployment(false, 'StakingLPEth', stakingLpEth.address, 'StakingLPEth');
+  await verifyOnTenderly('stakingLpUsdc', stakingLpUsdc.address);
+  await verifyOnTenderly('LockingLPEth', lockLpUsdc.address);
 
-  await verifyOnTenderly('LockingLPEth', lockLpEth.address);
-  await storeContractDeployment(false, 'LockingLPEth', lockLpEth.address, 'StakingLPEth');
-
-  return { stakingLpEth, lockLpEth };
+  return { stakingLpUsdc, lockLpUsdc };
 }
 
 async function deployActions(pool, vaultRegistry) {
@@ -178,7 +127,7 @@ async function deployActions(pool, vaultRegistry) {
   `);
 
   // Deploy Flashlender
-  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG.Core.Flashlender.constructorArguments.protocolFee_);
+  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG_NETWORK.Core.Flashlender.constructorArguments.protocolFee_);
   
   const UINT256_MAX = ethers.constants.MaxUint256;
   await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
@@ -190,18 +139,18 @@ async function deployActions(pool, vaultRegistry) {
   
   // Deploy Actions
   const swapAction = await deployContract(
-   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG.Core.Actions.SwapAction.constructorArguments)
+   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.SwapAction.constructorArguments)
   );
   const poolAction = await deployContract(
-   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG.Core.Actions.PoolAction.constructorArguments)
+   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.PoolAction.constructorArguments)
   );
 
   // Deploy ERC165Plugin and Position Actions
   await deployContract('ERC165Plugin');
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
-  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG.Core.WETH);
+  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
+  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
+  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
+  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
   
   console.log('------------------------------------');
 
@@ -301,13 +250,10 @@ async function deployGearboxCore() {
   console.log('Gearbox Core Contracts Deployed');
   
   await verifyOnTenderly('ACL', ACL.address);
-  await storeContractDeployment(false, 'ACL', ACL.address, 'ACL');
   
   await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
-  await storeContractDeployment(false, 'AddressProviderV3', AddressProviderV3.address, 'AddressProviderV3');
   
   await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
-  await storeContractDeployment(false, 'ContractsRegister', ContractsRegister.address, 'ContractsRegister');
 
   return { ACL, AddressProviderV3, ContractsRegister };
 }
@@ -352,11 +298,9 @@ async function deployPools(addressProviderV3) {
 
     console.log(`Pool ${poolKey} Deployed at ${PoolV3.address}`);
     
+    // Only verify on Tenderly, don't call storeContractDeployment again
     await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
-    await storeContractDeployment(false, `LinearInterestRateModelV3_${poolKey}`, LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
-    
     await verifyOnTenderly('PoolV3', PoolV3.address);
-    await storeContractDeployment(false, `PoolV3_${poolKey}`, PoolV3.address, 'PoolV3');
 
     pools.push(PoolV3);
   }
@@ -414,19 +358,10 @@ async function deployGearbox() {
   console.log('Gearbox Contracts Deployed');
   
   await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
-  await storeContractDeployment(false, 'LinearInterestRateModelV3', LinearInterestRateModelV3.address, 'LinearInterestRateModelV3');
-  
   await verifyOnTenderly('ACL', ACL.address);
-  await storeContractDeployment(false, 'ACL', ACL.address, 'ACL');
-  
   await verifyOnTenderly('AddressProviderV3', AddressProviderV3.address);
-  await storeContractDeployment(false, 'AddressProviderV3', AddressProviderV3.address, 'AddressProviderV3');
-  
   await verifyOnTenderly('ContractsRegister', ContractsRegister.address);
-  await storeContractDeployment(false, 'ContractsRegister', ContractsRegister.address, 'ContractsRegister');
-  
   await verifyOnTenderly('PoolV3', PoolV3.address);
-  await storeContractDeployment(false, 'PoolV3', PoolV3.address, 'PoolV3');
 
   return { PoolV3, AddressProviderV3 };
 }
@@ -528,12 +463,24 @@ async function deployVaults(pool) {
     }
 
     const poolAddress = await getPoolAddress(config.poolAddress);
-    if (poolAddress == undefined || poolAddress == null) {
-      console.log('No pool address defined for', key);
+    if (!poolAddress) {
+      console.log(`ERROR: Could not find pool address for ${config.poolAddress}`);
       return;
     }
-    console.log('poolAddress', poolAddress);
-    
+
+    // Verify this is actually a Pool contract
+    try {
+      const pool = await attachContract('PoolV3', poolAddress);
+      // Call a method that only exists on PoolV3 to verify it's the right contract
+      const underlyingToken = await pool.underlyingToken();
+      console.log(`Verified pool at ${poolAddress} with underlying token: ${underlyingToken}`);
+    } catch (error) {
+      console.error(`ERROR: Address ${poolAddress} is not a valid PoolV3 contract:`, error.message);
+      return;
+    }
+
+    console.log(`Proceeding with vault deployment using pool: ${poolAddress}`);
+
     const cdpVault = await deployContract(
       config.type,
       vaultName,
@@ -544,7 +491,9 @@ async function deployVaults(pool) {
         tokenAddress,
         tokenScale
       ],
-      [...Object.values(config.deploymentArguments.configs).map((v) => v === "deployer" ? signer : v)]
+      [
+        ...Object.values(config.deploymentArguments.configs).map((v) => v === "deployer" ? signer : v)
+      ]
     );
 
     console.log('CDPVault deployed for', vaultName, 'at', cdpVault.address);
@@ -626,20 +575,6 @@ async function logVaults() {
   }
 }
 
-async function getPoolAddress(poolName) {
-  poolName = "PoolV3_" + poolName;
-  const deploymentFilePath = await getDeploymentFilePath();
-  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
-
-  
-  // Look for pool directly in core section
-  if (deployment.core && deployment.core[poolName]) {
-    return deployment.core[poolName].address;
-  }
-  
-  throw new Error(`Pool ${poolName} not found in deployment file`);
-}
-
 async function deployWstUSROracle(key, config) {
   console.log('Deploying WstUSR oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
@@ -695,10 +630,11 @@ async function deployWstUSROracle(key, config) {
 }
 
 ((async () => {
+
   await deployCore();
   await deployVaults();
   await registerVaults();
-  await deployGauge();
+  // await deployGauge();
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

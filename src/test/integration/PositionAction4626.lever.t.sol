@@ -48,7 +48,7 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
 
         token = ERC20PresetMinterPauser(wstETH);
 
-        stakingLPEth = new StakingLPEth(address(token), "Staking LP ETH", "sLPETH");
+        stakingLPEth = new StakingLPEth(address(token), "Staking LP ETH", "sLPETH", 0.01 ether);
         stakingLPEth.setCooldownDuration(0);
         vault = createCDPVault(stakingLPEth, 5_000_000 ether, 0, 1.25 ether, 1.0 ether, 1.05 ether);
         createGaugeAndSetGauge(address(vault), address(stakingLPEth));

@@ -26,7 +26,7 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     }
 
     /// @notice Minimum non-zero shares amount to prevent donation attack
-    uint256 private constant MIN_SHARES = 0.01 ether;
+    uint256 private immutable minShares;
 
     Silo public immutable silo;
 
@@ -55,10 +55,13 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     constructor(
         address _liquidityPool,
         string memory _name,
-        string memory _symbol
+        string memory _symbol,
+        uint256 _minShares
     ) ERC4626(IERC20(_liquidityPool)) ERC20(_name, _symbol) {
         silo = new Silo(address(this), _liquidityPool);
         cooldownDuration = MAX_COOLDOWN_DURATION;
+
+        minShares = _minShares;
     }
 
     /**
@@ -141,7 +144,7 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     /// @notice ensures a small non-zero amount of shares does not remain, exposing to donation attack
     function _checkMinShares() internal view {
         uint256 _totalSupply = totalSupply();
-        if (_totalSupply > 0 && _totalSupply < MIN_SHARES) revert MinSharesViolation();
+        if (_totalSupply > 0 && _totalSupply < minShares) revert MinSharesViolation();
     }
 
     /**

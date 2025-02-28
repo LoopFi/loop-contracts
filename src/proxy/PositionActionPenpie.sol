@@ -48,7 +48,7 @@ contract PositionActionPenpie is PositionAction {
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
     /// @param src Pendle LP token address
-    /// @return Amount of collateral deposited [wad]
+    /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
@@ -113,7 +113,6 @@ contract PositionActionPenpie is PositionAction {
         IERC20(underlying).forceApprove(address(penpieStaking), addCollateralAmount);
         penpieHelper.depositMarketFor(underlying, address(this), addCollateralAmount);
 
-        addCollateralAmount = ICDPVault(leverParams.vault).token().balanceOf(address(this));
         ICDPVault(leverParams.vault).token().forceApprove(leverParams.vault, addCollateralAmount);
 
         // deposit into the CDP Vault

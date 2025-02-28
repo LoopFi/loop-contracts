@@ -128,9 +128,8 @@ contract PositionActionPenpie is PositionAction {
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
         (address pendleToken, , ) = abi.decode(leverParams.auxAction.args, (address, uint256, address));
-        penpieHelper.withdrawMarket(pendleToken, subCollateral);
+        _onWithdraw(leverParams.vault, leverParams.position, pendleToken, subCollateral, 0);
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(
                 address(poolAction),

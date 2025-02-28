@@ -64,9 +64,9 @@ contract PositionActionPenpie is PositionAction {
         }
 
         IERC20(collateralToken).forceApprove(vault, amount);
-        uint256 depositAmount = ICDPVault(vault).deposit(position, amount);
-        uint256 scaledAmount = wmul(depositAmount, ICDPVault(vault).tokenScale());
-        return scaledAmount;
+        uint256 scaledAmount = ICDPVault(vault).deposit(position, amount);
+        uint256 depositAmount = wmul(scaledAmount, ICDPVault(vault).tokenScale());
+        return depositAmount;
     }
 
     /// @notice Withdraw collateral from the vault

@@ -10,6 +10,7 @@ module.exports = {
       },
       "initialDebtCeiling": toWad('100000000'),
     },
+    "PenpieHelper": "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4",
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     "Actions": {
       "SwapAction": {
@@ -65,7 +66,7 @@ module.exports = {
     //     "R_slope3": 60000, // R_slope3
     //   }, 
       "LpUSD": {
-      "name": "LpUSD",
+      "name": "Loop USD - lpUSD",
       "symbol": "lpUSD",
       "wrappedToken": "0x0000000000000000000000000000000000000000",
       "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",

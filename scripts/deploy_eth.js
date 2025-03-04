@@ -29,7 +29,7 @@ const {
 } = require('./utils/configUtils');
 
 // Hardcode the config type for this specific deployment script
-const CONFIG_TYPE = 'usdc';
+const CONFIG_TYPE = 'eth';
 
 // Load the network-specific and/or token-specific config
 const CONFIG_NETWORK = loadConfig(CONFIG_TYPE);
@@ -61,13 +61,13 @@ async function deployCore() {
   console.log('PoolV3 deployed to:', pool.address);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
 
-  const { stakingLpUsdc, lockLpUsdc } = await deployStakingAndLockingLP(pool);
-  console.log('StakingLPUsdc deployed to:', stakingLpUsdc.address);
-  console.log('LockingLpUsdc deployed to:', lockLpUsdc.address);
+  const { stakingLpEth, lockLpEth } = await deployStakingAndLockingLP(pool);
+  console.log('StakingLPEth deployed to:', stakingLpEth.address);
+  console.log('LockingLpEth deployed to:', lockLpEth.address);
 
   const treasuryReplaceParams = {
     'deployer': signer,
-    'stakingLpUsdc': stakingLpUsdc.address
+    'stakingLpEth': stakingLpEth.address
   };
 
   const { payees, shares, admin } = replaceParams(CONFIG_NETWORK.Core.Treasury.constructorArguments, treasuryReplaceParams);
@@ -82,7 +82,7 @@ async function deployCore() {
   console.log('Vault Registry deployed to:', vaultRegistry.address);
 
   // Deploy actions with the vault registry
-  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry);
+  const { flashlender, proxyRegistry } = await deployActionsAndFlashlender(pool, vaultRegistry);
   
   console.log('------------------------------------');
 }
@@ -95,32 +95,32 @@ async function deployStakingAndLockingLP(pool) {
   `);
 
   const minShares = "10000"; // 0.01 * 10^6
-  const stakingLpUsdc = await deployContract(
+  const stakingLpEth = await deployContract(
     'StakingLPEth', 
-    'StakingLPUsdc', 
+    'StakingLPEth', 
     false, 
     pool.address, 
-    "StakingLPUsdc", 
-    "slpUSDC",
+    "StakingLPETH", 
+    "slpETH",
     minShares
   );
-  console.log('StakingLPUsdc deployed to:', stakingLpUsdc.address);
+  console.log('StakingLPEth deployed to:', stakingLpEth.address);
 
-  const lockLpUsdc = await deployContract(
+  const lockLpEth = await deployContract(
     'Locking', 
-    'LockingLpUsdc', 
+    'LockingLpETH',
     false, 
     pool.address
   );
-  console.log('lockLpUsdc deployed to:', lockLpUsdc.address);
+  console.log('lockLpEth deployed to:', lockLpEth.address);
 
-  await verifyOnTenderly('stakingLpUsdc', stakingLpUsdc.address);
-  await verifyOnTenderly('LockingLPEth', lockLpUsdc.address);
+  await verifyOnTenderly('stakingLpEth', stakingLpEth.address);
+  await verifyOnTenderly('LockingLPEth', lockLpEth.address);
 
-  return { stakingLpUsdc, lockLpUsdc };
+  return { stakingLpEth, lockLpEth };
 }
 
-async function deployActions(pool, vaultRegistry) {
+async function deployActionsAndFlashlender(pool, vaultRegistry) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                       DEPLOYING ACTIONS
@@ -138,24 +138,40 @@ async function deployActions(pool, vaultRegistry) {
   const proxyRegistry = await deployContract('PRBProxyRegistry');
   console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
   
-  // Deploy Actions
-  const swapAction = await deployContract(
-   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.SwapAction.constructorArguments)
-  );
-  const poolAction = await deployContract(
-   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.PoolAction.constructorArguments)
-  );
-
-  // Deploy ERC165Plugin and Position Actions
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionPenpie', 'PositionActionPenpie', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH, CONFIG_NETWORK.Core.PenpieHelper);
-  
-  console.log('------------------------------------');
+  const { swapAction, poolAction } = await deployActions(flashlender.address, vaultRegistry.address);
 
   return { flashlender, proxyRegistry, swapAction, poolAction };
+}
+
+async function deployActions(flashlenderAddress, vaultRegistryAddress) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                      DEPLOYING ACTIONS
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  console.log('flashlenderAddress', flashlenderAddress);
+  console.log('vaultRegistryAddress', vaultRegistryAddress);
+
+    // Deploy Actions
+    const swapAction = await deployContract(
+        'SwapAction', 'SwapAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.SwapAction.constructorArguments)
+    );
+    const poolAction = await deployContract(
+        'PoolAction', 'PoolAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.PoolAction.constructorArguments)
+    );
+    
+    // Deploy ERC165Plugin and Position Actions
+    await deployContract('PositionAction20', 'PositionAction20', false, flashlenderAddress, swapAction.address, poolAction.address, vaultRegistryAddress, CONFIG_NETWORK.Core.WETH);
+    await deployContract('PositionAction4626', 'PositionAction4626', false, flashlenderAddress, swapAction.address, poolAction.address, vaultRegistryAddress, CONFIG_NETWORK.Core.WETH);
+    await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlenderAddress, swapAction.address, poolAction.address, vaultRegistryAddress, CONFIG_NETWORK.Core.WETH);
+    await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlenderAddress, swapAction.address, poolAction.address, vaultRegistryAddress, CONFIG_NETWORK.Core.WETH);
+    await deployContract('PositionActionPenpie', 'PositionActionPenpie', false, flashlenderAddress, swapAction.address, poolAction.address, vaultRegistryAddress, CONFIG_NETWORK.Core.WETH, CONFIG_NETWORK.Core.PenpieHelper);
+
+    
+    console.log('------------------------------------');
+
+    return { swapAction, poolAction };
 }
 
 async function deployGauge() {
@@ -373,20 +389,8 @@ async function deployVaultOracle(key, config) {
     return null;
   }
 
-  if(config.oracle.type == "WstUSR") {
-    return await deployWstUSROracle(key, config);
-  }
-
-  if(config.oracle.type == "syrupUSDC") {
-    return await deploySyrupUSDCOracle(key, config);
-  }
-
-  if (config.oracle.type == "deUSD") {
-    return await deploydeUSDOracle(key, config);
-  }
-
-  if (config.oracle.type == "PendleLPOracle_sUSDe") {
-    return await deploysUSDeOracle(key, config);
+  if (config.oracle.type == "tETH") {
+    return await deployVaultOracle_tETH(key, config);
   }
 
   console.log('Deploying oracle for', key);
@@ -400,150 +404,6 @@ async function deployVaultOracle(key, config) {
   console.log(`Oracle deployed for ${key} at ${deployedOracle.address}`);
   return deployedOracle.address;
 }
-
-async function deploySyrupUSDCOracle(key, config) {
-  console.log('Deploying syrupUSDC oracle for', key);
-  const oracleConfig = config.oracle.deploymentArguments;
-
-  // Deploy Combined4626AggregatorV3Oracle
-  const aggregator4626 = await deployContract(
-    'AggregatorV3Oracle4626',
-    'AggregatorV3Oracle4626',
-    false,
-    oracleConfig.vault,
-  );
-  console.log(`AggregatorV3Oracle4626 deployed for ${key} at ${aggregator4626.address}`);
-
-  // Deploy PendleLPOracle
-  const pendleLPOracle = await deployContract(
-    'PendleLPOracle',
-    'PendleLPOracle',
-    false,
-    oracleConfig.ptOracle,
-    oracleConfig.market,
-    oracleConfig.twap,
-    aggregator4626.address,
-    oracleConfig.stalePeriod
-  );
-  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
-
-  return pendleLPOracle.address;
-}
-
-async function deploydeUSDOracle(key, config) {
-  console.log('Deploying deUSD oracle for', key);
-  const oracleConfig = config.oracle.deploymentArguments;
-
-  const combined4626AggregatorV3Oracle = await deployContract(
-    'Combined4626AggregatorV3Oracle',
-    'Combined4626AggregatorV3Oracle',
-    false,
-    oracleConfig.deUSDFeed,
-    oracleConfig.heartbeat,
-    oracleConfig.sdeUSDVault,
-  );
-  console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626AggregatorV3Oracle.address}`);
-
-  const chainlinkCurveOracle = await deployContract(
-    'ChainlinkCurveOracle',
-    'ChainlinkCurveOracle',
-    false,
-    combined4626AggregatorV3Oracle.address,
-    oracleConfig.curvePool,
-    oracleConfig.stalePeriod
-  );
-  console.log(`ChainlinkCurveOracle deployed for ${key} at ${chainlinkCurveOracle.address}`);
-
-  return chainlinkCurveOracle.address;
-}
-
-async function deploysUSDeOracle(key, config) {
-  console.log('Deploying sUSDe oracle for', key);
-  const oracleConfig = config.oracle.deploymentArguments;
-  
-  const CombinedAggregatorV3Oracle = await deployContract(
-    'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle',
-    false,
-    oracleConfig.usde_aggregator,
-    oracleConfig.usde_heartbeat,
-    oracleConfig.usdc_aggregator,
-    oracleConfig.usdc_heartbeat,
-    false
-  );
-  console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
-
-  const maxHeartbeat = Math.max(oracleConfig.usde_heartbeat, oracleConfig.usdc_heartbeat);
-
-  const PendleLPOracle = await deployContract(
-    'PendleLPOracle',
-    'PendleLPOracle',
-    false,
-    oracleConfig.ptOracle,
-    oracleConfig.market,
-    oracleConfig.twap,
-    CombinedAggregatorV3Oracle.address,
-    maxHeartbeat
-  );
-  console.log(`PendleLPOracle deployed for ${key} at ${PendleLPOracle.address}`);
-
-  return CombinedAggregatorV3Oracle.address;
-}
-
-async function deployWstUSROracle(key, config) {
-  console.log('Deploying WstUSR oracle for', key);
-  const oracleConfig = config.oracle.deploymentArguments;
-
-  // Deploy PythAggregatorV3
-  const pythAggregator = await deployContract(
-    'PythAggregatorV3',
-    'PythAggregatorV3',
-    false,
-    oracleConfig.pythPriceFeedsContract,
-    oracleConfig.feedIdUSRUSD
-  );
-  console.log(`PythAggregatorV3 deployed for ${key} at ${pythAggregator.address}`);
-
-  // Deploy Combined4626AggregatorV3Oracle
-  const combined4626Oracle = await deployContract(
-    'Combined4626AggregatorV3Oracle',
-    'Combined4626AggregatorV3Oracle',
-    false,
-    pythAggregator.address,
-    3600, // heartbeat
-    oracleConfig.wstUSRVault
-  );
-  console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626Oracle.address}`);
-
-  // Deploy CombinedAggregatorV3Oracle
-  const combinedOracle = await deployContract(
-    'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle',
-    false,
-    combined4626Oracle.address,
-    3600, // heartbeat
-    oracleConfig.chainlinkUSDCFeed,
-    oracleConfig.usdcHeartbeat,
-    false // invertPrice
-  );
-  console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${combinedOracle.address}`);
-
-  // Deploy PendleLPOracle
-  const pendleLPOracle = await deployContract(
-    'PendleLPOracle',
-    'PendleLPOracle',
-    false,
-    oracleConfig.ptOracle,
-    oracleConfig.market,
-    oracleConfig.twap,
-    pythAggregator.address,
-    oracleConfig.stalePeriod
-  );
-  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
-
-  return pendleLPOracle.address;
-}
-
 
 async function deployVaults(pool) {
   console.log(`
@@ -625,6 +485,7 @@ async function deployVaults(pool) {
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
     const pool = await attachContract('PoolV3', poolAddress);
     await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    // await cdm["setParameter(address,bytes32,uint256)"](cdpVault.address, toBytes32("debtCeiling"), config.deploymentArguments.debtCeiling);
     
     console.log('------------------------------------');
 
@@ -663,6 +524,10 @@ async function deployVaults(pool) {
 
     await cdpVault["setParameter(bytes32,address)"](toBytes32("rewardManager"), rewardManager.address);
     console.log('Set reward manager for', vaultName, 'to', rewardManager.address);
+
+    // if (config.oracle)
+    // await oracle.updateSpot(tokenAddress, config.oracle.defaultPrice);
+    // console.log('Updated default price for', key, 'to', fromWad(config.oracle.defaultPrice), 'USD');
 
     await storeVaultMetadata(
       cdpVault.address,
@@ -724,8 +589,18 @@ async function logVaults() {
   }
 }
 
+async function redeployActions() {
+    const { Flashlender: flashlender, VaultRegistry: vaultRegistry } = await loadDeployedContracts();
+    console.log('flashlenderAddress', flashlender.address);
+    console.log('vaultRegistryAddress', vaultRegistry.address);
+
+    await deployActions(flashlender.address, vaultRegistry.address);
+}
+
 ((async () => {
-  await deployCore();
+
+//   await deployCore();
+  await redeployActions();
   await deployVaults();
   await registerVaults();
   // await deployGauge();

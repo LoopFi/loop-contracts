@@ -11,11 +11,18 @@ async function getDeploymentFilePath() {
   return path.join(__dirname, '..', `deployment-${hre.network.name}.json`);
 }
 
-async function storeContractDeployment(isVault, name, address, artifactName, constructorArgs = []) {
+async function storeContractDeployment(isVault, name, address, artifactName, constructorArgs = [], rewardManagerData = null) {
   const deploymentFilePath = await getDeploymentFilePath();
+  
+  // Initialize with all required sections when file doesn't exist or is empty
   const deployment = fs.existsSync(deploymentFilePath) ? 
-    JSON.parse(fs.readFileSync(deploymentFilePath)) : 
-    { core: {}, vaults: {} };
+    JSON.parse(fs.readFileSync(deploymentFilePath)) || { core: {}, vaults: {}, rewardManagers: {} } : 
+    { core: {}, vaults: {}, rewardManagers: {} };
+  
+  // Ensure all sections exist even if file exists but is missing sections
+  deployment.core = deployment.core || {};
+  deployment.vaults = deployment.vaults || {};
+  deployment.rewardManagers = deployment.rewardManagers || {};
   
   // Properly serialize constructor arguments
   const serializedArgs = [];
@@ -24,15 +31,12 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
     const arg = constructorArgs[i];
     
     if (Array.isArray(arg)) {
-      // Handle arrays
       serializedArgs.push(arg.map(item => 
         item === null || item === undefined ? '' : item.toString()
       ));
     } else if (arg === null || arg === undefined) {
-      // Handle null/undefined
       serializedArgs.push('');
     } else if (typeof arg === 'object') {
-      // Handle BigNumber and other objects
       if (ethers.BigNumber.isBigNumber(arg)) {
         serializedArgs.push(arg.toString());
       } else {
@@ -43,7 +47,6 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
         }
       }
     } else {
-      // Handle primitives
       serializedArgs.push(arg.toString());
     }
   }
@@ -51,11 +54,19 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
   const contractData = {
     address,
     artifactName,
-    constructorArgs: serializedArgs
+    constructorArgs: serializedArgs,
+    addedToRegistry: false
   };
 
   if (isVault) {
     deployment.vaults[name] = contractData;
+  } else if (rewardManagerData) {
+    // Store reward manager with reference to its vault
+    deployment.rewardManagers[address] = {
+      ...contractData,
+      vaultName: rewardManagerData.vaultName,
+      vaultAddress: rewardManagerData.vaultAddress
+    };
   } else {
     deployment.core[name] = contractData;
   }
@@ -77,11 +88,11 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
 async function deployContract(name, artifactName, isVault, ...args) {
   console.log(`Deploying ${artifactName || name}...`);
   
-  // Check if the contract is already deployed
-  if (await isContractDeployed(artifactName || name)) {
-    console.log(`${artifactName || name} already deployed, skipping`);
-    return await getDeployedContract(artifactName || name);
-  }
+  // // Check if the contract is already deployed
+  // if (await isContractDeployed(artifactName || name)) {
+  //   console.log(`${artifactName || name} already deployed, skipping`);
+  //   return await getDeployedContract(artifactName || name);
+  // }
 
   const Contract = await ethers.getContractFactory(name);
   
@@ -139,9 +150,12 @@ async function attachContract(name, address) {
 }
 
 async function loadDeployedContracts() {
+  console.log('Loading deployed contracts...');
   const deploymentFilePath = await getDeploymentFilePath();
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
   const contracts = {};
+
+  console.log('Loading deployed contracts... for deployment', deployment);
   
   for (let [name, { address, artifactName }] of Object.entries({ 
     ...(deployment.core || {}), 
@@ -253,10 +267,16 @@ async function getVaultMetadata(address) {
 
 /**
  * Gets the pool address from a pool key or returns the address if it's already an address
- * @param {string} poolKey - The pool key or address
+ * @param {string} poolName - The pool key or address
  * @returns {string|null} The pool address or null if not found
  */
 async function getPoolAddress(poolName) {
+  // Check if poolName is already an Ethereum address
+  if (ethers.utils.isAddress(poolName)) {
+    console.log(`Pool name is already an address: ${poolName}`);
+    return poolName;
+  }
+
   // Format the pool name correctly for lookup
   const formattedPoolName = `PoolV3_${poolName}`;
   console.log(`Looking for pool with name: ${formattedPoolName}`);
@@ -279,6 +299,24 @@ async function getPoolAddress(poolName) {
   return null;
 }
 
+async function loadDeployedRewardManagers() {
+  console.log('Loading deployed reward managers...');
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+  const rewardManagers = {};
+  
+  for (let [address, data] of Object.entries(deployment.rewardManagers || {})) {
+    const contract = await ethers.getContractFactory(data.artifactName).then(f => f.attach(address));
+    rewardManagers[data.vaultName] = {
+      contract,
+      address,
+      vaultAddress: data.vaultAddress
+    };
+    console.log(`Loaded reward manager for ${data.vaultName} at ${address}`);
+  }
+  return rewardManagers;
+}
+
 module.exports = {
   getSignerAddress,
   getDeploymentFilePath,
@@ -295,5 +333,6 @@ module.exports = {
   storeEnvMetadata,
   storeVaultMetadata,
   getVaultMetadata,
-  getPoolAddress
+  getPoolAddress,
+  loadDeployedRewardManagers
 }; 

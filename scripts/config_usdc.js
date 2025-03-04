@@ -89,10 +89,16 @@ module.exports = {
       type: "CDPVault",
       collateralType: "ERC20",
       oracle: {
-        type: "MockOracle",
-        deploymentArguments: {},
+        type: "deUSD",
+        deploymentArguments: {
+          "curvePool": "0xFb7c3C95f4C2C05F6eC7dcFE3e368a40eB338603",
+          "deUSDFeed": "0x89F48f6671Ec1B1C4f6abE964EBdd21F4eb7076f",
+          "heartbeat": 43200, // 12 hours
+          "sdeUSDVault": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
+          "stalePeriod": 3600,
+        },
       },
-      token: "0x09d484b738dd85ce3953102453e91507982121d0",
+      token: "0x09d484B738dD85CE3953102453E91507982121d0",
       poolAddress: "LpUSD",
       tokenSymbol: "LOOP-deUSD",
       tokenScale: toWad("1.0"),
@@ -123,8 +129,17 @@ module.exports = {
       type: "CDPVault",
       collateralType: "ERC20",
       oracle: {
-        type: "MockOracle",
-        deploymentArguments: {},
+        type: "PendleLPOracle_sUSDe",
+        deploymentArguments: {
+          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+          "market": "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+          "twap": 180,
+          "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
+          "usde_heartbeat": 86400, // 24 hours
+          "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+          "usdc_heartbeat": 86400, // 24 hours
+          "stalePeriod": 3600,
+        },
       },
       token: "0xcdd26eb5eb2ce0f203a84553853667ae69ca29ce",
       poolAddress: "LpUSD",

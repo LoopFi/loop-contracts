@@ -2,60 +2,69 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Gets the network name from command line arguments or environment variables
+ * Gets the network name from Hardhat Runtime Environment
  * @returns {string} The network name (e.g., 'mainnet', 'arbitrum', etc.)
  */
 function getNetworkName() {
+  // When running with Hardhat, use the network from hre
+  try {
+    const hre = require('hardhat');
+    if (hre && hre.network && hre.network.name) {
+      return hre.network.name;
+    }
+  } catch (e) {
+    // Ignore error if hardhat is not available
+  }
+  
   return process.env.CONFIG_NETWORK || 
          process.argv.find(arg => arg.startsWith('--network='))?.split('=')[1] || 
          'mainnet';
 }
 
 /**
- * Gets the config type from command line arguments
+ * Gets the config type from environment variables
  * @returns {string} The config type (e.g., 'usdc', 'eth', etc.)
  */
 function getConfigType() {
-  return process.argv.find(arg => arg.startsWith('--config='))?.split('=')[1] || '';
+  return process.env.CONFIG_TYPE || '';
 }
 
 /**
- * Gets the deployment type from command line arguments
+ * Gets the deployment type from environment variables
  * @returns {string} The deployment type (e.g., 'vault', 'pool', etc.)
  */
 function getDeploymentType() {
-  return process.argv.find(arg => arg.startsWith('--deploy='))?.split('=')[1] || '';
+  return process.env.DEPLOY_TYPE || '';
 }
 
 /**
- * Loads the appropriate configuration file based on network and config type
- * @returns {Object} The loaded configuration object
+ * Loads the appropriate configuration based on network and config type
+ * @param {string} configType - The type of config to load (e.g., 'usdc', 'eth')
+ * @returns {Object} The loaded configuration
  */
-function loadConfig() {
+function loadConfig(configType = '') {
   const network = getNetworkName();
-  const configType = getConfigType();
   
-  // First try to load network-specific config with config type
-  if (configType) {
-    try {
-      return require(`../config_${configType}_${network}.js`);
-    } catch (e) {
-      console.log(`Config file for type ${configType} and network ${network} not found, trying config_${configType}.js`);
-      try {
-        return require(`../config_${configType}.js`);
-      } catch (e) {
-        console.log(`Config file for type ${configType} not found, falling back to network config`);
-      }
+  console.log(`Loading config for network: ${network}, config type: ${configType || 'default'}`);
+  
+  // Try to load config in order of specificity
+  const configPaths = [
+    configType && network ? `config_${configType}_${network}.js` : null,
+    configType ? `config_${configType}.js` : null,
+    network ? `config_${network}.js` : null,
+    'config.js'
+  ].filter(Boolean);
+  
+  for (const configPath of configPaths) {
+    const fullPath = path.join(__dirname, '..', configPath);
+    if (fs.existsSync(fullPath)) {
+      console.log(`Using config from ${configPath}`);
+      return require(fullPath);
     }
   }
   
-  // Try to load network-specific config
-  try {
-    return require(`../config_${network}.js`);
-  } catch (e) {
-    console.log(`Config file for network ${network} not found, using default config.js`);
-    return require('../config.js');
-  }
+  console.warn('No config file found, using empty config');
+  return {};
 }
 
 module.exports = {

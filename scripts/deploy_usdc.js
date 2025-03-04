@@ -25,13 +25,14 @@ const {
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
-  getConfigType, 
-  getDeploymentType, 
   loadConfig 
 } = require('./utils/configUtils');
 
+// Hardcode the config type for this specific deployment script
+const CONFIG_TYPE = 'usdc';
+
 // Load the network-specific and/or token-specific config
-const CONFIG_NETWORK = loadConfig();
+const CONFIG_NETWORK = loadConfig(CONFIG_TYPE);
 
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
@@ -380,6 +381,14 @@ async function deployVaultOracle(key, config) {
     return await deploySyrupUSDCOracle(key, config);
   }
 
+  if (config.oracle.type == "deUSD") {
+    return await deploydeUSDOracle(key, config);
+  }
+
+  if (config.oracle.type == "PendleLPOracle_sUSDe") {
+    return await deploysUSDeOracle(key, config);
+  }
+
   console.log('Deploying oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
   const deployedOracle = await deployContract(
@@ -419,6 +428,66 @@ async function deploySyrupUSDCOracle(key, config) {
   console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
 
   return pendleLPOracle.address;
+}
+
+async function deploydeUSDOracle(key, config) {
+  console.log('Deploying deUSD oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  const combined4626AggregatorV3Oracle = await deployContract(
+    'Combined4626AggregatorV3Oracle',
+    'Combined4626AggregatorV3Oracle',
+    false,
+    oracleConfig.deUSDFeed,
+    oracleConfig.heartbeat,
+    oracleConfig.sdeUSDVault,
+  );
+  console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626AggregatorV3Oracle.address}`);
+
+  const chainlinkCurveOracle = await deployContract(
+    'ChainlinkCurveOracle',
+    'ChainlinkCurveOracle',
+    false,
+    combined4626AggregatorV3Oracle.address,
+    oracleConfig.curvePool,
+    oracleConfig.stalePeriod
+  );
+  console.log(`ChainlinkCurveOracle deployed for ${key} at ${chainlinkCurveOracle.address}`);
+
+  return chainlinkCurveOracle.address;
+}
+
+async function deploysUSDeOracle(key, config) {
+  console.log('Deploying sUSDe oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+  
+  const CombinedAggregatorV3Oracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle',
+    false,
+    oracleConfig.usde_aggregator,
+    oracleConfig.usde_heartbeat,
+    oracleConfig.usdc_aggregator,
+    oracleConfig.usdc_heartbeat,
+    false
+  );
+  console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
+
+  const maxHeartbeat = Math.max(oracleConfig.usde_heartbeat, oracleConfig.usdc_heartbeat);
+
+  const PendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    CombinedAggregatorV3Oracle.address,
+    maxHeartbeat
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${PendleLPOracle.address}`);
+
+  return CombinedAggregatorV3Oracle.address;
 }
 
 async function deployVaults(pool) {

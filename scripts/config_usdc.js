@@ -97,6 +97,8 @@ module.exports = {
           "heartbeat": 43200, // 12 hours
           "sdeUSDVault": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
           "stalePeriod": 43200,
+          "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+          "usdc_heartbeat": 86400, // 24 hours
         },
       },
       token: "0x09d484B738dD85CE3953102453E91507982121d0",
@@ -123,6 +125,11 @@ module.exports = {
           minRate: 100,
           maxRate: 10000,
       },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
     },
     "Vaults_sUSDe": {
       name: "Vaults_sUSDe",
@@ -166,6 +173,11 @@ module.exports = {
           minRate: 100,
           maxRate: 10000,
       },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
     },
     "Vaults_wstUSR": {
       name: "Vaults_wstUSR",
@@ -210,6 +222,11 @@ module.exports = {
           minRate: 100,
           maxRate: 10000,
       },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
     },
     "Vaults_syrupUSDC": {
       name: "Vaults_syrupUSDC",
@@ -250,6 +267,11 @@ module.exports = {
           minRate: 100,
           maxRate: 10000,
       },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
     },
   },
  

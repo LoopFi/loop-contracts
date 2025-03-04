@@ -444,13 +444,24 @@ async function deploydeUSDOracle(key, config) {
   );
   console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626AggregatorV3Oracle.address}`);
 
+  const combinedAggregatorV3Oracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle',
+    false,
+    combined4626AggregatorV3Oracle.address,
+    oracleConfig.heartbeat,
+    oracleConfig.usdc_aggregator,
+    oracleConfig.usdc_heartbeat,
+    false
+  );
+
   const chainlinkCurveOracle = await deployContract(
     'ChainlinkCurveOracle',
     'ChainlinkCurveOracle',
     false,
-    combined4626AggregatorV3Oracle.address,
+    combinedAggregatorV3Oracle.address,
     oracleConfig.curvePool,
-    oracleConfig.stalePeriod
+    oracleConfig.heartbeat
   );
   console.log(`ChainlinkCurveOracle deployed for ${key} at ${chainlinkCurveOracle.address}`);
 

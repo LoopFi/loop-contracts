@@ -95,7 +95,7 @@ module.exports = {
           "deUSDFeed": "0x89F48f6671Ec1B1C4f6abE964EBdd21F4eb7076f",
           "heartbeat": 43200, // 12 hours
           "sdeUSDVault": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
-          "stalePeriod": 3600,
+          "stalePeriod": 43200,
         },
       },
       token: "0x09d484B738dD85CE3953102453E91507982121d0",

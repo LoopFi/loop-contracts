@@ -39,6 +39,11 @@ const toWad = ethers.utils.parseEther;
 const fromWad = ethers.utils.formatEther;
 const toBytes32 = ethers.utils.formatBytes32String;
 
+// Add this helper function at the top level
+function getPoolSpecificName(baseName, poolIdentifier = 'usdc') {
+  return `${baseName}_${poolIdentifier}`;
+}
+
 async function deployCore() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
@@ -52,14 +57,11 @@ async function deployCore() {
     await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
   }
 
-  const { AddressProviderV3: addressProviderV3 } = await deployGearboxCore();
-  const pools = await deployPools(addressProviderV3);
-  
-  // Use the first pool as the main pool for remaining setup
-  const pool = pools[0];
-
-  console.log('PoolV3 deployed to:', pool.address);
+  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
   console.log('AddressProviderV3 deployed to:', addressProviderV3.address);
+
+  const pool = await attachContract('PoolV3', CONFIG_NETWORK.Core.PoolV3_LpUSD);
+  console.log('PoolV3 deployed to:', pool.address);
 
   const { stakingLpUsdc, lockLpUsdc } = await deployStakingAndLockingLP(pool);
   console.log('StakingLPUsdc deployed to:', stakingLpUsdc.address);
@@ -74,11 +76,10 @@ async function deployCore() {
   const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
   console.log('Treasury deployed to:', treasury.address);
   
-  await addressProviderV3.setAddress(toBytes32('TREASURY'), treasury.address, false);
   await pool.setTreasury(treasury.address);
 
   // Deploy Vault Registry
-  const vaultRegistry = await deployContract('VaultRegistry');
+  const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
   console.log('Vault Registry deployed to:', vaultRegistry.address);
 
   // Deploy actions with the vault registry
@@ -97,7 +98,7 @@ async function deployStakingAndLockingLP(pool) {
   const minShares = "10000"; // 0.01 * 10^6
   const stakingLpUsdc = await deployContract(
     'StakingLPEth', 
-    'StakingLPUsdc', 
+    getPoolSpecificName('StakingLPUsdc'),
     false, 
     pool.address, 
     "StakingLPUsdc", 
@@ -108,7 +109,7 @@ async function deployStakingAndLockingLP(pool) {
 
   const lockLpUsdc = await deployContract(
     'Locking', 
-    'LockingLpUsdc', 
+    getPoolSpecificName('LockingLpUsdc'),
     false, 
     pool.address
   );
@@ -127,32 +128,95 @@ async function deployActions(pool, vaultRegistry) {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Deploy Flashlender
-  const flashlender = await deployContract('Flashlender', 'Flashlender', false, pool.address, CONFIG_NETWORK.Core.Flashlender.constructorArguments.protocolFee_);
+  // Deploy Flashlender with pool-specific name
+  const flashlender = await deployContract(
+    'Flashlender', 
+    getPoolSpecificName('Flashlender'),
+    false, 
+    pool.address, 
+    CONFIG_NETWORK.Core.Flashlender.constructorArguments.protocolFee_
+  );
   
   const UINT256_MAX = ethers.constants.MaxUint256;
   await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
   console.log('Set credit manager debt limit for flashlender to max');
   
-  // Deploy PRBProxyRegistry
+  // Deploy PRBProxyRegistry (this one doesn't need pool suffix as it's chain-wide)
   const proxyRegistry = await deployContract('PRBProxyRegistry');
   console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
   
-  // Deploy Actions
+  // Deploy Actions with pool-specific names
   const swapAction = await deployContract(
-   'SwapAction', 'SwapAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.SwapAction.constructorArguments)
+    'SwapAction', 
+    getPoolSpecificName('SwapAction'),
+    false, 
+    ...Object.values(CONFIG_NETWORK.Core.Actions.SwapAction.constructorArguments)
   );
+  
   const poolAction = await deployContract(
-   'PoolAction', 'PoolAction', false, ...Object.values(CONFIG_NETWORK.Core.Actions.PoolAction.constructorArguments)
+    'PoolAction', 
+    getPoolSpecificName('PoolAction'),
+    false, 
+    ...Object.values(CONFIG_NETWORK.Core.Actions.PoolAction.constructorArguments)
   );
 
-  // Deploy ERC165Plugin and Position Actions
-  await deployContract('PositionAction20', 'PositionAction20', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionAction4626', 'PositionAction4626', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionPendle', 'PositionActionPendle', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionTranchess', 'PositionActionTranchess', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH);
-  await deployContract('PositionActionPenpie', 'PositionActionPenpie', false, flashlender.address, swapAction.address, poolAction.address, vaultRegistry.address, CONFIG_NETWORK.Core.WETH, CONFIG_NETWORK.Core.PenpieHelper);
+  // Deploy Position Actions with pool-specific names
+  await deployContract(
+    'PositionAction20', 
+    getPoolSpecificName('PositionAction20'),
+    false, 
+    flashlender.address, 
+    swapAction.address, 
+    poolAction.address, 
+    vaultRegistry.address, 
+    CONFIG_NETWORK.Core.WETH
+  );
   
+  await deployContract(
+    'PositionAction4626', 
+    getPoolSpecificName('PositionAction4626'),
+    false, 
+    flashlender.address, 
+    swapAction.address, 
+    poolAction.address, 
+    vaultRegistry.address, 
+    CONFIG_NETWORK.Core.WETH
+  );
+  
+  await deployContract(
+    'PositionActionPendle', 
+    getPoolSpecificName('PositionActionPendle'),
+    false, 
+    flashlender.address, 
+    swapAction.address, 
+    poolAction.address, 
+    vaultRegistry.address, 
+    CONFIG_NETWORK.Core.WETH
+  );
+  
+  await deployContract(
+    'PositionActionTranchess', 
+    getPoolSpecificName('PositionActionTranchess'),
+    false, 
+    flashlender.address, 
+    swapAction.address, 
+    poolAction.address, 
+    vaultRegistry.address, 
+    CONFIG_NETWORK.Core.WETH
+  );
+  
+  await deployContract(
+    'PositionActionPenpie', 
+    getPoolSpecificName('PositionActionPenpie'),
+    false, 
+    flashlender.address, 
+    swapAction.address, 
+    poolAction.address, 
+    vaultRegistry.address, 
+    CONFIG_NETWORK.Core.WETH, 
+    CONFIG_NETWORK.Core.PenpieHelper
+  );
+
   console.log('------------------------------------');
 
   return { flashlender, proxyRegistry, swapAction, poolAction };
@@ -174,6 +238,7 @@ async function deployGauge() {
     console.log('No pool address defined for gauge');
     return;
   }
+  console.log('GAUGE POOL ADDRESS:', poolAddress);
 
   const liquidityPool = await attachContract('PoolV3', poolAddress);
   const latestBlock = await ethers.provider.getBlock('latest');
@@ -184,11 +249,22 @@ async function deployGauge() {
   console.log(`Voter deployed to: ${voter.address}`);
 
   // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
+  const gaugeV3 = await deployContract(
+    'GaugeV3', 
+    getPoolSpecificName('GaugeV3'),
+    false, 
+    liquidityPool.address, 
+    voter.address
+  );
   console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
   
   // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
+  const poolQuotaKeeperV3 = await deployContract(
+    'PoolQuotaKeeperV3', 
+    getPoolSpecificName('PoolQuotaKeeperV3'),
+    false, 
+    liquidityPool.address
+  );
   await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
 
   // Set Gauge in QuotaKeeper
@@ -735,11 +811,18 @@ async function logVaults() {
   }
 }
 
+async function deployPool() {
+  const addressProviderV3Address = '0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D';
+  const addressProviderV3 = await attachContract('AddressProviderV3', addressProviderV3Address);
+  const pools = await deployPools(addressProviderV3);
+}
+
 ((async () => {
+  // await deployPool();
   await deployCore();
   await deployVaults();
   await registerVaults();
-  // await deployGauge();
+  await deployGauge();
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

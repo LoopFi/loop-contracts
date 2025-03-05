@@ -155,8 +155,6 @@ async function loadDeployedContracts() {
   const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
   const contracts = {};
 
-  console.log('Loading deployed contracts... for deployment', deployment);
-  
   for (let [name, { address, artifactName }] of Object.entries({ 
     ...(deployment.core || {}), 
     ...(deployment.vaults || {}) 

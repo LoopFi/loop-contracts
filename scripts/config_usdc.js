@@ -12,6 +12,9 @@ module.exports = {
     },
     "PenpieHelper": "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4",
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "PoolV3_LpUSD": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+    "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+    "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -20,7 +23,7 @@ module.exports = {
           "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0",
           "kyberRouter": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
           "tranchessRouter": "0x63BAEe33649E589Cc70435F898671461B624CBCc",
-          "spectraRouter": "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+          "spectraRouter": "0xD733e545C65d539f588d7c3793147B497403F0d2"
         }
       },
       "PoolAction": {
@@ -28,7 +31,7 @@ module.exports = {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
           "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0",
           "tranchessRouter": "0x63BAEe33649E589Cc70435F898671461B624CBCc",
-          "spectraRouter": "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+          "spectraRouter": "0xD733e545C65d539f588d7c3793147B497403F0d2"
         }
       },
     },
@@ -65,21 +68,21 @@ module.exports = {
     //     "R_slope2": 2500, // R_slope2
     //     "R_slope3": 60000, // R_slope3
     //   }, 
-      "LpUSD": {
-      "name": "Loop USD - lpUSD",
-      "symbol": "lpUSD",
-      "wrappedToken": "0x0000000000000000000000000000000000000000",
-      "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-      "underlier": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", //USDC
-      "interestRateModel": {
-        "U_1": 7000, // U_1
-        "U_2": 9000, // U_2
-        "R_base": 0, // R_base
-        "R_slope1": 2000, // R_slope1
-        "R_slope2": 2500, // R_slope2
-        "R_slope3": 60000, // R_slope3
-      },
-    }
+    //   "LpUSD": {
+    //   "name": "Loop USD - lpUSD",
+    //   "symbol": "lpUSD",
+    //   "wrappedToken": "0x0000000000000000000000000000000000000000",
+    //   "treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+    //   "underlier": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", //USDC
+    //   "interestRateModel": {
+    //     "U_1": 7000, // U_1
+    //     "U_2": 9000, // U_2
+    //     "R_base": 0, // R_base
+    //     "R_slope1": 2000, // R_slope1
+    //     "R_slope2": 2500, // R_slope2
+    //     "R_slope3": 60000, // R_slope3
+    //   },
+    // }
   },
   "Vendors": {
   },

@@ -209,7 +209,7 @@ contract StakingLPEthTest is TestBase {
         uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
         
         // Try to unstake immediately (should fail for non-whitelisted user)
-        vm.expectRevert(StakingLPEth.OperationNotAllowed.selector);
+        vm.expectRevert(StakingLPEth.InvalidCooldown.selector);
         stakingLpEth.unstake(nonWhitelistedUser);
         vm.stopPrank();
     }
@@ -237,7 +237,7 @@ contract StakingLPEthTest is TestBase {
         
         // Try to unstake (should fail now)
         vm.prank(user);
-        vm.expectRevert(StakingLPEth.OperationNotAllowed.selector);
+        vm.expectRevert(StakingLPEth.InvalidCooldown.selector);
         stakingLpEth.unstake(user);
     }
 }

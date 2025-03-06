@@ -494,12 +494,12 @@ async function deployVaults(pool) {
     // deploy reward manager with vault reference
     const rewardManager = await deployContract(
       config.RewardManager.artifactName,
-      `RewardManager_${key}`, // Include vault name in reward manager identifier
+      `RewardManager_${key}`,
       false,
       cdpVault.address,
       tokenAddress,
       prbProxyRegistry.address,
-      ...Object.values(config.RewardManager.constructorArguments)
+      ...Object.values(config.RewardManager.constructorArguments).map(v => v === "deployer" ? signer : v)
     );
 
     // Store reward manager with vault reference
@@ -512,7 +512,7 @@ async function deployVaults(pool) {
         cdpVault.address,
         tokenAddress,
         prbProxyRegistry.address,
-        ...Object.values(config.RewardManager.constructorArguments)
+        ...Object.values(config.RewardManager.constructorArguments).map(v => v === "deployer" ? signer : v)
       ],
       {
         vaultName: vaultName,

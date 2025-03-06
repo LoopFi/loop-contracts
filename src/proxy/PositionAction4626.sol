@@ -87,7 +87,7 @@ contract PositionAction4626 is PositionAction {
     /// @param upFrontToken the token passed up front
     /// @param upFrontAmount the amount of tokens passed up front [IYVault.decimals()]
     /// @param swapAmountOut the amount of tokens received from the stablecoin flash loan swap [IYVault.decimals()]
-    /// @return Amount of collateral added to CDPVault position [wad]
+    /// @return Amount of collateral added to CDPVault position [CDPVault.tokenScale()]
     function _onIncreaseLever(
         LeverParams memory leverParams,
         address upFrontToken,
@@ -156,12 +156,12 @@ contract PositionAction4626 is PositionAction {
         tokenOut = IERC4626(leverParams.collateralToken).redeem(withdrawnCollateral, address(this), address(this));
 
         if (leverParams.auxAction.args.length != 0) {
-            _delegateCall(
+            bytes memory exitData = _delegateCall(
                 address(poolAction),
                 abi.encodeWithSelector(poolAction.exit.selector, leverParams.auxAction)
             );
 
-            tokenOut = IERC20(IERC4626(leverParams.collateralToken).asset()).balanceOf(address(this));
+            tokenOut = abi.decode(exitData, (uint256));
         }
     }
 }

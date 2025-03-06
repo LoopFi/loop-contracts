@@ -90,7 +90,7 @@ module.exports = {
     "Vaults_deUSD": {
       name: "Vaults_deUSD",
       description: "This vault allows for borrowing and lending of assets",
-      type: "CDPVault",
+      type: "CDPVaultSpectra",
       collateralType: "ERC20",
       oracle: {
         type: "deUSD",
@@ -129,8 +129,10 @@ module.exports = {
           maxRate: 10000,
       },
       "RewardManager": {
-        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
         "constructorArguments": [
+          "deployer",
+          "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
         ]
       }
     },
@@ -143,7 +145,7 @@ module.exports = {
         type: "PendleLPOracle_sUSDe",
         deploymentArguments: {
           "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+          "market": "0xb162b764044697cf03617c2efbcb1f42e31e4766",
           "twap": 180,
           "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
           "usde_heartbeat": 86400, // 24 hours
@@ -152,7 +154,7 @@ module.exports = {
           "stalePeriod": 3600,
         },
       },
-      token: "0xcdd26eb5eb2ce0f203a84553853667ae69ca29ce",
+      token: "0xb162b764044697cf03617c2efbcb1f42e31e4766",
       poolAddress: "LpUSD",
       tokenSymbol: "LOOP-sUSDe",
       tokenScale: toWad("1.0"),

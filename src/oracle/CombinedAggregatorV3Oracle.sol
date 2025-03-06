@@ -43,11 +43,11 @@ contract CombinedAggregatorV3Oracle {
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
-        (uint256 value, uint256 timestamp) = getAggregatorData(aggregator, aggregatorScale, aggregatorHeartbeat);
-        (uint256 value2, ) = getAggregatorData(aggregator2, aggregator2Scale, aggregator2Heartbeat);
-        uint256 price;
-        if(isMul) price = wmul(value, value2); else price = wdiv(value, value2);
-        return (0, int256(price), 0, timestamp, 0);
+        (uint256 value1, uint256 updatedAt1) = getAggregatorData(aggregator, aggregatorScale, aggregatorHeartbeat);
+        (uint256 value2, uint256 updatedAt2) = getAggregatorData(aggregator2, aggregator2Scale, aggregator2Heartbeat);
+        uint256 price = isMul ? wmul(value1, value2) : wdiv(value1, value2);
+        uint256 updatedAt_ = updatedAt1 < updatedAt2 ? updatedAt1 : updatedAt2;
+        return (0, int256(price), 0, updatedAt_, 0);
     }
 
 

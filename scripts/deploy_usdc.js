@@ -560,8 +560,6 @@ async function deploysUSDeOracle(key, config) {
   );
   console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
 
-  const maxHeartbeat = Math.max(oracleConfig.usde_heartbeat, oracleConfig.usdc_heartbeat);
-
   const PendleLPOracle = await deployContract(
     'PendleLPOracle',
     'PendleLPOracle',
@@ -570,7 +568,7 @@ async function deploysUSDeOracle(key, config) {
     oracleConfig.market,
     oracleConfig.twap,
     CombinedAggregatorV3Oracle.address,
-    maxHeartbeat
+    oracleConfig.usde_heartbeat
   );
   console.log(`PendleLPOracle deployed for ${key} at ${PendleLPOracle.address}`);
 
@@ -591,23 +589,12 @@ async function deployWstUSROracle(key, config) {
   );
   console.log(`PythAggregatorV3 deployed for ${key} at ${pythAggregator.address}`);
 
-  // Deploy Combined4626AggregatorV3Oracle
-  const combined4626Oracle = await deployContract(
-    'Combined4626AggregatorV3Oracle',
-    'Combined4626AggregatorV3Oracle',
-    false,
-    pythAggregator.address,
-    3600, // heartbeat
-    oracleConfig.wstUSRVault
-  );
-  console.log(`Combined4626AggregatorV3Oracle deployed for ${key} at ${combined4626Oracle.address}`);
-
   // Deploy CombinedAggregatorV3Oracle
   const combinedOracle = await deployContract(
     'CombinedAggregatorV3Oracle',
     'CombinedAggregatorV3Oracle',
     false,
-    combined4626Oracle.address,
+    pythAggregator.address,
     3600, // heartbeat
     oracleConfig.chainlinkUSDCFeed,
     oracleConfig.usdcHeartbeat,
@@ -717,15 +704,14 @@ async function deployVaults(pool) {
 
     console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
 
-    // deploy reward manager with vault reference
     const rewardManager = await deployContract(
       config.RewardManager.artifactName,
-      `RewardManager_${key}`, // Include vault name in reward manager identifier
+      `RewardManager_${key}`,
       false,
       cdpVault.address,
       tokenAddress,
       prbProxyRegistry.address,
-      ...Object.values(config.RewardManager.constructorArguments)
+      ...Object.values(config.RewardManager.constructorArguments).map(v => v === "deployer" ? signer : v)
     );
 
     // Store reward manager with vault reference

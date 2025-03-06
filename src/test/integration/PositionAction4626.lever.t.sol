@@ -241,20 +241,33 @@ contract PositionAction4626_Lever_Test is IntegrationTestBase {
                 )
             );
 
+            emit log_named_uint("amarcu here", 1);
             // Collateral is 180 ETH, debt is 110 ETH
             uint256 flashloanFee = flashlender.flashFee(address(underlyingToken), 40 ether);
             (uint256 collateral, uint256 debt, , , , ) = vault.positions(address(userProxy));
+            emit log_named_uint("collateral", collateral);
+            emit log_named_uint("debt", debt);
+            emit log_named_uint("depositAmount", depositAmount);
+            emit log_named_uint("borrowAmount", borrowAmount);
+            emit log_named_uint("flashLoanAmount", flashLoanAmount);
+            emit log_named_uint("flashloanFee", flashloanFee);
             assertEq(collateral, depositAmount - 70 ether);
             assertGe(debt, borrowAmount + flashLoanAmount - 40 ether + flashloanFee);
 
             // All balancer LP tokens are burnt
+            emit log_named_uint("bptAmount", bptAmount);
+            emit log_named_uint("1 wstETH_bb_a_WETH_BPTl balance", IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(user));
+            emit log_named_uint("2 wstETH_bb_a_WETH_BPTl balance", IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(address(positionAction)));
             assertEq(IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(user), 0);
             assertEq(IERC20(wstETH_bb_a_WETH_BPTl).balanceOf(address(positionAction)), 0);
 
             uint256 expectedBalance = (59 ether + (70 ether - 50 ether)) / 1 ether;
+            emit log_named_uint("expectedBalance", expectedBalance);
+            emit log_named_uint("token balance", token.balanceOf(user) / 1 ether);
             assertEq(token.balanceOf(user) / 1 ether, expectedBalance);
 
             // Position action should hold 0 collateral tokens
+            emit log_named_uint("positionAction collateral", token.balanceOf(address(positionAction)));
             assertEq(token.balanceOf(address(positionAction)), 0);
         }
     }

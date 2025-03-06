@@ -83,7 +83,7 @@ module.exports = {
             "twap": 180
         },
       },
-      token: "0x09d484B738dD85CE3953102453E91507982121d0",
+      token: "0xBDb8F9729d3194f75fD1A3D9bc4FFe0DDe3A404c",
       poolAddress: "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
       tokenSymbol: "LOOP-tETH",
       tokenScale: toWad("1.0"),

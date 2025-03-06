@@ -98,9 +98,9 @@ contract ChainlinkCurveOracle is IOracle, AccessControlUpgradeable, UUPSUpgradea
     /// @dev reverts if the price is invalid
     function spot(address /* token */) external view virtual override returns (uint256 price) {
         uint256 virtualPrice = _fetchVirtualPrice();
-        (bool isValid, uint256 price) = _fetchAndValidate();
+        (bool isValid, uint256 price_) = _fetchAndValidate();
         if (!isValid) revert ChainlinkCurveOracle__spot_invalidValue();
-        return wmul(price, virtualPrice);
+        return wmul(price_, virtualPrice);
     }
 
     /// @notice Fetches and validates the latest price from Chainlink

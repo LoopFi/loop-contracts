@@ -537,7 +537,7 @@ async function deploydeUSDOracle(key, config) {
     false,
     combinedAggregatorV3Oracle.address,
     oracleConfig.curvePool,
-    oracleConfig.heartbeat
+    oracleConfig.stalePeriod
   );
   console.log(`ChainlinkCurveOracle deployed for ${key} at ${chainlinkCurveOracle.address}`);
 

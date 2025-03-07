@@ -95,13 +95,13 @@ module.exports = {
       oracle: {
         type: "deUSD",
         deploymentArguments: {
-          "curvePool": "0xFb7c3C95f4C2C05F6eC7dcFE3e368a40eB338603",
           "deUSDFeed": "0x89F48f6671Ec1B1C4f6abE964EBdd21F4eb7076f",
           "heartbeat": 43200, // 12 hours
           "sdeUSDVault": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
-          "stalePeriod": 43200,
           "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
           "usdc_heartbeat": 86400, // 24 hours
+          "curvePool": "0xFb7c3C95f4C2C05F6eC7dcFE3e368a40eB338603",
+          "stalePeriod": 90000, // 25 hours
         },
       },
       token: "0x09d484B738dD85CE3953102453E91507982121d0",

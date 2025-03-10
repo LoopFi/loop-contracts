@@ -482,7 +482,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         );
 
         LocalVars memory vars;
-        vars.totalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+        uint256 scaledTotalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
+        uint256 totalDebt = wmul(scaledTotalDebt, ICDPVault(leverParams.vault).poolUnderlyingScale());
+        vars.totalDebt = totalDebt;
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
             vars.subDebt = min(vars.totalDebt + fee, leverParams.primarySwap.limit);

@@ -25,11 +25,13 @@ contract AgETHFeedTest is Test {
         (uint80 roundId, int256 price, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = feed
             .latestRoundData();
         (int224 proxyValue, uint256 timestamp) = api3AgETHrsETHFeed.read();
+        (uint256 value2, uint256 timestamp2) = feed.getAggregatorData(rsETHCl, 10 ** 18, api3Heartbeat);
         (, int256 clPrice, , , ) = rsETHCl.latestRoundData();
         assertEq(roundId, 0);
         assertEq(uint(price), (uint224(proxyValue) * uint(clPrice)) / 10 ** 18);
         assertEq(startedAt, 0);
-        assertEq(updatedAt, timestamp);
+        uint256 updatedAt_ = timestamp < timestamp2 ? timestamp : timestamp2;
+        assertEq(updatedAt, updatedAt_);
         assertEq(answeredInRound, 0);
         console.log("price", uint(price));
     }

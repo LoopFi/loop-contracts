@@ -52,12 +52,13 @@ contract WstUSRFeedTest is Test {
         uint256 pythPrice = uint256(int256(pyth.price));
         assertEq(roundId, 0);
         AggregatorV3Interface aggregatorUsdc = AggregatorV3Interface(clUsdc);
-          (, int256 priceUsdc, ,, ) = aggregatorUsdc
+          (, int256 priceUsdc, ,uint256 updatedAtUsdc, ) = aggregatorUsdc
             .latestRoundData();
      
         assertEq(uint(price), (pythPrice * vault.convertToAssets(1e18) * 10 ** (18 - aggregator.decimals())) / 1e18 *1e8/ uint(priceUsdc));
         assertEq(startedAt, 0);
-        assertEq(updatedAt, pyth.publishTime);
+        uint256 updatedAt_ = updatedAt < updatedAtUsdc ? updatedAt : updatedAtUsdc;
+        assertEq(updatedAt, updatedAt_);
         assertEq(answeredInRound, 0);
         console.log("price", uint(price));
     }

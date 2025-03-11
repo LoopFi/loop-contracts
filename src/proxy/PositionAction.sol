@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPermission} from "../interfaces/IPermission.sol";
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-import {toInt256, wmul, wdiv, min} from "../utils/Math.sol";
+import {toInt256, wmul, wdiv, min, wmulUp, wscaleLoss} from "../utils/Math.sol";
 import {TransferAction, PermitParams} from "./TransferAction.sol";
 import {BaseAction} from "./BaseAction.sol";
 import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
@@ -66,6 +66,7 @@ struct LocalVars {
     uint256 residualDestAmount;
     uint256 residualSrcAmount;
     uint256 estimatedSwapInAmount;
+    uint256 totalDebtLoss;
 }
 
 /// @title PositionAction
@@ -483,14 +484,23 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
 
         LocalVars memory vars;
         uint256 scaledTotalDebt = ICDPVault(leverParams.vault).virtualDebt(leverParams.position);
-        uint256 totalDebt = wmul(scaledTotalDebt, ICDPVault(leverParams.vault).poolUnderlyingScale());
+        uint256 poolScale = ICDPVault(leverParams.vault).poolUnderlyingScale();
+        
+        // Scale down totalDebt and track precision loss
+        {
+        (uint256 totalDebt, uint256 totalDebtLoss) = wscaleLoss(scaledTotalDebt, poolScale);
         vars.totalDebt = totalDebt;
+        vars.totalDebtLoss = totalDebtLoss;
+        }
 
         if (leverParams.primarySwap.swapType == SwapType.EXACT_IN) {
             vars.subDebt = min(vars.totalDebt + fee, leverParams.primarySwap.limit);
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
-            uint256 scaledDebt = wdiv(vars.subDebt - fee, ICDPVault(leverParams.vault).poolUnderlyingScale());
+            
+            // Scale to WAD and add back the precision loss
+            uint256 scaledDebt = wdiv(vars.subDebt - fee, poolScale) + vars.totalDebtLoss;
+
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),
@@ -546,7 +556,10 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
             vars.subDebt = leverParams.primarySwap.amount;
 
             underlyingToken.forceApprove(address(leverParams.vault), vars.subDebt + fee);
-            uint256 scaledAmount = wdiv(vars.subDebt - fee, ICDPVault(leverParams.vault).poolUnderlyingScale());
+            
+            // Scale to WAD and add back the precision loss
+            uint256 scaledAmount = wdiv(vars.subDebt - fee, poolScale) + vars.totalDebtLoss;
+
             ICDPVault(leverParams.vault).modifyCollateralAndDebt(
                 leverParams.position,
                 address(this),

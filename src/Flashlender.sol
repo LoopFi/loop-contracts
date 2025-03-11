@@ -80,7 +80,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     /// @dev Reverts if `Flashlender` gets reentered in the same transaction or if token is not Stablecoin
     /// @param receiver Address of the receiver of the flash loan
     /// @param token Address of the token to borrow (has to be the address of Stablecoin)
-    /// @param amount Amount of `token` to borrow [wad]
+    /// @param amount Amount of `token` to borrow [Pool token scale]
     /// @param data Arbitrary data structure, intended to contain user-defined parameters
     /// @return true if flash loan
     function flashLoan(
@@ -112,7 +112,7 @@ contract Flashlender is IFlashlender, ReentrancyGuard {
     /// @notice Flashlender lends ICreditFlashBorrower Credit to `receiver`
     /// @dev Reverts if `Flashlender` gets reentered in the same transaction
     /// @param receiver Address of the receiver of the flash loan [ICreditFlashBorrower]
-    /// @param amount Amount of `token` to borrow [wad]
+    /// @param amount Amount of `token` to borrow [Pool token scale]
     /// @param data Arbitrary data structure, intended to contain user-defined parameters
     /// @return true if flash loan
     function creditFlashLoan(

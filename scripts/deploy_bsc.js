@@ -36,7 +36,7 @@ const {
 } = require('./utils/configUtils');
 
 // Hardcode the config type for this specific deployment script
-const CONFIG_TYPE = 'eth';
+const CONFIG_TYPE = 'bsc';
 
 // Load the network-specific and/or token-specific config
 const CONFIG_NETWORK = loadConfig(CONFIG_TYPE);
@@ -281,15 +281,14 @@ async function deployGauge(poolAddress) {
 }
 
 async function deployInterestRateModel() {
-
   //default values
   const U_1 = 7000; // U_1
   const U_2 = 9000; // U_2
   const R_base = 0; // R_base
-  const R_slope1 = 2000; // R_slope1
-  const R_slope2 = 2500; // R_slope2
-  const R_slope3 = 60000; // R_slope3
-  const version = 3;
+  const R_slope1 = 1500; // R_slope1
+  const R_slope2 = 1875; // R_slope2
+  const R_slope3 = 5000; // R_slope3
+  const version = 4;
 
   //decrease factor for slopes
   const decreaseFactor = 0.85; // 15% decrease
@@ -301,9 +300,9 @@ async function deployInterestRateModel() {
     U_1,
     U_2,
     R_base,
-    R_slope1 * decreaseFactor,
-    R_slope2 * decreaseFactor,
-    R_slope3 * decreaseFactor,
+    Math.round(R_slope1 * decreaseFactor),
+    Math.round(R_slope2 * decreaseFactor),
+    Math.round(R_slope3 * decreaseFactor), 
     false
   );
 

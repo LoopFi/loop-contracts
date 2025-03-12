@@ -315,6 +315,273 @@ async function loadDeployedRewardManagers() {
   return rewardManagers;
 }
 
+// Add new deployment utility functions
+
+/**
+ * Deploys core contracts including staking, locking LP, treasury, and actions
+ * @param {Object} config - The network configuration object
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ */
+async function deployPoolCore(config, poolType) {
+  const signer = await getSignerAddress();
+  
+  if (hre.network.name == 'tenderly') {
+    await ethers.provider.send('tenderly_setBalance', [[signer], ethers.utils.hexValue(toWad('100').toHexString())]);
+  }
+
+  const addressProviderV3 = await attachContract('AddressProviderV3', config.Core.AddressProviderV3);
+  const pool = await attachContract('PoolV3', config.Core.PoolV3_LpUSD);
+
+  const { stakingLp, lockLp } = await deployStakingAndLockingLP(pool, poolType);
+  console.log('staking lp property name', `stakingLp${poolType.toUpperCase()}`);
+  
+  const treasuryReplaceParams = {
+    'deployer': signer,
+    [`stakingLp${poolType.toUpperCase()}`]: stakingLp.address
+  };
+
+  const { payees, shares, admin } = replaceParams(config.Core.Treasury.constructorArguments, treasuryReplaceParams);
+  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
+  
+  await pool.setTreasury(treasury.address);
+
+  const vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
+  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, poolType, config);
+
+  return {
+    stakingLp,
+    lockLp,
+    treasury,
+    vaultRegistry,
+    flashlender,
+    proxyRegistry
+  };
+}
+
+/**
+ * Deploys staking and locking LP contracts
+ * @param {Contract} pool - The pool contract
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ */
+async function deployStakingAndLockingLP(pool, poolType) {
+  const minShares = "10000"; // 0.01 * 10^6
+  const upperPoolType = poolType.toUpperCase();
+  
+  const stakingLp = await deployContract(
+    'StakingLPEth',
+    `StakingLP${upperPoolType}`,
+    false,
+    pool.address,
+    `StakingLP${upperPoolType}`,
+    `slp${upperPoolType}`,
+    minShares
+  );
+
+  const lockLp = await deployContract(
+    'Locking',
+    `LockingLp${upperPoolType}`,
+    false,
+    pool.address
+  );
+
+  return { stakingLp, lockLp };
+}
+
+/**
+ * Deploys actions contracts
+ * @param {Contract} pool - The pool contract
+ * @param {Contract} vaultRegistry - The vault registry contract
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ */
+async function deployActions(pool, vaultRegistry, poolType, config) {
+  const flashlender = await deployContract(
+    'Flashlender',
+    `Flashlender_${poolType}`,
+    false,
+    pool.address,
+    config.Core.Flashlender.constructorArguments.protocolFee_
+  );
+
+  const UINT256_MAX = ethers.constants.MaxUint256;
+  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
+
+  const proxyRegistry = await deployContract('PRBProxyRegistry');
+
+  const swapAction = await deployContract(
+    'SwapAction',
+    `SwapAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.SwapAction.constructorArguments)
+  );
+
+  const poolAction = await deployContract(
+    'PoolAction',
+    `PoolAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.PoolAction.constructorArguments)
+  );
+
+  // Deploy position actions
+  await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+
+  return { flashlender, proxyRegistry, swapAction, poolAction };
+}
+
+/**
+ * Deploys position action contracts
+ * @param {Contract} flashlender - The flashlender contract
+ * @param {Contract} swapAction - The swap action contract
+ * @param {Contract} poolAction - The pool action contract
+ * @param {Contract} vaultRegistry - The vault registry contract
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ */
+async function deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config) {
+  const positionActions = [
+    'PositionAction20',
+    'PositionAction4626',
+    'PositionActionPendle',
+    'PositionActionTranchess',
+    'PositionActionPenpie'
+  ];
+
+  for (const action of positionActions) {
+    const args = [
+      flashlender.address,
+      swapAction.address,
+      poolAction.address,
+      vaultRegistry.address,
+      config.Core.WETH
+    ];
+
+    if (action === 'PositionActionPenpie') {
+      args.push(config.Core.PenpieHelper);
+    }
+
+    await deployContract(
+      action,
+      `${action}_${poolType}`,
+      false,
+      ...args
+    );
+  }
+}
+
+/**
+ * Base oracle deployment function
+ * @param {string} key - The oracle key
+ * @param {Object} config - The oracle configuration
+ * @param {Object} oracleDeployers - Map of oracle type to deployer function
+ */
+async function deployVaultOracle(key, config, oracleDeployers) {
+  if (!config.oracle) {
+    console.log('No oracle defined for', key);
+    return null;
+  }
+
+  const oracleType = config.oracle.type;
+  const deployer = oracleDeployers[oracleType];
+  
+  if (!deployer) {
+    console.log('Deploying default oracle for', key);
+    const oracleConfig = config.oracle.deploymentArguments;
+    const deployedOracle = await deployContract(
+      oracleType,
+      oracleType,
+      false,
+      ...Object.values(oracleConfig)
+    );
+    return deployedOracle.address;
+  }
+
+  return await deployer(key, config);
+}
+
+/**
+ * Registers vaults in the vault registry
+ */
+async function registerVaults(config) {
+  const vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
+  
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+
+  if (!vaultRegistry) {
+    console.log('Vault registry not found');
+    return;
+  }
+  
+  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+    console.log(`${name}: ${vault.address}`);
+    
+    // Check if vault is already registered
+    if (deployment.vaults[name] && !deployment.vaults[name].addedToRegistry) {
+      await vaultRegistry.addVault(vault.address);
+      console.log('Added', name, 'to vault registry');
+      
+      // Update the registry status
+      deployment.vaults[name].addedToRegistry = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+    } else {
+      console.log(name, 'already registered, skipping');
+    }
+  }
+}
+
+/**
+ * Deploys pools with their interest rate models
+ * @param {Object} config - The network configuration object
+ * @param {Contract} addressProviderV3 - The address provider contract
+ */
+async function deployPools(config, addressProviderV3) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        DEPLOYING POOLS
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  const pools = [];
+  
+  for (const [poolKey, poolConfig] of Object.entries(config.Pools)) {
+    // Deploy LinearInterestRateModelV3 for this pool
+    const LinearInterestRateModelV3 = await deployContract(
+      'LinearInterestRateModelV3',
+      `LinearInterestRateModelV3_${poolKey}`,
+      false,
+      poolConfig.interestRateModel.U_1,
+      poolConfig.interestRateModel.U_2,
+      poolConfig.interestRateModel.R_base,
+      poolConfig.interestRateModel.R_slope1,
+      poolConfig.interestRateModel.R_slope2,
+      poolConfig.interestRateModel.R_slope3,
+      poolConfig.interestRateModel.isBorrowingMoreU2Forbidden || false
+    );
+
+    // Deploy PoolV3 contract
+    const PoolV3 = await deployContract(
+      'PoolV3',
+      `PoolV3_${poolKey}`,
+      false,
+      poolConfig.wrappedToken,
+      addressProviderV3.address,
+      poolConfig.underlier,
+      LinearInterestRateModelV3.address,
+      poolConfig.initialDebtCeiling || config.Core.Gearbox.initialGlobalDebtCeiling,
+      poolConfig.name,
+      poolConfig.symbol
+    );
+
+    console.log(`Pool ${poolKey} Deployed at ${PoolV3.address}`);
+    
+    // Only verify on Tenderly, don't call storeContractDeployment again
+    await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
+    await verifyOnTenderly('PoolV3', PoolV3.address);
+
+    pools.push(PoolV3);
+  }
+
+  return pools;
+}
+
 module.exports = {
   getSignerAddress,
   getDeploymentFilePath,
@@ -332,5 +599,12 @@ module.exports = {
   storeVaultMetadata,
   getVaultMetadata,
   getPoolAddress,
-  loadDeployedRewardManagers
+  loadDeployedRewardManagers,
+  deployPoolCore,
+  deployStakingAndLockingLP,
+  deployActions,
+  deployPositionActions,
+  deployVaultOracle,
+  registerVaults,
+  deployPools
 }; 

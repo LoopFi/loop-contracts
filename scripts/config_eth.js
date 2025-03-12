@@ -12,6 +12,10 @@ module.exports = {
     },
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     "PenpieHelper": "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4",
+    "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+    "PoolV3_LpUSD": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+    "PoolV3_LpETH": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+    "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -39,7 +43,7 @@ module.exports = {
       "constructorArguments": {
         "payees":[
           "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-          "stakingLpEth"
+          "stakingLpETH"
         ],
         "shares":[
           200,

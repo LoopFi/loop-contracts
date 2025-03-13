@@ -369,8 +369,8 @@ function wln(int256 x) pure returns (int256 r) {
 /// @return d The scaled down amount
 /// @return l The precision loss to add back when scaling up
 function wscaleLoss(uint256 x, uint256 s) pure returns (uint256 d, uint256 l) {
-    d = wdiv(x, s);
-    uint256 scaled = wmul(d, s);
-    l = x - scaled;
-    return (d, l);
+    uint256 scaled = wmul(x, s);
+    uint256 scaledUp = wdiv(scaled, s);
+    l = x - scaledUp;
+    d = scaled;
 }

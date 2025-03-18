@@ -73,7 +73,7 @@ async function deployCore() {
   };
 
   const { payees, shares, admin } = replaceParams(CONFIG_NETWORK.Core.Treasury.constructorArguments, treasuryReplaceParams);
-  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
+  const treasury = await deployContract('Treasury', getPoolSpecificName('Treasury'), false, payees, shares, admin);
   console.log('Treasury deployed to:', treasury.address);
   
   await pool.setTreasury(treasury.address);
@@ -142,8 +142,7 @@ async function deployActions(pool, vaultRegistry) {
   console.log('Set credit manager debt limit for flashlender to max');
   
   // Deploy PRBProxyRegistry (this one doesn't need pool suffix as it's chain-wide)
-  const proxyRegistry = await deployContract('PRBProxyRegistry');
-  console.log('PRBProxyRegistry deployed to ', proxyRegistry.address);
+  const proxyRegistry = await attachContract('PRBProxyRegistry', CONFIG_NETWORK.Core.PRBProxyRegistry);
   
   // Deploy Actions with pool-specific names
   const swapAction = await deployContract(
@@ -245,7 +244,7 @@ async function deployGauge() {
   const blockTimestamp = latestBlock.timestamp;
   const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
   
-  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
+  const voter = await deployContract('LoopVoter', getPoolSpecificName('LoopVoter'), false, addressProviderV3.address, firstEpochTimestamp);
   console.log(`Voter deployed to: ${voter.address}`);
 
   // Deploy GaugeV3 contract
@@ -805,10 +804,10 @@ async function deployPool() {
 
 ((async () => {
   // await deployPool();
-  await deployCore();
-  await deployVaults();
-  await registerVaults();
-  await deployGauge();
+  // await deployCore();
+  // await deployVaults();
+  // await registerVaults();
+  // await deployGauge();
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

@@ -15,6 +15,7 @@ module.exports = {
     "PoolV3_LpUSD": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
     "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+    "PRBProxyRegistry": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -105,7 +106,7 @@ module.exports = {
         },
       },
       token: "0x09d484B738dD85CE3953102453E91507982121d0",
-      poolAddress: "LpUSD",
+      poolAddress: "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
       tokenSymbol: "LOOP-deUSD",
       tokenScale: toWad("1.0"),
       protocolIcon: null,

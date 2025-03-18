@@ -67,10 +67,7 @@ async function deployVaults() {
   `);
 
   const signer = await getSignerAddress();
-  const {
-    PRBProxyRegistry: prbProxyRegistry,
-  } = await loadDeployedContracts();
-  
+  const prbProxyRegistry = await attachContract('PRBProxyRegistry', CONFIG_NETWORK.Core.ProxyRegistry);
   for (const [key, config] of Object.entries(CONFIG_NETWORK.Vaults)) {
     const vaultName = `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
@@ -90,7 +87,7 @@ async function deployVaults() {
       }
     }, CONFIG_NETWORK);
     
-    if (!oracleAddress) return;
+    if (!oracleAddress) continue;
 
     var token;
     var tokenAddress = config.token;
@@ -115,7 +112,7 @@ async function deployVaults() {
     const poolAddress = await getPoolAddress(config.poolAddress);
     if (!poolAddress) {
       console.log(`ERROR: Could not find pool address for ${config.poolAddress}`);
-      return;
+      continue;
     }
 
     // Verify this is actually a Pool contract
@@ -125,7 +122,7 @@ async function deployVaults() {
       console.log(`Verified pool at ${poolAddress} with underlying token: ${underlyingToken}`);
     } catch (error) {
       console.error(`ERROR: Address ${poolAddress} is not a valid PoolV3 contract:`, error.message);
-      return;
+      continue;
     }
 
     console.log(`Proceeding with vault deployment using pool: ${poolAddress}`);
@@ -311,11 +308,10 @@ async function deployInterestRateModel() {
 }
 
 ((async () => {
-  await deployInterestRateModel();
   // await deployCore();
-  // await deployVaults();
-  // await registerVaults(CONFIG_NETWORK);
-  // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+  await deployVaults();
+  await registerVaults(CONFIG_NETWORK);
+  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

@@ -88,26 +88,19 @@ module.exports = {
   "Vendors": {
   },
   "Vaults": {
-    "Vaults_deUSD": {
-      name: "Vaults_deUSD",
+    "Vaults_GHOUSR": {
+      name: "Vaults_GHOUSR",
       description: "This vault allows for borrowing and lending of assets",
       type: "CDPVaultSpectra",
       collateralType: "ERC20",
       oracle: {
-        type: "deUSD",
+        type: "MockOracle",
         deploymentArguments: {
-          "deUSDFeed": "0x89F48f6671Ec1B1C4f6abE964EBdd21F4eb7076f",
-          "heartbeat": 43200, // 12 hours
-          "sdeUSDVault": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
-          "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
-          "usdc_heartbeat": 86400, // 24 hours
-          "curvePool": "0xFb7c3C95f4C2C05F6eC7dcFE3e368a40eB338603",
-          "stalePeriod": 90000, // 25 hours
         },
       },
-      token: "0x09d484B738dD85CE3953102453E91507982121d0",
+      token: "0x04f970bb02b4cf20e836e4a3fd434c5e60057936",
       poolAddress: "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
-      tokenSymbol: "LOOP-deUSD",
+      tokenSymbol: "LOOP-GHOUSR",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
       deploymentArguments: {

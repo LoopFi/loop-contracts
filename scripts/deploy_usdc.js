@@ -21,7 +21,9 @@ const {
   storeEnvMetadata,
   storeVaultMetadata,
   getVaultMetadata,
-  getPoolAddress
+  getPoolAddress,
+  impersonateAccount,
+  stopImpersonatingAccount,
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -802,12 +804,52 @@ async function deployPool() {
   const pools = await deployPools(addressProviderV3);
 }
 
+async function impersonateDeployer() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                       INITIALIZING DEPLOYMENT
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Address to impersonate
+  const accountToImpersonate = "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC";
+  
+  // Get original signer for reference
+  const originalSigner = await getSignerAddress();
+  console.log(`Original deployer: ${originalSigner}`);
+  
+  // Impersonate the account and set it as default signer
+  const { signer, restore } = await impersonateAccount(accountToImpersonate);
+  
+  console.log(`Now deploying as impersonated account: ${accountToImpersonate}`);
+  
+  // Check if the impersonation was successful
+  const currentSigner = await getSignerAddress();
+  console.log(`Current deployer after impersonation: ${currentSigner}`);
+  
+  // Verify the signer by trying to send a small transaction
+  try {
+    const tx = await signer.sendTransaction({
+      to: signer.address,
+      value: ethers.utils.parseEther("0")
+    });
+    console.log(`Verification transaction sent: ${tx.hash}`);
+  } catch (error) {
+    console.error(`Error verifying impersonated signer: ${error.message}`);
+    throw new Error("Impersonation failed - check that you're using a local Anvil node with fork");
+  }
+  
+  return signer;
+}
+
 ((async () => {
+  // Initialize deployment with impersonation
+  await impersonateDeployer();
   // await deployPool();
   // await deployCore();
-  // await deployVaults();
-  // await registerVaults();
-  // await deployGauge();
+  await deployVaults();
+  await registerVaults();
+  await deployGauge();
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

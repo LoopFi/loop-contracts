@@ -4,7 +4,14 @@ const { ethers } = require('hardhat');
 const hre = require('hardhat');
 
 async function getSignerAddress() {
-  return (await ethers.getSigners())[0].address;
+  // Check if we have an override from impersonation
+  if (global.getSignerAddressOverride) {
+    return global.getSignerAddressOverride;
+  }
+  
+  // Otherwise use the default approach
+  const [signer] = await ethers.getSigners();
+  return await signer.getAddress();
 }
 
 async function getDeploymentFilePath() {
@@ -582,6 +589,77 @@ async function deployPools(config, addressProviderV3) {
   return pools;
 }
 
+/**
+ * Impersonates an account using anvil's impersonation feature and sets it as the default signer
+ * @param {string} address - The address to impersonate
+ * @returns {Promise<ethers.Signer>} - An ethers Signer connected to the impersonated account
+ */
+async function impersonateAccount(address) {
+  console.log(`Impersonating account: ${address}`);
+  
+  // Send the anvil_impersonateAccount JSON-RPC request
+  await ethers.provider.send("anvil_impersonateAccount", [address]);
+  
+  // Get a signer for the impersonated account
+  const impersonatedSigner = await ethers.getSigner(address);
+  
+  // Check the current signer balance and fund if necessary
+  const balance = await ethers.provider.getBalance(address);
+  console.log(`Impersonated account balance: ${ethers.utils.formatEther(balance)} ETH`);
+  
+  // Store the original signer functions for later restoration
+  const originalSigners = [...await ethers.getSigners()];
+  
+  // Replace the ethers.getSigners function to always return our impersonated signer first
+  const originalGetSigners = ethers.getSigners;
+  ethers.getSigners = async () => {
+    return [impersonatedSigner, ...originalSigners.slice(1)];
+  };
+  
+  // Replace the getSignerAddress function in deployUtils
+  const originalGetSignerAddress = getSignerAddress;
+  global.getSignerAddressOverride = address;
+  
+  // Return both the signer and utility functions for restoration later
+  return {
+    signer: impersonatedSigner,
+    restore: async () => {
+      ethers.getSigners = originalGetSigners;
+      global.getSignerAddressOverride = undefined;
+      await stopImpersonatingAccount(address);
+    }
+  };
+}
+
+/**
+ * Stops impersonating a previously impersonated account
+ * @param {string} address - The address to stop impersonating
+ */
+async function stopImpersonatingAccount(address) {
+  console.log(`Stopping impersonation of account: ${address}`);
+  await ethers.provider.send("anvil_stopImpersonatingAccount", [address]);
+}
+
+/**
+ * Optional: Fund an account with ETH if needed
+ * @param {string} address - The address to fund
+ * @param {BigNumber} amount - The amount to fund
+ */
+async function fundAccount(address, amount) {
+  console.log(`Funding account ${address} with ${ethers.utils.formatEther(amount)} ETH`);
+  
+  // Get a signer with some ETH (typically the default account in Anvil)
+  const [signer] = await ethers.getSigners();
+  
+  // Send ETH to the target address
+  await signer.sendTransaction({
+    to: address,
+    value: amount
+  });
+  
+  console.log(`Funded account: ${address}`);
+}
+
 module.exports = {
   getSignerAddress,
   getDeploymentFilePath,
@@ -606,5 +684,8 @@ module.exports = {
   deployPositionActions,
   deployVaultOracle,
   registerVaults,
-  deployPools
+  deployPools,
+  impersonateAccount,
+  stopImpersonatingAccount,
+  fundAccount,
 }; 

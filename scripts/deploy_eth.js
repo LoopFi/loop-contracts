@@ -29,6 +29,8 @@ const {
   deployVaultOracle,
   registerVaults,
   deployPools,
+  impersonateAccount,
+  stopImpersonatingAccount,
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -45,6 +47,48 @@ ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
 const fromWad = ethers.utils.formatEther;
 const toBytes32 = ethers.utils.formatBytes32String;
+
+// Function to initialize the deployment with account impersonation
+async function impersonateDeployer() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                       INITIALIZING DEPLOYMENT
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Address to impersonate
+  const accountToImpersonate = "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC";
+  
+  // Get original signer for reference
+  const originalSigner = await getSignerAddress();
+  console.log(`Original deployer: ${originalSigner}`);
+  
+  // Impersonate the account and set it as default signer
+  const impersonatedSigner = await impersonateAccount(accountToImpersonate);
+  console.log(`Now deploying as impersonated account: ${accountToImpersonate}`);
+  
+  // Check if the impersonation was successful
+  const currentSigner = await getSignerAddress();
+  console.log(`Current deployer after impersonation: ${currentSigner}`);
+  
+  return impersonatedSigner;
+}
+
+// Function to cleanup after deployment
+async function finalizeDeployment() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        FINALIZING DEPLOYMENT
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  // Address that was impersonated
+  const accountToImpersonate = "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC";
+  
+  // Stop impersonating
+  await stopImpersonatingAccount(accountToImpersonate);
+  console.log(`Stopped impersonating account: ${accountToImpersonate}`);
+}
 
 async function deployCore() {
   console.log(`
@@ -224,25 +268,28 @@ async function deployGauge(poolAddress) {
     return;
   }
 
-  const liquidityPool = await attachContract('PoolV3', poolAddress);
-  const latestBlock = await ethers.provider.getBlock('latest');
-  const blockTimestamp = latestBlock.timestamp;
-  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
+  // const liquidityPool = await attachContract('PoolV3', poolAddress);
+  // const latestBlock = await ethers.provider.getBlock('latest');
+  // const blockTimestamp = latestBlock.timestamp;
+  // const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
   
-  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
-  console.log(`Voter deployed to: ${voter.address}`);
+  // const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
+  // console.log(`Voter deployed to: ${voter.address}`);
 
-  // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
-  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
+  // // Deploy GaugeV3 contract
+  // const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
+  // console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
   
-  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
-  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
+  // // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
+  // const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
+  // await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
 
-  // Set Gauge in QuotaKeeper
-  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  console.log('Set gauge in QuotaKeeper');
+  // // Set Gauge in QuotaKeeper
+  // await poolQuotaKeeperV3.setGauge(gaugeV3.address);
+  // console.log('Set gauge in QuotaKeeper');
+
+  const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
+  const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
 
   const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
@@ -307,16 +354,36 @@ async function deployInterestRateModel() {
   return LinearInterestRateModelV3;
 }
 
+// Main execution function
 ((async () => {
-  // await deployCore();
-  await deployVaults();
-  await registerVaults(CONFIG_NETWORK);
-  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
-  // await deployGearbox();
-  // await logVaults();
-  // await verifyAllDeployedContracts();
-
-  // const pools = await deployPools(CONFIG_NETWORK, addressProviderV3);
+  try {
+    // Initialize deployment with impersonation
+    // uncomment this to deploy as the impersonated account, only supported on local deployment(anvil)
+    // await impersonateDeployer();
+    
+    // await deployCore();
+    await deployVaults();
+    await registerVaults(CONFIG_NETWORK);
+    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+    // await deployGearbox();
+    // await logVaults();
+    // await verifyAllDeployedContracts();
+    // const pools = await deployPools(CONFIG_NETWORK, addressProviderV3);
+    
+    // Finalize and clean up if needed
+    // await finalizeDeployment();
+  } catch (error) {
+    console.error("Deployment failed:", error);
+    
+    // Make sure to stop impersonating if an error occurs
+    try {
+      await stopImpersonatingAccount("0x9B2205E4E62e333141117Fc895DC77B558E2a2BC");
+    } catch (cleanupError) {
+      console.error("Error during cleanup:", cleanupError);
+    }
+    
+    process.exit(1);
+  }
 })()).catch((error) => {
   console.error(error);
   process.exit(1);

@@ -27,7 +27,7 @@ anvil            :; anvil --fork-url $(MAINNET_RPC_URL) --auto-impersonate
 anvil-scroll     :; anvil --fork-url $(SCROLL_RPC_URL) --auto-impersonate
 anvil-bsc        :; anvil --fork-url $(BNB_RPC_URL) --auto-impersonate
 deploy-clear     :; rm -rf scripts/*-local.json
-deploy-anvil     :; rm -rf scripts/*-local.json && npx hardhat run scripts/deploy_eth.js --network local --show-stack-traces
+deploy-anvil     :; npx hardhat run scripts/deploy_eth.js --network local --show-stack-traces
 deploy-anvil-usdc:; npx hardhat run scripts/deploy_usdc.js --network local --show-stack-traces
 deploy-anvil-bsc :;	npx hardhat run scripts/deploy_bsc.js --network local --show-stack-traces
 deploy-tenderly  :; npx hardhat run scripts/Deploy.js --network tenderly

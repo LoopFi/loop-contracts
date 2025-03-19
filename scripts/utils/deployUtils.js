@@ -685,7 +685,6 @@ module.exports = {
   deployVaultOracle,
   registerVaults,
   deployPools,
-  // New functions for account impersonation
   impersonateAccount,
   stopImpersonatingAccount,
   fundAccount,

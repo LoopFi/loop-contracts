@@ -3,10 +3,11 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import "src/Silo.sol";
 
-contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
+contract StakingLPEth is ERC4626, AccessControl, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     // Errors //
     /// @notice Error emitted when the shares amount to redeem is greater than the shares balance of the owner
@@ -26,7 +27,7 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     }
 
     /// @notice Minimum non-zero shares amount to prevent donation attack
-    uint256 private constant MIN_SHARES = 0.01 ether;
+    uint256 private immutable minShares;
 
     Silo public immutable silo;
 
@@ -36,9 +37,20 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
 
     uint24 public cooldownDuration;
 
+    // Role for whitelist administrators
+    bytes32 public constant WHITELIST_ADMIN_ROLE = keccak256("WHITELIST_ADMIN_ROLE");
+
+    mapping(address => bool) public isWhitelisted;
+
     // Events //
     /// @notice Event emitted when cooldown duration updates
     event CooldownDurationUpdated(uint24 previousDuration, uint24 newDuration);
+
+    /// @notice Event emitted when an address is whitelisted
+    event AddressWhitelisted(address indexed account);
+
+    /// @notice Event emitted when an address is removed from the whitelist
+    event AddressRemovedFromWhitelist(address indexed account);
 
     /// @notice ensure cooldownDuration is zero
     modifier ensureCooldownOff() {
@@ -55,10 +67,31 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     constructor(
         address _liquidityPool,
         string memory _name,
-        string memory _symbol
+        string memory _symbol,
+        uint256 _minShares
     ) ERC4626(IERC20(_liquidityPool)) ERC20(_name, _symbol) {
         silo = new Silo(address(this), _liquidityPool);
         cooldownDuration = MAX_COOLDOWN_DURATION;
+
+        minShares = _minShares;
+
+        // Setup admin role
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(WHITELIST_ADMIN_ROLE, msg.sender);
+    }
+
+    /// @notice Add an address to the whitelist
+    /// @param account The address to whitelist
+    function addToWhitelist(address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
+        isWhitelisted[account] = true;
+        emit AddressWhitelisted(account);
+    }
+
+    /// @notice Remove an address from the whitelist
+    /// @param account The address to remove from whitelist
+    function removeFromWhitelist(address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
+        isWhitelisted[account] = false;
+        emit AddressRemovedFromWhitelist(account);
     }
 
     /**
@@ -90,7 +123,9 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
         UserCooldown storage userCooldown = cooldowns[msg.sender];
         uint256 assets = userCooldown.underlyingAmount;
 
-        if (block.timestamp >= userCooldown.cooldownEnd || cooldownDuration == 0) {
+        if (isWhitelisted[msg.sender] || 
+            block.timestamp >= userCooldown.cooldownEnd || 
+            cooldownDuration == 0) {
             userCooldown.cooldownEnd = 0;
             userCooldown.underlyingAmount = 0;
 
@@ -141,7 +176,7 @@ contract StakingLPEth is ERC4626, Ownable, ReentrancyGuard {
     /// @notice ensures a small non-zero amount of shares does not remain, exposing to donation attack
     function _checkMinShares() internal view {
         uint256 _totalSupply = totalSupply();
-        if (_totalSupply > 0 && _totalSupply < MIN_SHARES) revert MinSharesViolation();
+        if (_totalSupply > 0 && _totalSupply < minShares) revert MinSharesViolation();
     }
 
     /**

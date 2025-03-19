@@ -27,7 +27,7 @@ contract SpectraYnETHOracleTest is Test {
         spectraOracle = SpectraYnETHOracle(
             address(
                 new ERC1967Proxy(
-                    address(new SpectraYnETHOracle(curvePool, ynETH, swYnETH)),
+                    address(new SpectraYnETHOracle(curvePool, swYnETH)),
                     abi.encodeWithSelector(SpectraYnETHOracle.initialize.selector, address(this), address(this))
                 )
             )
@@ -37,7 +37,6 @@ contract SpectraYnETHOracleTest is Test {
     function test_deployOracle() public {
         assertTrue(address(spectraOracle) != address(0));
         assertEq(address(spectraOracle.curvePool()), curvePool);
-        assertEq(address(spectraOracle.ynETH()), ynETH);
         assertEq(address(spectraOracle.spectraYnETH()), address(swYnETH));
     }
 
@@ -56,17 +55,16 @@ contract SpectraYnETHOracleTest is Test {
     }
 
     function test_upgradeOracle() public {
-        spectraOracle.upgradeTo(address(new SpectraYnETHOracle(address(0x1), address(0x2), address(0x3))));
+        spectraOracle.upgradeTo(address(new SpectraYnETHOracle(address(0x1), address(0x2))));
         assertTrue(address(spectraOracle) != address(0));
         assertEq(address(spectraOracle.curvePool()), address(0x1));
-        assertEq(address(spectraOracle.ynETH()), address(0x2));
-        assertEq(address(spectraOracle.spectraYnETH()), address(0x3));
+        assertEq(address(spectraOracle.spectraYnETH()), address(0x2));
     }
 
     function test_upgradeOracle_revertsOnUnauthorized() public {
         // attempt to upgrade from an unauthorized address
         vm.startPrank(address(0x123123));
-        address newImplementation = address(new SpectraYnETHOracle(address(0x1), address(0x2), address(0x3)));
+        address newImplementation = address(new SpectraYnETHOracle(address(0x1), address(0x2)));
 
         vm.expectRevert();
         spectraOracle.upgradeTo(newImplementation);

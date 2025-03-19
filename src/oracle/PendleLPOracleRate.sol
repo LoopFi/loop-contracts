@@ -3,24 +3,26 @@ pragma solidity ^0.8.19;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-
-import {wdiv, wmul} from "../utils/Math.sol";
+import "pendle/oracles/PendleLpOracleLib.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
-import {IStableSwap} from "src/interfaces/IStableSwapTranchess.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ICurvePool} from "src/vendor/ICurvePool.sol";
+import {IPMarket} from "pendle/interfaces/IPMarket.sol";
+import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
+import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
 
 /// The oracle is upgradable if the current implementation does not return a valid price
-contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
+contract PendleLPOracleRate is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
+    using PendleLpOracleLib for IPMarket;
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Stableswap contract
-    ICurvePool public immutable curvePool;
-    /// @notice Spectra ynETH
-    ERC4626 public immutable spectraYnETH;
+
+    /// @notice Pendle Market
+    IPMarket public immutable market;
+    /// @notice TWAP window in seconds
+    uint32 public immutable twapWindow;
+    /// @notice Pendle Pt Oracle
+    IPPtOracle public immutable ptOracle;
+
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
     //////////////////////////////////////////////////////////////*/
@@ -28,14 +30,27 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     uint256[50] private __gap;
 
     /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error PendleLPOracle__spot_invalidValue();
+    error PendleLPOracle__authorizeUpgrade_validStatus();
+    error PendleLPOracle__validatePtOracle_invalidValue();
+
+    /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:oz-upgrades-unsafe-allow constructor
 
-    constructor(address curvePool_, address spectraYnETH_) initializer {
-        spectraYnETH = ERC4626(spectraYnETH_);
-        curvePool = ICurvePool(curvePool_);
+    constructor(
+        address ptOracle_,
+        address market_,
+        uint32 twap_
+    ) initializer {
+        market = IPMarket(market_);
+        twapWindow = twap_;
+        ptOracle = IPPtOracle(ptOracle_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -57,7 +72,9 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @notice Authorizes an upgrade
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
-    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {}
+    function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
+        if (_getStatus()) revert PendleLPOracle__authorizeUpgrade_validStatus();
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 PRICING
@@ -67,7 +84,7 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @param /*token*/ Token address, ignored for this oracle
     /// @dev The status is valid if the price is validated and not stale
     function getStatus(address /*token*/) public view virtual override returns (bool status) {
-        return true;
+        return _getStatus();
     }
 
     /// @notice Returns the latest price for the asset from Chainlink [WAD]
@@ -75,13 +92,29 @@ contract SpectraYnETHOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     /// @return price Asset price [WAD]
     /// @dev reverts if the price is invalid
     function spot(address /* token */) external view virtual override returns (uint256 price) {
-        uint256 spectraYnETHVirtualPrice = _fetchVirtualPrice();
-        return spectraYnETH.convertToAssets(spectraYnETHVirtualPrice);
+        bool isValidPtOracle = _validatePtOracle();
+        if (!isValidPtOracle) revert PendleLPOracle__validatePtOracle_invalidValue();
+        return market.getLpToAssetRate(twapWindow);
     }
 
-    /// @notice LP token virtual price in Spectra ynETH
-    /// @return virtualPrice LP token virtual price in Spectra ynETH
-    function _fetchVirtualPrice() internal view returns (uint256 virtualPrice) {
-        return curvePool.lp_price();
+    /// @notice Returns the status of the oracle
+    /// @return status Whether the oracle is valid
+    /// @dev The status is valid if the price is validated and not stale
+    function _getStatus() private view returns (bool status) {
+       return _validatePtOracle();
+    }
+
+    /// @notice Validates the PT oracle
+    /// @return isValid Whether the PT oracle is valid for this market and twap window
+    function _validatePtOracle() internal view returns (bool isValid) {
+        try ptOracle.getOracleState(address(market), twapWindow) returns (
+            bool increaseCardinalityRequired,
+            uint16,
+            bool oldestObservationSatisfied
+        ) {
+            if (!increaseCardinalityRequired && oldestObservationSatisfied) return true;
+        } catch {
+            // return default value on failure
+        }
     }
 }

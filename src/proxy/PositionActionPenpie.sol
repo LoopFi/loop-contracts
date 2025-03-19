@@ -3,14 +3,17 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {ICDPVault} from "../interfaces/ICDPVault.sol";
-import {wmul} from "../utils/Math.sol";
+import {wmul} from "src/utils/Math.sol";
 import {PositionAction, LeverParams} from "./PositionAction.sol";
 import {PoolActionParams, Protocol} from "./PoolAction.sol";
+import {IPendleMarketDepositHelper} from "src/interfaces/IPendleMarketDepositHelper.sol";
+import {IPenpieReceiptToken} from "src/interfaces/IPenpieReceiptToken.sol";
 
-/// @title PositionActionPendle
-/// @notice Pendle LP implementation of PositionAction base contract
-contract PositionActionPendle is PositionAction {
+/// @title PositionActionPenpie
+/// @notice Penpie for Pendle LP implementation of PositionAction base contract
+contract PositionActionPenpie is PositionAction {
     /*//////////////////////////////////////////////////////////////
                                LIBRARIES
     //////////////////////////////////////////////////////////////*/
@@ -21,13 +24,21 @@ contract PositionActionPendle is PositionAction {
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
+    IPendleMarketDepositHelper public immutable penpieHelper;
+
+    address public immutable penpieStaking;
+
     constructor(
         address flashlender_,
         address swapAction_,
         address poolAction_,
         address vaultRegistry_,
-        address weth_
-    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_, weth_) {}
+        address weth_,
+        address penpieHelper_
+    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_, weth_) {
+        penpieHelper = IPendleMarketDepositHelper(penpieHelper_);
+        penpieStaking = penpieHelper.pendleStaking();
+    }
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION
@@ -36,56 +47,48 @@ contract PositionActionPendle is PositionAction {
     /// @notice Deposit collateral into the vault
     /// @param vault Address of the vault
     /// @param amount Amount of collateral to deposit [CDPVault.tokenScale()]
+    /// @param src Pendle LP token address
     /// @return Amount of collateral deposited [CDPVault.tokenScale()]
     function _onDeposit(
         address vault,
         address position,
-        address /*src*/,
+        address src,
         uint256 amount
     ) internal override returns (uint256) {
         address collateralToken = address(ICDPVault(vault).token());
+
+        // if the src is not the collateralToken, we need to deposit the underlying into the Penpie staking contract
+        if (src != collateralToken) {
+            IERC20(src).forceApprove(address(penpieStaking), amount);
+            penpieHelper.depositMarketFor(src, address(this), amount);
+        }
+
         IERC20(collateralToken).forceApprove(vault, amount);
-        uint256 depositAmount = ICDPVault(vault).deposit(position, amount);
-        uint256 scaledAmount = wmul(depositAmount, ICDPVault(vault).tokenScale());
-        return scaledAmount;
+        uint256 scaledAmount = ICDPVault(vault).deposit(position, amount);
+        uint256 depositAmount = wmul(scaledAmount, ICDPVault(vault).tokenScale());
+        return depositAmount;
     }
 
     /// @notice Withdraw collateral from the vault
     /// @param vault Address of the vault
+    /// @param position Address of the position
+    /// @param dst Token the caller expects to receive
     /// @param amount Amount of collateral to withdraw [wad]
-    /// @param minAmountOut The minimum amount out for the aux swap
     /// @return Amount of collateral withdrawn [CDPVault.tokenScale()]
     function _onWithdraw(
         address vault,
         address position,
         address dst,
         uint256 amount,
-        uint256 minAmountOut
+        uint256 /*minAmountOut*/
     ) internal override returns (uint256) {
         uint256 scaledCollateralWithdrawn = ICDPVault(vault).withdraw(address(position), amount);
         uint256 collateralWithdrawn = wmul(scaledCollateralWithdrawn, ICDPVault(vault).tokenScale());
         address collateralToken = address(ICDPVault(vault).token());
 
         if (dst != collateralToken && dst != address(0)) {
-            PoolActionParams memory poolActionParams = PoolActionParams({
-                protocol: Protocol.PENDLE,        
-                minOut: minAmountOut,                   
-                recipient: address(this),     
-                args: abi.encode(
-                    collateralToken,          
-                    collateralWithdrawn,       
-                    dst                        
-                )
-            });
-
-            bytes memory exitData = _delegateCall(
-                address(poolAction),
-                abi.encodeWithSelector(poolAction.exit.selector, poolActionParams)
-            );
-
-            collateralWithdrawn = abi.decode(exitData, (uint256));
+            penpieHelper.withdrawMarket(dst, collateralWithdrawn);
         }
-        
         return collateralWithdrawn;
     }
 
@@ -104,8 +107,14 @@ contract PositionActionPendle is PositionAction {
         if (leverParams.auxAction.args.length != 0) {
             _delegateCall(address(poolAction), abi.encodeWithSelector(poolAction.join.selector, leverParams.auxAction));
         }
-        addCollateralAmount = ICDPVault(leverParams.vault).token().balanceOf(address(this));
-        IERC20(leverParams.collateralToken).forceApprove(leverParams.vault, addCollateralAmount);
+        address underlying = IPenpieReceiptToken(address(ICDPVault(leverParams.vault).token())).underlying();
+        
+        addCollateralAmount = IERC20(underlying).balanceOf(address(this));
+        IERC20(underlying).forceApprove(address(penpieStaking), addCollateralAmount);
+        penpieHelper.depositMarketFor(underlying, address(this), addCollateralAmount);
+
+        ICDPVault(leverParams.vault).token().forceApprove(leverParams.vault, addCollateralAmount);
+
         // deposit into the CDP Vault
         return addCollateralAmount;
     }
@@ -113,13 +122,13 @@ contract PositionActionPendle is PositionAction {
     /// @notice Hook to decrease lever by withdrawing collateral from the CDPVault
     /// @param leverParams LeverParams struct
     /// @param subCollateral Amount of collateral to subtract in CDPVault decimals [wad]
-    /// @return tokenOut Amount of underlying token withdrawn from CDPVault [CDPVault.tokenScale()]
+    /// @return tokenOut Amount of underlying token of Pendle SY [underlying scale]
     function _onDecreaseLever(
         LeverParams memory leverParams,
         uint256 subCollateral
     ) internal override returns (uint256 tokenOut) {
-        _onWithdraw(leverParams.vault, leverParams.position, address(0), subCollateral, 0);
-
+        (address pendleToken, , ) = abi.decode(leverParams.auxAction.args, (address, uint256, address));
+        _onWithdraw(leverParams.vault, leverParams.position, pendleToken, subCollateral, 0);
         if (leverParams.auxAction.args.length != 0) {
             bytes memory exitData = _delegateCall(
                 address(poolAction),

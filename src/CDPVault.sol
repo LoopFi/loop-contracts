@@ -61,8 +61,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     //////////////////////////////////////////////////////////////*/
 
     // CDPVault Parameters
-    /// @notice Oracle of the collateral token
-    IOracle public immutable oracle;
+
     /// @notice collateral token
     IERC20 public immutable token;
     /// @notice Collateral token's decimals scale (10 ** decimals)
@@ -133,6 +132,9 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
 
     /// @notice Reward manager
     IRewardManager public rewardManager;
+
+    /// @notice Oracle of the collateral token
+    IOracle public oracle;
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -225,6 +227,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
     function setParameter(bytes32 parameter, address data) external whenNotPaused onlyRole(VAULT_CONFIG_ROLE) {
         if (parameter == "rewardController") rewardController = IChefIncentivesController(data);
         else if (parameter == "rewardManager") rewardManager = IRewardManager(data);
+        else if (parameter == "oracle") oracle = IOracle(data);
         else revert CDPVault__setParameter_unrecognizedParameter();
         emit SetParameter(parameter, data);
     }

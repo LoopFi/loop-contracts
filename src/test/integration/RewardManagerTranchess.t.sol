@@ -119,7 +119,7 @@ contract RewardManagerTranchessTest is TestBase {
     address kyberRouter = 0x6131B5fae19EA4f9D964eAc0408E4408b66337b5;
 
     function setUp() public virtual override {
-        vm.createSelectFork(vm.rpcUrl("scroll"));
+        vm.createSelectFork(vm.rpcUrl("scroll"), 11743794);
         usePatchedDeal = true;
         super.setUp();
 
@@ -177,11 +177,9 @@ contract RewardManagerTranchessTest is TestBase {
         userPk2 = 0x12341235;
         user2 = vm.addr(userPk2);
         userProxy2 = PRBProxy(payable(address(prbProxyRegistry.deployFor(user2))));
-        vm.prank(stoneHolder);
-        ERC20(STONE).transfer(user, 100 ether);
-        vm.startPrank(lpTokenHolder);
-        ERC20(lpToken).transfer(user2, 10 ether);
-        ERC20(lpToken).transfer(user, 10 ether);
+        deal(STONE, user, 100 ether);
+        deal(lpToken, user, 10 ether);
+        deal(lpToken, user2, 10 ether);
 
         vm.stopPrank();
         vm.prank(address(userProxy));

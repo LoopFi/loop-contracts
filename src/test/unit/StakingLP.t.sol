@@ -114,4 +114,130 @@ contract StakingLPEthTest is TestBase {
         stakingLpEth.unstake(user1);
         assertApproxEqAbs(liquidityPool.balanceOf(user1), 0.199999999999999999 ether, 1);
     }
+
+    function test_addToWhitelist() public {
+        address whitelistedUser = address(0x123);
+        
+        // Grant WHITELIST_ADMIN_ROLE to the test contract
+        stakingLpEth.grantRole(stakingLpEth.WHITELIST_ADMIN_ROLE(), address(this));
+        
+        // Add user to whitelist
+        stakingLpEth.addToWhitelist(whitelistedUser);
+        
+        // Verify user is whitelisted
+        assertTrue(stakingLpEth.isWhitelisted(whitelistedUser));
+    }
+
+    function test_addToWhitelist_RevertWhenNotAdmin() public {
+        address whitelistedUser = address(0x123);
+        address nonAdmin = address(0x456);
+        
+        // Try to add to whitelist from non-admin account
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        stakingLpEth.addToWhitelist(whitelistedUser);
+    }
+
+    function test_removeFromWhitelist() public {
+        address whitelistedUser = address(0x123);
+        
+        // Grant WHITELIST_ADMIN_ROLE to the test contract
+        stakingLpEth.grantRole(stakingLpEth.WHITELIST_ADMIN_ROLE(), address(this));
+        
+        // First add user to whitelist
+        stakingLpEth.addToWhitelist(whitelistedUser);
+        assertTrue(stakingLpEth.isWhitelisted(whitelistedUser));
+        
+        // Remove user from whitelist
+        stakingLpEth.removeFromWhitelist(whitelistedUser);
+        
+        // Verify user is no longer whitelisted
+        assertFalse(stakingLpEth.isWhitelisted(whitelistedUser));
+    }
+
+    function test_removeFromWhitelist_RevertWhenNotAdmin() public {
+        address whitelistedUser = address(0x123);
+        address nonAdmin = address(0x456);
+        
+        // Grant WHITELIST_ADMIN_ROLE to the test contract and add user to whitelist
+        stakingLpEth.grantRole(stakingLpEth.WHITELIST_ADMIN_ROLE(), address(this));
+        stakingLpEth.addToWhitelist(whitelistedUser);
+        
+        // Try to remove from whitelist using non-admin account
+        vm.prank(nonAdmin);
+        vm.expectRevert();
+        stakingLpEth.removeFromWhitelist(whitelistedUser);
+    }
+
+    function test_unstake_whitelisted() public {
+        stakingLpEth.setCooldownDuration(7 days);
+        address whitelistedUser = address(0x123);
+        uint256 depositAmount = 1e18;
+        
+        // Setup whitelist
+        stakingLpEth.grantRole(stakingLpEth.WHITELIST_ADMIN_ROLE(), address(this));
+        stakingLpEth.addToWhitelist(whitelistedUser);
+        
+        // Setup initial state - deposit and start cooldown
+        deal(address(liquidityPool), whitelistedUser, depositAmount);
+        vm.startPrank(whitelistedUser);
+        liquidityPool.approve(address(stakingLpEth), depositAmount);
+        stakingLpEth.deposit(depositAmount, whitelistedUser);
+        
+        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        
+        // Try to unstake immediately (should work for whitelisted user)
+        stakingLpEth.unstake(whitelistedUser);
+        vm.stopPrank();
+        
+        // Verify unstake was successful
+        assertEq(liquidityPool.balanceOf(whitelistedUser), depositAmount);
+        assertEq(stakingLpEth.balanceOf(whitelistedUser), 0);
+    }
+
+    function test_unstake_revertOnCooldownIfNotWhitelisted() public {
+        stakingLpEth.setCooldownDuration(7 days);
+        address nonWhitelistedUser = address(0x123);
+        uint256 depositAmount = 1e18;
+        
+        // Setup initial state - deposit and start cooldown
+        deal(address(liquidityPool), nonWhitelistedUser, depositAmount);
+        vm.startPrank(nonWhitelistedUser);
+        liquidityPool.approve(address(stakingLpEth), depositAmount);
+        stakingLpEth.deposit(depositAmount, nonWhitelistedUser);
+        
+        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        
+        // Try to unstake immediately (should fail for non-whitelisted user)
+        vm.expectRevert(StakingLPEth.InvalidCooldown.selector);
+        stakingLpEth.unstake(nonWhitelistedUser);
+        vm.stopPrank();
+    }
+
+    function test_unstake_revertOnCooldownIfRemovedFromWhitelist() public {
+        stakingLpEth.setCooldownDuration(7 days);
+        address user = address(0x123);
+        uint256 depositAmount = 1e18;
+        
+        // Setup whitelist
+        stakingLpEth.grantRole(stakingLpEth.WHITELIST_ADMIN_ROLE(), address(this));
+        stakingLpEth.addToWhitelist(user);
+        
+        // Setup initial state
+        deal(address(liquidityPool), user, depositAmount);
+        vm.startPrank(user);
+        liquidityPool.approve(address(stakingLpEth), depositAmount);
+        stakingLpEth.deposit(depositAmount, user);
+        
+        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        
+        // Remove from whitelist
+        vm.stopPrank();
+        stakingLpEth.removeFromWhitelist(user);
+        
+        // Try to unstake (should fail now)
+        vm.prank(user);
+        vm.expectRevert(StakingLPEth.InvalidCooldown.selector);
+        stakingLpEth.unstake(user);
+    }
 }

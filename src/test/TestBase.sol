@@ -128,7 +128,7 @@ contract TestBase is Test {
     }
 
     function createStakingLpEth() internal virtual {
-        stakingLpEth = new StakingLPEth(address(liquidityPool), "StakingLPEth", "sLP-ETH");
+        stakingLpEth = new StakingLPEth(address(liquidityPool), "StakingLPEth", "sLP-ETH", 0.01 ether);
         vm.label({account: address(stakingLpEth), newLabel: "StakingLPEth"});
         silo = stakingLpEth.silo();
         vm.label({account: address(silo), newLabel: "Silo"});

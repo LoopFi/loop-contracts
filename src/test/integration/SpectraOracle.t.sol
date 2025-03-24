@@ -67,7 +67,7 @@ contract SpectraOracleTest is TestBase {
         spectraOracle = SpectraYnETHOracle(
             address(
                 new ERC1967Proxy(
-                    address(new SpectraYnETHOracle(curvePool, ynETH, address(swYnETH))),
+                    address(new SpectraYnETHOracle(curvePool, address(swYnETH))),
                     abi.encodeWithSelector(SpectraYnETHOracle.initialize.selector, address(this), address(this))
                 )
             )

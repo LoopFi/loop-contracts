@@ -182,7 +182,7 @@ contract CDPVault is AccessControl, Pause, Permission, ICDPVaultBase {
         pool = constants.pool;
         oracle = constants.oracle;
         token = constants.token;
-        tokenScale = constants.tokenScale;
+        tokenScale = 10 ** IERC20Metadata(address(constants.token)).decimals();
 
         poolUnderlying = IERC20(pool.underlyingToken());
         poolUnderlyingScale = 10 ** IERC20Metadata(address(poolUnderlying)).decimals();

@@ -28,5 +28,8 @@
     "generate-ts-bindings": "node ./scripts/generate-ts-bindings.js",
     "generate-permit-sigs": "node ./scripts/generate-permit-sigs.js",
     "tenderly-fund": "node ./scripts/tenderly-fund.js"
+  },
+  "dependencies": {
+    "@pythnetwork/pyth-sdk-solidity": "^4.0.0"
   }
 }

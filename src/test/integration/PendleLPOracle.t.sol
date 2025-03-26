@@ -12,8 +12,8 @@ import {wdiv, wmul} from "../../utils/Math.sol";
 import {PendleLPOracle} from "../../oracle/PendleLPOracle.sol";
 
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
-import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
-import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
+import {PendleLpOracleLib} from "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
+import {IPPYLpOracle} from "pendle/interfaces/IPPYLpOracle.sol";
 
 contract PendleLPOracleTest is IntegrationTestBase {
     using PendleLpOracleLib for IPMarket;
@@ -67,21 +67,21 @@ contract PendleLPOracleTest is IntegrationTestBase {
     function test_getStatus_returnsFalseOnPendleInvalidValue() public {
         vm.mockCall(
             ptOracle,
-            abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180),
+            abi.encodeWithSelector(IPPYLpOracle.getOracleState.selector, market, 180),
             abi.encode(true, 0, true)
         );
         assertTrue(pendleOracle.getStatus(address(0)) == false);
 
         vm.mockCall(
             ptOracle,
-            abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180),
+            abi.encodeWithSelector(IPPYLpOracle.getOracleState.selector, market, 180),
             abi.encode(false, 0, false)
         );
         assertTrue(pendleOracle.getStatus(address(0)) == false);
 
         vm.mockCall(
             ptOracle,
-            abi.encodeWithSelector(IPPtOracle.getOracleState.selector, market, 180),
+            abi.encodeWithSelector(IPPYLpOracle.getOracleState.selector, market, 180),
             abi.encode(false, 0, true)
         );
         assertTrue(pendleOracle.getStatus(address(0)));

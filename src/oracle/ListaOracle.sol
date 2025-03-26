@@ -7,25 +7,25 @@ import "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
 
 import {AggregatorV3Interface} from "../vendor/AggregatorV3Interface.sol";
 
-import {wdiv, wmul} from "../utils/Math.sol";
+import {wdiv, wmul, WAD} from "../utils/Math.sol";
 import {IOracle, MANAGER_ROLE} from "../interfaces/IOracle.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
 import {PendleLpOracleLib} from "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
 import {IPPYLpOracle} from "pendle/interfaces/IPPYLpOracle.sol";
-
+import {IStakeManager} from "../vendor/IStakeManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 /// The oracle is upgradable if the current implementation does not return a valid price
-contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
+contract ListaOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     using PendleLpOracleLib for IPMarket;
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Chainlink aggregator address
-    AggregatorV3Interface public immutable aggregator;
+    /// @notice Lista Stake manager
+    IStakeManager public immutable listaStakeManager;
     /// @notice Stable period in seconds
     uint256 public immutable stalePeriod;
-    /// @notice Aggregator decimal to WAD conversion scale
-    uint256 public immutable aggregatorScale;
     /// @notice Pendle Market
     IPMarket public immutable market;
     /// @notice TWAP window in seconds
@@ -43,9 +43,10 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error PendleLPOracle__spot_invalidValue();
-    error PendleLPOracle__authorizeUpgrade_validStatus();
-    error PendleLPOracle__validatePtOracle_invalidValue();
+    error ListaOracle__unsupportedToken();
+    error ListaOracle__spot_invalidValue();
+    error ListaOracle__authorizeUpgrade_validStatus();
+    error ListaOracle__validatePtOracle_invalidValue();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
@@ -55,14 +56,13 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
 
     constructor(
         address ptOracle_,
+        address listaStakeManager_,
         address market_,
         uint32 twap_,
-        AggregatorV3Interface aggregator_,
         uint256 stalePeriod_
     ) initializer {
-        aggregator = aggregator_;
+        listaStakeManager = IStakeManager(listaStakeManager_);
         stalePeriod = stalePeriod_;
-        aggregatorScale = 10 ** uint256(aggregator.decimals());
         market = IPMarket(market_);
         twapWindow = twap_;
         ptOracle = IPPYLpOracle(ptOracle_);
@@ -88,7 +88,7 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @param /*implementation*/ The address of the new implementation
     /// @dev reverts if the caller is not a manager or if the status check succeeds
     function _authorizeUpgrade(address /*implementation*/) internal virtual override onlyRole(MANAGER_ROLE) {
-        if (_getStatus()) revert PendleLPOracle__authorizeUpgrade_validStatus();
+        if (_getStatus()) revert ListaOracle__authorizeUpgrade_validStatus();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -107,39 +107,17 @@ contract PendleLPOracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     /// @return price Asset price [WAD]
     /// @dev reverts if the price is invalid
     function spot(address /* token */) external view virtual override returns (uint256 price) {
-        bool isValid;
-        (isValid, price) = _fetchAndValidate();
-        if (!isValid) revert PendleLPOracle__spot_invalidValue();
         bool isValidPtOracle = _validatePtOracle();
-        if (!isValidPtOracle) revert PendleLPOracle__validatePtOracle_invalidValue();
-        uint256 lpRate = market.getLpToAssetRate(twapWindow);
-        price = wmul(price, lpRate);
-    }
-
-    /// @notice Fetches and validates the latest price from Chainlink
-    /// @return isValid Whether the price is valid based on the value range and staleness
-    /// @return price Asset price [WAD]
-    function _fetchAndValidate() internal view returns (bool isValid, uint256 price) {
-        try AggregatorV3Interface(aggregator).latestRoundData() returns (
-            uint80,
-            int256 answer,
-            uint256 /*startedAt*/,
-            uint256 updatedAt,
-            uint80
-        ) {
-            isValid = (answer > 0 && block.timestamp - updatedAt <= stalePeriod);
-            return (isValid, wdiv(uint256(answer), aggregatorScale));
-        } catch {
-            // return the default values (false, 0) on failure
-        }
+        if (!isValidPtOracle) revert ListaOracle__validatePtOracle_invalidValue();
+        price = market.getLpToAssetRate(twapWindow);
+        if (price == 0) revert ListaOracle__spot_invalidValue();
     }
 
     /// @notice Returns the status of the oracle
     /// @return status Whether the oracle is valid
     /// @dev The status is valid if the price is validated and not stale
     function _getStatus() private view returns (bool status) {
-        (status, ) = _fetchAndValidate();
-        if (status) return _validatePtOracle();
+        status = _validatePtOracle();
     }
 
     /// @notice Validates the PT oracle

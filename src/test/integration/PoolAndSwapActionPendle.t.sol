@@ -22,13 +22,13 @@ import {PositionAction4626} from "../../proxy/PositionAction4626.sol";
 import {IVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/interfaces/IPAllActionTypeV3.sol";
 
 import {IPActionSwapPTV3} from "pendle/interfaces/IPActionSwapPTV3.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
 import {Test} from "forge-std/Test.sol";
 import {ActionMarketCoreStatic} from "pendle/offchain-helpers/router-static/base/ActionMarketCoreStatic.sol";
-import {SwapAction, SwapParams, SwapType, SwapProtocol} from "../../proxy/SwapAction.sol";
+import {SwapAction, SwapParams, SwapType, SwapProtocol, PendleExitType} from "../../proxy/SwapAction.sol";
 import {IUniswapV3Router, decodeLastToken, UniswapV3Router_decodeLastToken_invalidPath} from "../../vendor/IUniswapV3Router.sol";
 import {IVault as IBalancerVault} from "../../vendor/IBalancerVault.sol";
 import {IPActionAddRemoveLiqV3} from "pendle/interfaces/IPActionAddRemoveLiqV3.sol";
@@ -234,6 +234,9 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
 
         uint256 lpIn = ERC20(market).balanceOf(user);
 
+        bytes memory args = abi.encode(market, lpIn, weETH);
+        PendleExitType exitType = PendleExitType.SY_REDEEM;
+
         swapParams = SwapParams({
             swapProtocol: SwapProtocol.PENDLE_OUT,
             swapType: SwapType.EXACT_IN,
@@ -243,7 +246,7 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
             recipient: user,
             residualRecipient: user,
             deadline: block.timestamp,
-            args: abi.encode(market, lpIn, weETH)
+            args: abi.encode(exitType, args)
         });
 
         ERC20(market).approve(address(userProxy), type(uint256).max);

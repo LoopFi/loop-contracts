@@ -23,7 +23,7 @@ import {IVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol
 import {IPoolV3} from "src/interfaces/IPoolV3.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/router/math/MarketApproxLibV2.sol";
 
 import {TestBase} from "src/test/TestBase.sol";
 import {Test} from "forge-std/Test.sol";
@@ -89,7 +89,7 @@ contract USDVaultTest is TestBase {
 
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address internal constant UNISWAP_V3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    address internal constant PENDLE_ROUTER = 0x00000000005BBB0EF59571E58418F9a4357b68A0;
+    address internal constant PENDLE_ROUTER = 0x888888888889758F76e7103c6CbF23ABbF58F946;
     ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
 
     address internal constant SPECTRA_ROUTER = 0xD733e545C65d539f588d7c3793147B497403F0d2;

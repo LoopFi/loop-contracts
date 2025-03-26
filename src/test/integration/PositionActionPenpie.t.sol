@@ -20,7 +20,7 @@ import {PositionAction, CollateralParams, CreditParams} from "../../proxy/Positi
 import {PositionActionPenpie} from "../../proxy/PositionActionPenpie.sol";
 
 import {TokenInput, LimitOrderData} from "pendle/interfaces/IPAllActionTypeV3.sol";
-import {ApproxParams} from "pendle/router/base/MarketApproxLib.sol";
+import {ApproxParams} from "pendle/router/math/MarketApproxLibV2.sol";
 import {IPendleMarketDepositHelper} from "src/interfaces/IPendleMarketDepositHelper.sol";
 contract PositionActionPenpieTest is IntegrationTestBase {
     using SafeERC20 for ERC20;

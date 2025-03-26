@@ -12,8 +12,8 @@ import {wdiv, wmul} from "../../utils/Math.sol";
 import {PendleLPOracle} from "../../oracle/PendleLPOracle.sol";
 
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
-import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
-import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
+import {PendleLpOracleLib} from "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
+import {IPPYLpOracle} from "pendle/interfaces/IPPYLpOracle.sol";
 import {ChainlinkCurveOracle} from "../../oracle/ChainlinkCurveOracle.sol";
 import {Combined4626AggregatorV3Oracle} from "../../oracle/Combined4626AggregatorV3Oracle.sol";
 import {CombinedAggregatorV3Oracle} from "../../oracle/CombinedAggregatorV3Oracle.sol";

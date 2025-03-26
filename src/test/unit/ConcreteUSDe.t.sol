@@ -3,8 +3,8 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 
 import {AggregatorV3Interface} from "src/oracle/CombinedAggregatorV3Oracle.sol";
-import {PendleLPOracle, IPMarket, IPPtOracle} from "src/oracle/PendleLPOracle.sol";
-import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
+import {PendleLPOracle, IPMarket, IPPYLpOracle} from "src/oracle/PendleLPOracle.sol";
+import {PendleLpOracleLib} from "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
 contract ConcreteUSDeTest is Test {
     using PendleLpOracleLib for IPMarket;
 
@@ -28,13 +28,13 @@ contract ConcreteUSDeTest is Test {
 
         vm.mockCall(
             ptOracle,
-            abi.encodeWithSelector(IPPtOracle.getOracleState.selector, pendleMarket, 180),
+            abi.encodeWithSelector(IPPYLpOracle.getOracleState.selector, pendleMarket, 180),
             abi.encode(false, 0, true)
         );
 
         vm.mockCall(
             ptOracle,
-            abi.encodeWithSelector(IPPtOracle.getOracleState.selector, pendleSMarket, 180),
+            abi.encodeWithSelector(IPPYLpOracle.getOracleState.selector, pendleSMarket, 180),
             abi.encode(false, 0, true)
         );
     }

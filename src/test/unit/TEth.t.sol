@@ -4,8 +4,8 @@ import "forge-std/Test.sol";
 
 import {PendleLPOracleRate} from "src/oracle/PendleLPOracleRate.sol";
 import {IPMarket} from "pendle/interfaces/IPMarket.sol";
-import {PendleLpOracleLib} from "pendle/oracles/PendleLpOracleLib.sol";
-import {IPPtOracle} from "pendle/interfaces/IPPtOracle.sol";
+import {PendleLpOracleLib} from "pendle/oracles/PtYtLpOracle/PendleLpOracleLib.sol";
+import {IPPYLpOracle} from "pendle/interfaces/IPPYLpOracle.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {wdiv, wmul} from "../../utils/Math.sol";
 

@@ -24,18 +24,18 @@ module.exports = {
         "constructorArguments": {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
           "uniV3Router": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-          "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+          "pendleRouter": "0x888888888889758F76e7103c6CbF23ABbF58F946",
           "kyberRouter": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
           "tranchessRouter": "0x63BAEe33649E589Cc70435F898671461B624CBCc",
-          "spectraRouter": "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+          "spectraRouter": "0xD733e545C65d539f588d7c3793147B497403F0d2"
         }
       },
       "PoolAction": {
         "constructorArguments": {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
-          "pendleRouter": "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+          "pendleRouter": "0x888888888889758F76e7103c6CbF23ABbF58F946",
           "tranchessRouter": "0x63BAEe33649E589Cc70435F898671461B624CBCc",
-          "spectraRouter": "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+          "spectraRouter": "0xD733e545C65d539f588d7c3793147B497403F0d2"
         }
       },
     },

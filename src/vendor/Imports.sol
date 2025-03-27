@@ -8,3 +8,5 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 import {IAllowanceTransfer} from "permit2/interfaces/IAllowanceTransfer.sol";
 import {PendleMarketV3} from "pendle/core/Market/v3/PendleMarketV3.sol";
+import {IPMarketFactory} from "pendle/interfaces/IPMarketFactory.sol";
+import {PendleERC20Permit} from "pendle/core/erc20/PendleERC20Permit.sol";

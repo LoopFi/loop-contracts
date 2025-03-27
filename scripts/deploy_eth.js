@@ -128,7 +128,7 @@ async function deployVaults() {
           ...Object.values(oracleConfig)
         );
         return deployedOracle.address;
-      }
+      },
     }, CONFIG_NETWORK);
     
     if (!oracleAddress) continue;
@@ -374,13 +374,6 @@ async function deployInterestRateModel() {
     // await finalizeDeployment();
   } catch (error) {
     console.error("Deployment failed:", error);
-    
-    // Make sure to stop impersonating if an error occurs
-    try {
-      await stopImpersonatingAccount("0x9B2205E4E62e333141117Fc895DC77B558E2a2BC");
-    } catch (cleanupError) {
-      console.error("Error during cleanup:", cleanupError);
-    }
     
     process.exit(1);
   }

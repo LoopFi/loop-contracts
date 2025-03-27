@@ -34,7 +34,7 @@ module.exports = {
     local: {
       url: 'http://127.0.0.1:8545',
       allowUnlimitedContractSize: true,
-      // accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
     },
     hardhat: {
         allowUnlimitedContractSize: true,

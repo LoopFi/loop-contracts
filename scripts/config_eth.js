@@ -91,7 +91,7 @@ module.exports = {
       },
       token: "0xBc48c48789031A130F957c59e07B7F987aA642dE",
       poolAddress: "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
-      tokenSymbol: "Loop-uniETH",
+      tokenSymbol: "Loop-ynETHx",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
       deploymentArguments: {
@@ -114,8 +114,10 @@ module.exports = {
           maxRate: 10000,
       },
       "RewardManager": {
-        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
         "constructorArguments": [
+          "deployer",
+          "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
         ]
       }
     },

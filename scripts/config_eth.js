@@ -15,6 +15,7 @@ module.exports = {
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
     "PoolV3_LpUSD": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
     "PoolV3_LpETH": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+    "FlashlenderLPEth": "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
     "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
     "ProxyRegistry": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
     "PoolQuotaKeeperV3": "0x3cc6e65d333DadD9113f227F4da07cF4F9D0eeF9",

@@ -354,6 +354,31 @@ async function deployInterestRateModel() {
   return LinearInterestRateModelV3;
 }
 
+async function redeployActions() {
+  const poolType = 'eth';
+  const config = CONFIG_NETWORK;
+
+  const swapAction = await deployContract(
+    'SwapAction',
+    `SwapAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.SwapAction.constructorArguments)
+  );
+
+  const poolAction = await deployContract(
+    'PoolAction',
+    `PoolAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.PoolAction.constructorArguments)
+  );
+
+  const flashlender = await attachContract('Flashlender', CONFIG_NETWORK.Core.FlashlenderLPEth);
+  const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
+
+  await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+
+}
+
 // Main execution function
 ((async () => {
   try {
@@ -362,6 +387,7 @@ async function deployInterestRateModel() {
     // await impersonateDeployer();
     
     // await deployCore();
+    await redeployActions();
     await deployVaults();
     await registerVaults(CONFIG_NETWORK);
     await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);

@@ -261,37 +261,11 @@ async function deployGauge(poolAddress) {
     return;
   }
 
-  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
-
-  if (poolAddress == undefined || poolAddress == null) {
-    console.log('No pool address defined for gauge');
-    return;
-  }
-
-  // const liquidityPool = await attachContract('PoolV3', poolAddress);
-  // const latestBlock = await ethers.provider.getBlock('latest');
-  // const blockTimestamp = latestBlock.timestamp;
-  // const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
-  
-  // const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
-  // console.log(`Voter deployed to: ${voter.address}`);
-
-  // // Deploy GaugeV3 contract
-  // const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
-  // console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
-  
-  // // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  // const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
-  // await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
-
-  // // Set Gauge in QuotaKeeper
-  // await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  // console.log('Set gauge in QuotaKeeper');
-
   const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
   const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
 
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     const vaultMetadata = await getVaultMetadata(vault.address);
     if (!vaultMetadata) {
@@ -304,17 +278,25 @@ async function deployGauge(poolAddress) {
       continue;
     }
 
-    const tokenAddress = await vault.token();
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-    
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-    
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+    // Check if vault is already added to gauge
+    if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
+      const tokenAddress = await vault.token();
+      await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+      console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+      
+      const minRate = vaultMetadata.quotas.minRate;
+      const maxRate = vaultMetadata.quotas.maxRate;
+      
+      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+      // Update the gauge status
+      deployment.vaults[name].addedToGauge = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+    } else {
+      console.log(`${name} already added to gauge or not ready for gauge, skipping`);
+    }
   }
 
   // Unfreeze the epoch in Gauge
@@ -376,7 +358,6 @@ async function redeployActions() {
   const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
 
   await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
-
 }
 
 // Main execution function
@@ -387,7 +368,6 @@ async function redeployActions() {
     // await impersonateDeployer();
     
     // await deployCore();
-    await redeployActions();
     await deployVaults();
     await registerVaults(CONFIG_NETWORK);
     await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);

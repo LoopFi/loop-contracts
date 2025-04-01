@@ -25,18 +25,6 @@ const PRB_PROXY_ABI = [
 
 // Add at the top of the script with other constants
 const EXECUTED_TRANSACTIONS = [
-    // First batch
-    '0xaeAE6a6Ed740E597E0320928396aE35A163b5628',  // Confirmed in block 47405779
-    '0x5786C96F80ad6a00de474b85Bb83dc537d8aA088',  // Confirmed in block 47405780
-    '0x793EDb925eCe66604ebC0673c2D2fa5dBC497D61',  // Confirmed in block 47405781
-    '0xC4e0B2C2C766b1140AE40381D56D52604d6FBd4F',  // Confirmed in block 47405782
-    '0x2b28fE276e97F4467c0D7004162BB1812eCbF1CF',  // Confirmed in block 47405785
-    // Second batch
-    '0x44ceb39802d6BBBB4b37E70c11A8779A2F89F48d',  // Confirmed in block 47406100
-    '0xBb9800B12BE718c5D1d47587329B1114375Efe26',  // Confirmed in block 47406102
-    '0x07e2024abC1D20606F9a78Ef9ed34Cf9f5221222',  // Confirmed in block 47406105
-    '0x637b935CbA030Aeb876eae07Aa7FF637166de4D6',  // Confirmed in block 47406107
-    '0xc938b31aBc64c6a9479Aeb6864D27c27e0Fa90Ae',  // Confirmed in block 47406109
 ].map(addr => addr.toLowerCase());
 
 async function main() {
@@ -49,7 +37,8 @@ async function main() {
   console.log(`Account: ${deployer.address}`);
   
   // Get the balance of BNB to distribute - convert string to BigNumber
-  const balance = ethers.BigNumber.from("4590000000000000000");
+  // const balance = ethers.BigNumber.from("2364196022500000000");
+  const balance = ethers.BigNumber.from("2785245904100000000");
   const amountToDistribute = balance; // 100% of the balance
   console.log(`Balance: ${ethers.utils.formatEther(balance)} BNB`);
   console.log(`Amount to distribute: ${ethers.utils.formatEther(amountToDistribute)} BNB`);

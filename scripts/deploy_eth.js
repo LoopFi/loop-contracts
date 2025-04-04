@@ -29,6 +29,8 @@ const {
   deployVaultOracle,
   registerVaults,
   deployPools,
+  impersonateAccount,
+  stopImpersonatingAccount,
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -45,6 +47,48 @@ ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR);
 const toWad = ethers.utils.parseEther;
 const fromWad = ethers.utils.formatEther;
 const toBytes32 = ethers.utils.formatBytes32String;
+
+// Function to initialize the deployment with account impersonation
+async function impersonateDeployer() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                       INITIALIZING DEPLOYMENT
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Address to impersonate
+  const accountToImpersonate = "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC";
+  
+  // Get original signer for reference
+  const originalSigner = await getSignerAddress();
+  console.log(`Original deployer: ${originalSigner}`);
+  
+  // Impersonate the account and set it as default signer
+  const impersonatedSigner = await impersonateAccount(accountToImpersonate);
+  console.log(`Now deploying as impersonated account: ${accountToImpersonate}`);
+  
+  // Check if the impersonation was successful
+  const currentSigner = await getSignerAddress();
+  console.log(`Current deployer after impersonation: ${currentSigner}`);
+  
+  return impersonatedSigner;
+}
+
+// Function to cleanup after deployment
+async function finalizeDeployment() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        FINALIZING DEPLOYMENT
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  // Address that was impersonated
+  const accountToImpersonate = "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC";
+  
+  // Stop impersonating
+  await stopImpersonatingAccount(accountToImpersonate);
+  console.log(`Stopped impersonating account: ${accountToImpersonate}`);
+}
 
 async function deployCore() {
   console.log(`
@@ -84,7 +128,7 @@ async function deployVaults() {
           ...Object.values(oracleConfig)
         );
         return deployedOracle.address;
-      }
+      },
     }, CONFIG_NETWORK);
     
     if (!oracleAddress) continue;
@@ -217,34 +261,11 @@ async function deployGauge(poolAddress) {
     return;
   }
 
-  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
+  const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
+  const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
 
-  if (poolAddress == undefined || poolAddress == null) {
-    console.log('No pool address defined for gauge');
-    return;
-  }
-
-  const liquidityPool = await attachContract('PoolV3', poolAddress);
-  const latestBlock = await ethers.provider.getBlock('latest');
-  const blockTimestamp = latestBlock.timestamp;
-  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
-  
-  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
-  console.log(`Voter deployed to: ${voter.address}`);
-
-  // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
-  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
-  
-  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
-  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
-
-  // Set Gauge in QuotaKeeper
-  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  console.log('Set gauge in QuotaKeeper');
-
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     const vaultMetadata = await getVaultMetadata(vault.address);
     if (!vaultMetadata) {
@@ -257,17 +278,25 @@ async function deployGauge(poolAddress) {
       continue;
     }
 
-    const tokenAddress = await vault.token();
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-    
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-    
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+    // Check if vault is already added to gauge
+    if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
+      const tokenAddress = await vault.token();
+      await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+      console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+      
+      const minRate = vaultMetadata.quotas.minRate;
+      const maxRate = vaultMetadata.quotas.maxRate;
+      
+      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+      // Update the gauge status
+      deployment.vaults[name].addedToGauge = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+    } else {
+      console.log(`${name} already added to gauge or not ready for gauge, skipping`);
+    }
   }
 
   // Unfreeze the epoch in Gauge
@@ -307,16 +336,53 @@ async function deployInterestRateModel() {
   return LinearInterestRateModelV3;
 }
 
-((async () => {
-  // await deployCore();
-  await deployVaults();
-  await registerVaults(CONFIG_NETWORK);
-  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
-  // await deployGearbox();
-  // await logVaults();
-  // await verifyAllDeployedContracts();
+async function redeployActions() {
+  const poolType = 'eth';
+  const config = CONFIG_NETWORK;
 
-  // const pools = await deployPools(CONFIG_NETWORK, addressProviderV3);
+  const swapAction = await deployContract(
+    'SwapAction',
+    `SwapAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.SwapAction.constructorArguments)
+  );
+
+  const poolAction = await deployContract(
+    'PoolAction',
+    `PoolAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.PoolAction.constructorArguments)
+  );
+
+  const flashlender = await attachContract('Flashlender', CONFIG_NETWORK.Core.FlashlenderLPEth);
+  const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
+
+  await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+}
+
+// Main execution function
+((async () => {
+  try {
+    // Initialize deployment with impersonation
+    // uncomment this to deploy as the impersonated account, only supported on local deployment(anvil)
+    // await impersonateDeployer();
+    
+    // await deployCore();
+    await deployVaults();
+    await registerVaults(CONFIG_NETWORK);
+    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+    // await deployGearbox();
+    // await logVaults();
+    // await verifyAllDeployedContracts();
+    // const pools = await deployPools(CONFIG_NETWORK, addressProviderV3);
+    
+    // Finalize and clean up if needed
+    // await finalizeDeployment();
+  } catch (error) {
+    console.error("Deployment failed:", error);
+    
+    process.exit(1);
+  }
 })()).catch((error) => {
   console.error(error);
   process.exit(1);

@@ -37,7 +37,7 @@ CONTRACT_PATHS = {
     "ContractsRegister": "src/ContractsRegister.sol:ContractsRegister",
     "PoolV3": "src/PoolV3.sol:PoolV3",
     "VaultRegistry": "src/VaultRegistry.sol:VaultRegistry",
-    "CDPVault": "src/vaults/CDPVault.sol:CDPVault",
+    "CDPVault": "src/CDPVault.sol:CDPVault",
     "Treasury": "src/Treasury.sol:Treasury",
     "PoolQuotaKeeperV3": "src/quotas/PoolQuotaKeeperV3.sol:PoolQuotaKeeperV3",
     
@@ -87,7 +87,7 @@ def format_constructor_args(args, contract_name=None):
         return ""
     
     # Special case for known contracts with complex constructor arguments
-    if contract_name == "CDPVaultSpectra" or contract_name.startswith("CDPVault_"):
+    if contract_name == "CDPVaultSpectra" or contract_name.startswith("CDPVault_") or contract_name == "CDPVault":
         # We know this contract takes two structs as arguments
         if len(args) == 2 and isinstance(args[0], list) and isinstance(args[1], list):
             try:

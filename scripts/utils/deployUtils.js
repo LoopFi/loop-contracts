@@ -493,7 +493,7 @@ async function deployVaultOracle(key, config, oracleDeployers) {
     const oracleConfig = config.oracle.deploymentArguments;
     const deployedOracle = await deployContract(
       oracleType,
-      oracleType,
+      oracleType+'_'+key,
       false,
       ...Object.values(oracleConfig)
     );

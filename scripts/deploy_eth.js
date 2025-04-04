@@ -123,7 +123,7 @@ async function deployVaults() {
         const oracleConfig = config.oracle.deploymentArguments;
         const deployedOracle = await deployContract(
           config.oracle.type,
-          config.oracle.type,
+          config.oracle.type+'_'+key,
           false,
           ...Object.values(oracleConfig)
         );

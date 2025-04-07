@@ -88,96 +88,6 @@ module.exports = {
   "Vendors": {
   },
   "Vaults": {
-    "Vaults_GHOUSR": {
-      name: "Vaults_GHOUSR",
-      description: "This vault allows for borrowing and lending of assets",
-      type: "CDPVaultSpectra",
-      collateralType: "ERC20",
-      oracle: {
-        type: "MockOracle",
-        deploymentArguments: {
-        },
-      },
-      token: "0x04f970bb02b4cf20e836e4a3fd434c5e60057936",
-      poolAddress: "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
-      tokenSymbol: "LOOP-GHOUSR",
-      tokenScale: toWad("1.0"),
-      protocolIcon: null,
-      deploymentArguments: {
-          constants: {
-              protocolFee: toWad("0.01"),
-          },
-          configs: {
-              debtFloor: toWad("1"),
-              liquidationRatio: toWad("1.1"),
-              liquidationPenalty: toWad("0.99"),
-              liquidationDiscount: toWad("0.98"),
-              roleAdmin: "deployer",
-              vaultAdmin: "deployer",
-              pauseAdmin: "deployer",
-          },
-          debtCeiling: toWad("100000000"),
-      },
-      quotas: {
-          minRate: 100,
-          maxRate: 10000,
-      },
-      "RewardManager": {
-        "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
-        "constructorArguments": [
-          "deployer",
-          "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
-        ]
-      }
-    },
-    // "Vaults_sUSDe": {
-    //   name: "Vaults_sUSDe",
-    //   description: "This vault allows for borrowing and lending of assets",
-    //   type: "CDPVault",
-    //   collateralType: "ERC20",
-    //   oracle: {
-    //     type: "PendleLPOracle_sUSDe",
-    //     deploymentArguments: {
-    //       "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-    //       "market": "0xb162b764044697cf03617c2efbcb1f42e31e4766",
-    //       "twap": 180,
-    //       "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
-    //       "usde_heartbeat": 86400, // 24 hours
-    //       "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
-    //       "usdc_heartbeat": 86400, // 24 hours
-    //       "stalePeriod": 3600,
-    //     },
-    //   },
-    //   token: "0xb162b764044697cf03617c2efbcb1f42e31e4766",
-    //   poolAddress: "LpUSD",
-    //   tokenSymbol: "LOOP-sUSDe",
-    //   tokenScale: toWad("1.0"),
-    //   protocolIcon: null,
-    //   deploymentArguments: {
-    //       constants: {
-    //           protocolFee: toWad("0.01"),
-    //       },
-    //       configs: {
-    //           debtFloor: toWad("1"),
-    //           liquidationRatio: toWad("1.1"),
-    //           liquidationPenalty: toWad("0.99"),
-    //           liquidationDiscount: toWad("0.98"),
-    //           roleAdmin: "deployer",
-    //           vaultAdmin: "deployer",
-    //           pauseAdmin: "deployer",
-    //       },
-    //       debtCeiling: toWad("100000000"),
-    //   },
-    //   quotas: {
-    //       minRate: 100,
-    //       maxRate: 10000,
-    //   },
-    //   "RewardManager": {
-    //     "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
-    //     "constructorArguments": [
-    //     ]
-    //   }
-    // },
     // "Vaults_wstUSR": {
     //   name: "Vaults_wstUSR",
     //   description: "This vault allows for borrowing and lending of assets",
@@ -227,24 +137,114 @@ module.exports = {
     //     ]
     //   }
     // },
-    // "Vaults_syrupUSDC": {
-    //   name: "Vaults_syrupUSDC",
+
+    "Vaults_sUSDe": {
+      name: "Vaults_sUSDe",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "PendleLPOracle_sUSDe",
+        deploymentArguments: {
+          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+          "market": "0xb162b764044697cf03617c2efbcb1f42e31e4766",
+          "twap": 180,
+          "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
+          "usde_heartbeat": 86400, // 24 hours
+          "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+          "usdc_heartbeat": 86400, // 24 hours
+          "stalePeriod": 3600,
+        },
+      },
+      token: "0xb162b764044697cf03617c2efbcb1f42e31e4766",
+      poolAddress: "LpUSD",
+      tokenSymbol: "LOOP-sUSDe",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
+    },
+
+    "Vaults_syrupUSDC": {
+      name: "Vaults_syrupUSDC",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+          type: "syrupUSDC",
+          deploymentArguments: {
+            "vault": "0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b",
+            "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+            "market": "0x580e40c15261f7baf18ea50f562118ae99361096",
+            "twap": 180,
+            "stalePeriod": 3600,
+          },
+      },
+      token: "0x580e40c15261f7baf18ea50f562118ae99361096",
+      tokenSymbol: "LOOP-syrupUSDC",
+      poolAddress: "LpUSD",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
+    },
+    // "Vaults_GHOUSR": {
+    //   name: "Vaults_GHOUSR",
     //   description: "This vault allows for borrowing and lending of assets",
-    //   type: "CDPVault",
+    //   type: "CDPVaultSpectra",
     //   collateralType: "ERC20",
     //   oracle: {
-    //       type: "syrupUSDC",
-    //       deploymentArguments: {
-    //         "vault": "0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b",
-    //         "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-    //         "market": "0x580e40c15261f7baf18ea50f562118ae99361096",
-    //         "twap": 180,
-    //         "stalePeriod": 3600,
-    //       },
+    //     type: "MockOracle",
+    //     deploymentArguments: {
+    //     },
     //   },
-    //   token: "0x580e40c15261f7baf18ea50f562118ae99361096",
-    //   tokenSymbol: "LOOP-syrupUSDC",
-    //   poolAddress: "LpUSD",
+    //   token: "0x04f970bb02b4cf20e836e4a3fd434c5e60057936",
+    //   poolAddress: "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+    //   tokenSymbol: "LOOP-GHOUSR",
     //   tokenScale: toWad("1.0"),
     //   protocolIcon: null,
     //   deploymentArguments: {
@@ -267,8 +267,10 @@ module.exports = {
     //       maxRate: 10000,
     //   },
     //   "RewardManager": {
-    //     "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+    //     "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
     //     "constructorArguments": [
+    //       "deployer",
+    //       "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
     //     ]
     //   }
     // },

@@ -551,7 +551,7 @@ async function deploysUSDeOracle(key, config) {
   
   const CombinedAggregatorV3Oracle = await deployContract(
     'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_sUSDe',
     false,
     oracleConfig.usde_aggregator,
     oracleConfig.usde_heartbeat,
@@ -561,19 +561,19 @@ async function deploysUSDeOracle(key, config) {
   );
   console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
 
-  const PendleLPOracle = await deployContract(
+  const pendleLPOracle = await deployContract(
     'PendleLPOracle',
-    'PendleLPOracle',
+    'PendleLPOracle_sUSDe',
     false,
     oracleConfig.ptOracle,
     oracleConfig.market,
     oracleConfig.twap,
     CombinedAggregatorV3Oracle.address,
-    oracleConfig.usde_heartbeat
+    oracleConfig.stalePeriod
   );
-  console.log(`PendleLPOracle deployed for ${key} at ${PendleLPOracle.address}`);
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
 
-  return CombinedAggregatorV3Oracle.address;
+  return pendleLPOracle.address;
 }
 
 async function deployWstUSROracle(key, config) {

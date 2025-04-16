@@ -153,7 +153,7 @@ module.exports = {
           "usde_heartbeat": 86400, // 24 hours
           "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
           "usdc_heartbeat": 86400, // 24 hours
-          "stalePeriod": 3600,
+          "stalePeriod": 88400,
         },
       },
       token: "0xb162b764044697cf03617c2efbcb1f42e31e4766",

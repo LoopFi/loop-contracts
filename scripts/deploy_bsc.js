@@ -72,7 +72,7 @@ async function deployVaults() {
   } = await loadDeployedContracts();
   
   for (const [key, config] of Object.entries(CONFIG_NETWORK.Vaults)) {
-    const vaultName = `CDPVault_${key}`;
+    const vaultName = config.name || `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
     // Deploy oracle using the common function with CONFIG_NETWORK
@@ -90,7 +90,7 @@ async function deployVaults() {
       }
     }, CONFIG_NETWORK);
     
-    if (!oracleAddress) return;
+    if (!oracleAddress) continue;
 
     var token;
     var tokenAddress = config.token;
@@ -157,7 +157,7 @@ async function deployVaults() {
 
     const rewardManager = await deployContract(
       config.RewardManager.artifactName,
-      `RewardManager_${key}`,
+      `RewardManager_${vaultName}`,
       false,
       cdpVault.address,
       tokenAddress,
@@ -168,7 +168,7 @@ async function deployVaults() {
     // Store reward manager with vault reference
     await storeContractDeployment(
       false,
-      `RewardManager_${key}`,
+      `RewardManager_${vaultName}`,
       rewardManager.address,
       config.RewardManager.artifactName,
       [
@@ -179,7 +179,9 @@ async function deployVaults() {
       ],
       {
         vaultName: vaultName,
-        vaultAddress: cdpVault.address
+        vaultAddress: cdpVault.address,
+        addedToRegistry: false,
+        addedToGauge: false
       }
     );
 
@@ -247,7 +249,16 @@ async function deployGauge(poolAddress) {
   await poolQuotaKeeperV3.setGauge(gaugeV3.address);
   console.log('Set gauge in QuotaKeeper');
 
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
+  const deploymentFilePath = await getDeploymentFilePath();
+  let deployment;
+  
+  try {
+    deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+  } catch (e) {
+    console.error(`Failed to load deployment file: ${e.message}`);
+    return;
+  }
+
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     const vaultMetadata = await getVaultMetadata(vault.address);
     if (!vaultMetadata) {
@@ -260,17 +271,33 @@ async function deployGauge(poolAddress) {
       continue;
     }
 
-    const tokenAddress = await vault.token();
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-    
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-    
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+    // Check if vault is already added to the gauge
+    if (!deployment.vaults[name] || (deployment.vaults[name] && !deployment.vaults[name].addedToGauge)) {
+      const tokenAddress = await vault.token();
+      
+      try {
+        await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+        console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+        
+        const minRate = vaultMetadata.quotas.minRate;
+        const maxRate = vaultMetadata.quotas.maxRate;
+        
+        console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+        await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+        console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+        // Update the gauge status in the deployment file
+        if (deployment.vaults[name]) {
+          deployment.vaults[name].addedToGauge = true;
+          fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+          console.log(`Updated addedToGauge status for ${name}`);
+        }
+      } catch (error) {
+        console.error(`Failed to add ${name} to gauge: ${error.message}`);
+      }
+    } else {
+      console.log(`Vault ${name} already added to gauge, skipping`);
+    }
   }
 
   // Unfreeze the epoch in Gauge

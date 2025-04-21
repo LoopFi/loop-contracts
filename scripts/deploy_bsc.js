@@ -310,11 +310,11 @@ async function deployInterestRateModel() {
 }
 
 ((async () => {
-  await deployInterestRateModel();
+  // await deployInterestRateModel();
   // await deployCore();
-  // await deployVaults();
-  // await registerVaults(CONFIG_NETWORK);
-  // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+  await deployVaults();
+  await registerVaults(CONFIG_NETWORK);
+  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

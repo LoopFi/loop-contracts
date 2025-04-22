@@ -84,10 +84,13 @@ module.exports = {
       type: "CDPVaultSpectra",
       collateralType: "ERC20",
       oracle: {
-        type: "SpectraYnETHOracle",
+        type: "SpectraInwstETHOracle",
         deploymentArguments: {
-            "curvePool": "0xe119bad8a35b999f65b1e5fd48c626c327daa16b",
-            "ynETHx": "0xd89fc47aacbb31e2bf23ec599f593a4876d8c18c"
+            "wstEth": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+            "stETHClOracle": "0x86392dC19c0b719886221c78AB11eb8Cf5c52812",
+            "stalePeriod": 24 * 60 * 60,
+            "curvePool": "0xE119bad8a35B999f65b1e5Fd48c626C327DAa16B",
+            "spectraIBT": "0xd89Fc47AacBB31E2bF23EC599F593A4876D8c18C",
         },
       },
       token: "0x2cd244f1f9a856c251d276103862dd4325985d2a",

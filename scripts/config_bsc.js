@@ -6,8 +6,11 @@ module.exports = {
     Core: {
         WETH: "0x0000000000000000000000000000000000000000",
         "PoolV3_LpBNB": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
-        VaultRegistry: "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
-        AddressProviderV3:"0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "VaultRegistry": "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
+        "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "ProxyRegistry": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",
+        "PoolQuotaKeeperV3": "0x7fC6f72E895F1ed110799f5d6594149e4A0B7Ff3",
+        "GaugeV3": "0x0D7909318B497Da3060BcD371448E4629be2705D",
 
         Flashlender: {
             constructorArguments: {

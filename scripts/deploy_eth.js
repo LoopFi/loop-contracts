@@ -123,12 +123,15 @@ async function deployVaults() {
         const oracleConfig = config.oracle.deploymentArguments;
         const deployedOracle = await deployContract(
           config.oracle.type,
-          config.oracle.type,
+          config.oracle.type+'_'+key,
           false,
           ...Object.values(oracleConfig)
         );
         return deployedOracle.address;
       },
+      'SpectraInwstETHOracle': async (key, config) => {
+        return await deploySpectraInwstETHOracle(key, config);
+      }
     }, CONFIG_NETWORK);
     
     if (!oracleAddress) continue;
@@ -358,6 +361,100 @@ async function redeployActions() {
   const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
 
   await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+}
+
+// Standalone function for deploying SpectraInwstETHOracle as a proxy
+async function deploySpectraInwstETHOracle(key, config) {
+  console.log('Deploying SpectraInwstETHOracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+  
+  // Step 1: Deploy the WstEthOracle
+  const wstETHOracle = await deployContract(
+    'AggregatorV3WstEthOracle',
+    'AggregatorV3WstEthOracle_'+key,
+    false,
+    oracleConfig.wstEth
+  );
+  console.log('Deployed WstEthOracle at', wstETHOracle.address);
+
+  // Step 2: Deploy the CombinedOracle
+  const combinedOracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_'+key,
+    false,
+    wstETHOracle.address,
+    1, // 1 second heartbeat
+    oracleConfig.stETHClOracle,
+    oracleConfig.stalePeriod,
+    true // true for mul, false for div
+  );
+  console.log('Deployed CombinedOracle at', combinedOracle.address);
+
+  // Step 3: Deploy the implementation
+  const spectraOracleImpl = await deployContract(
+    'SpectraAggregatorV3Oracle',
+    'SpectraAggregatorV3Oracle_Impl_'+key,
+    false,
+    oracleConfig.curvePool,
+    oracleConfig.spectraIBT,
+    combinedOracle.address,
+    oracleConfig.stalePeriod
+  );
+  console.log('Deployed SpectraOracleImpl at', spectraOracleImpl.address);
+
+  // Step 4: Deploy the proxy
+  const signer = await getSignerAddress();
+  
+  // Get the contract factory for the proxy
+  const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+  
+  // Create initialization data for the proxy
+  const initData = spectraOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+  
+  // Deploy the proxy
+  const proxy = await ERC1967Proxy.deploy(
+    spectraOracleImpl.address,
+    initData
+  );
+  await proxy.deployed();
+  
+  const spectraOracle = await ethers.getContractAt('SpectraAggregatorV3Oracle', proxy.address);
+  console.log('Deployed SpectraOracle Proxy at', spectraOracle.address);
+  
+  // Step 5: Store all deployments
+  await storeContractDeployment(
+    false,
+    'AggregatorV3WstEthOracle_'+key,
+    wstETHOracle.address,
+    'AggregatorV3WstEthOracle',
+    [oracleConfig.wstEth]
+  );
+  
+  await storeContractDeployment(
+    false,
+    'CombinedAggregatorV3Oracle_'+key,
+    combinedOracle.address,
+    'CombinedAggregatorV3Oracle',
+    [wstETHOracle.address, 1, oracleConfig.stETHClOracle, oracleConfig.stalePeriod, true]
+  );
+  
+  await storeContractDeployment(
+    false,
+    'SpectraAggregatorV3Oracle_Impl_'+key,
+    spectraOracleImpl.address,
+    'SpectraAggregatorV3Oracle',
+    [oracleConfig.curvePool, oracleConfig.spectraIBT, combinedOracle.address, oracleConfig.stalePeriod]
+  );
+  
+  await storeContractDeployment(
+    false,
+    'SpectraAggregatorV3Oracle_'+key,
+    spectraOracle.address,
+    'ERC1967Proxy',
+    [spectraOracleImpl.address, initData]
+  );
+  
+  return spectraOracle.address;
 }
 
 // Main execution function

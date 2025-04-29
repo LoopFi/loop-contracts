@@ -272,14 +272,19 @@ async function deployInterestRateModel() {
   const U_1 = 7000; // U_1
   const U_2 = 9000; // U_2
   const R_base = 0; // R_base
-  const R_slope1 = 1500; // R_slope1
-  const R_slope2 = 1875; // R_slope2
-  const R_slope3 = 5000; // R_slope3
-  const version = 4;
+  const R_slope1 = 1020; // R_slope1
+  const R_slope2 = 1275; // R_slope2
+  const R_slope3 = 3400; // R_slope3
+  const version = 6;
 
   //decrease factor for slopes
-  const decreaseFactor = 0.85; // 15% decrease
-  
+  const decreaseFactor = 0.6; // 40% decrease
+
+  console.log('Deploying LinearInterestRateModelV3_', version);
+  console.log('R_slope1:', R_slope1 * decreaseFactor);
+  console.log('R_slope2:', R_slope2 * decreaseFactor);
+  console.log('R_slope3:', R_slope3 * decreaseFactor);
+
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
     `LinearInterestRateModelV3_${version}`,
@@ -297,11 +302,11 @@ async function deployInterestRateModel() {
 }
 
 ((async () => {
-  // await deployInterestRateModel();
+  await deployInterestRateModel();
   // await deployCore();
-  await deployVaults();
-  await registerVaults(CONFIG_NETWORK);
-  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);
+  // await deployVaults();
+  // await registerVaults(CONFIG_NETWORK);
+  // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

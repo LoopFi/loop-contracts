@@ -33,12 +33,12 @@ deploy-anvil-bsc :;	npx hardhat run scripts/deploy_bsc.js --network local --show
 deploy-tenderly-eth  :; npx hardhat run scripts/deploy_eth.js --network tenderly
 deploy-tenderly-usdc :; npx hardhat run scripts/deploy_usdc.js --network tenderly
 
-deploy-mainnet-usdc   :; npx hardhat run scripts/deploy_usdc.js --network mainnet
-deploy-mainnet-eth   :; npx hardhat run scripts/deploy_eth.js --network mainnet
-
+deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainnet
+deploy-mainnet-eth   	:; npx hardhat run scripts/deploy_eth.js --network mainnet
+deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
 
 # TODO: uncomment these when ready
 # deploy-arbitrum  :; npx hardhat run scripts/Deploy.js --network arbitrum
 
 # deploy-scroll    :; npx hardhat run scripts/Deploy.js --network scroll
-# deploy-bsc       :; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
+

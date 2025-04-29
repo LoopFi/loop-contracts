@@ -24,6 +24,7 @@ const {
   getPoolAddress,
   impersonateAccount,
   stopImpersonatingAccount,
+  deployPositionActions
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -842,14 +843,39 @@ async function impersonateDeployer() {
   return signer;
 }
 
+async function redeployActions() {
+  const poolType = 'usdc';
+  const config = CONFIG_NETWORK;
+
+  const swapAction = await deployContract(
+    'SwapAction',
+    `SwapAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.SwapAction.constructorArguments)
+  );
+
+  const poolAction = await deployContract(
+    'PoolAction',
+    `PoolAction_${poolType}`,
+    false,
+    ...Object.values(config.Core.Actions.PoolAction.constructorArguments)
+  );
+
+  const flashlender = await attachContract('Flashlender', CONFIG_NETWORK.Core.Flashlender_usdc);
+  const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
+
+  await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+}
+
 ((async () => {
   // Initialize deployment with impersonation
-  await impersonateDeployer();
+  // await impersonateDeployer();
+  await redeployActions();
   // await deployPool();
   // await deployCore();
-  await deployVaults();
-  await registerVaults();
-  await deployGauge();
+  // await deployVaults();
+  // await registerVaults();
+  // await deployGauge();
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

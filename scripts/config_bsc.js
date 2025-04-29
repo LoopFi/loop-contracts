@@ -5,6 +5,13 @@ const toWad = ethers.utils.parseEther;
 module.exports = {
     Core: {
         WETH: "0x0000000000000000000000000000000000000000",
+        "PoolV3_LpBNB": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+        "VaultRegistry": "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
+        "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "ProxyRegistry": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",
+        "PoolQuotaKeeperV3": "0x7fC6f72E895F1ed110799f5d6594149e4A0B7Ff3",
+        "GaugeV3": "0x0D7909318B497Da3060BcD371448E4629be2705D",
+
         Flashlender: {
             constructorArguments: {
                 protocolFee_: toWad("0"),
@@ -53,7 +60,7 @@ module.exports = {
     },
     Vaults: {
         CDPVault: {
-            name: "ClisBNB",
+            name: "ClisBNB-v2",
             description: "This vault allows for borrowing and lending of assets",
             type: "CDPVault",
             collateralType: "ERC20",
@@ -62,13 +69,13 @@ module.exports = {
                 type: "ListaOracle",
                 deploymentArguments: {
                     ptOracle: "0x9a9fa8338dd5e5b2188006f1cd2ef26d921650c2",
-                    listaStakeManager: "0x1adB950d8bB3dA4bE104211D5AB038628e477fE6",
-                    market: "0x1d9d27f0b89181cf1593ac2b36a37b444eb66bee",
+                    listaStakeManager: "0x0000000000000000000000000000000000000000",
+                    market: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
                     twap: "180",
                     stalePeriod: "1800",
                 },
             },
-            token: "0x1d9d27f0b89181cf1593ac2b36a37b444eb66bee",
+            token: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
             tokenSymbol: "LOOP-ClisBNB",
             tokenScale: toWad("1.0"),
             protocolIcon: null,
@@ -91,6 +98,11 @@ module.exports = {
                 minRate: 100,
                 maxRate: 10000,
             },
+            "RewardManager": {
+                "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+                "constructorArguments": [
+                ]
+            }
         },
     },
     LinearInterestRateModelV3: {

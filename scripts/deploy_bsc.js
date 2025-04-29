@@ -72,7 +72,7 @@ async function deployVaults() {
   } = await loadDeployedContracts();
   
   for (const [key, config] of Object.entries(CONFIG_NETWORK.Vaults)) {
-    const vaultName = `CDPVault_${key}`;
+    const vaultName = config.name || `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
     // Deploy oracle using the common function with CONFIG_NETWORK
@@ -90,7 +90,7 @@ async function deployVaults() {
       }
     }, CONFIG_NETWORK);
     
-    if (!oracleAddress) return;
+    if (!oracleAddress) continue;
 
     var token;
     var tokenAddress = config.token;
@@ -157,7 +157,7 @@ async function deployVaults() {
 
     const rewardManager = await deployContract(
       config.RewardManager.artifactName,
-      `RewardManager_${key}`,
+      `RewardManager_${vaultName}`,
       false,
       cdpVault.address,
       tokenAddress,
@@ -168,7 +168,7 @@ async function deployVaults() {
     // Store reward manager with vault reference
     await storeContractDeployment(
       false,
-      `RewardManager_${key}`,
+      `RewardManager_${vaultName}`,
       rewardManager.address,
       config.RewardManager.artifactName,
       [
@@ -179,7 +179,9 @@ async function deployVaults() {
       ],
       {
         vaultName: vaultName,
-        vaultAddress: cdpVault.address
+        vaultAddress: cdpVault.address,
+        addedToRegistry: false,
+        addedToGauge: false
       }
     );
 
@@ -210,9 +212,9 @@ async function deployVaults() {
 
 async function deployGauge(poolAddress) {
   console.log(`
-/*//////////////////////////////////////////////////////////////
-                        DEPLOYING GAUGE
-//////////////////////////////////////////////////////////////*/
+    /*//////////////////////////////////////////////////////////////
+                            DEPLOYING GAUGE
+    //////////////////////////////////////////////////////////////*/
   `);
 
   if (!poolAddress) {
@@ -220,34 +222,11 @@ async function deployGauge(poolAddress) {
     return;
   }
 
-  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
+  const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
+  const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
 
-  if (poolAddress == undefined || poolAddress == null) {
-    console.log('No pool address defined for gauge');
-    return;
-  }
-
-  const liquidityPool = await attachContract('PoolV3', poolAddress);
-  const latestBlock = await ethers.provider.getBlock('latest');
-  const blockTimestamp = latestBlock.timestamp;
-  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
-  
-  const voter = await deployContract('LoopVoter', 'LoopVoter', false, addressProviderV3.address, firstEpochTimestamp);
-  console.log(`Voter deployed to: ${voter.address}`);
-
-  // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract('GaugeV3', 'GaugeV3', false, liquidityPool.address, voter.address);
-  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
-  
-  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract('PoolQuotaKeeperV3', 'PoolQuotaKeeperV3', false, liquidityPool.address);
-  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
-
-  // Set Gauge in QuotaKeeper
-  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  console.log('Set gauge in QuotaKeeper');
-
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     const vaultMetadata = await getVaultMetadata(vault.address);
     if (!vaultMetadata) {
@@ -260,17 +239,25 @@ async function deployGauge(poolAddress) {
       continue;
     }
 
-    const tokenAddress = await vault.token();
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-    
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-    
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+    // Check if vault is already added to gauge
+    if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
+      const tokenAddress = await vault.token();
+      await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+      console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+      
+      const minRate = vaultMetadata.quotas.minRate;
+      const maxRate = vaultMetadata.quotas.maxRate;
+      
+      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+      // Update the gauge status
+      deployment.vaults[name].addedToGauge = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+    } else {
+      console.log(`${name} already added to gauge or not ready for gauge, skipping`);
+    }
   }
 
   // Unfreeze the epoch in Gauge
@@ -285,14 +272,19 @@ async function deployInterestRateModel() {
   const U_1 = 7000; // U_1
   const U_2 = 9000; // U_2
   const R_base = 0; // R_base
-  const R_slope1 = 1500; // R_slope1
-  const R_slope2 = 1875; // R_slope2
-  const R_slope3 = 5000; // R_slope3
-  const version = 4;
+  const R_slope1 = 1020; // R_slope1
+  const R_slope2 = 1275; // R_slope2
+  const R_slope3 = 3400; // R_slope3
+  const version = 6;
 
   //decrease factor for slopes
-  const decreaseFactor = 0.85; // 15% decrease
-  
+  const decreaseFactor = 0.6; // 40% decrease
+
+  console.log('Deploying LinearInterestRateModelV3_', version);
+  console.log('R_slope1:', R_slope1 * decreaseFactor);
+  console.log('R_slope2:', R_slope2 * decreaseFactor);
+  console.log('R_slope3:', R_slope3 * decreaseFactor);
+
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
     `LinearInterestRateModelV3_${version}`,
@@ -314,7 +306,7 @@ async function deployInterestRateModel() {
   // await deployCore();
   // await deployVaults();
   // await registerVaults(CONFIG_NETWORK);
-  // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+  // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

@@ -328,8 +328,9 @@ async function loadDeployedRewardManagers() {
  * Deploys core contracts including staking, locking LP, treasury, and actions
  * @param {Object} config - The network configuration object
  * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
  */
-async function deployPoolCore(config, poolType) {
+async function deployPoolCore(config, poolType, customPositionActions) {
   const signer = await getSignerAddress();
   
   if (hre.network.name == 'tenderly') {
@@ -353,7 +354,7 @@ async function deployPoolCore(config, poolType) {
   await pool.setTreasury(treasury.address);
 
   const vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
-  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, poolType, config);
+  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, poolType, config, customPositionActions);
 
   return {
     stakingLp,
@@ -399,8 +400,11 @@ async function deployStakingAndLockingLP(pool, poolType) {
  * @param {Contract} pool - The pool contract
  * @param {Contract} vaultRegistry - The vault registry contract
  * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {Object} config - The network configuration object
+ * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
+ * @returns {Object} The deployed action contracts
  */
-async function deployActions(pool, vaultRegistry, poolType, config) {
+async function deployActions(pool, vaultRegistry, poolType, config, customPositionActions) {
   const flashlender = await deployContract(
     'Flashlender',
     `Flashlender_${poolType}`,
@@ -429,7 +433,11 @@ async function deployActions(pool, vaultRegistry, poolType, config) {
   );
 
   // Deploy position actions
-  await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+  if (customPositionActions) {
+    await deployCustomPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config, customPositionActions);
+  } else {
+    await deployPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config);
+  }
 
   return { flashlender, proxyRegistry, swapAction, poolAction };
 }
@@ -452,6 +460,39 @@ async function deployPositionActions(flashlender, swapAction, poolAction, vaultR
   ];
 
   for (const action of positionActions) {
+    const args = [
+      flashlender.address,
+      swapAction.address,
+      poolAction.address,
+      vaultRegistry.address,
+      config.Core.WETH
+    ];
+
+    if (action === 'PositionActionPenpie') {
+      args.push(config.Core.PenpieHelper);
+    }
+
+    await deployContract(
+      action,
+      `${action}_${poolType}`,
+      false,
+      ...args
+    );
+  }
+}
+
+/**
+ * Deploys custom position action contracts
+ * @param {Contract} flashlender - The flashlender contract
+ * @param {Contract} swapAction - The swap action contract
+ * @param {Contract} poolAction - The pool action contract
+ * @param {Contract} vaultRegistry - The vault registry contract
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {Object} config - The network configuration object
+ * @param {Array<string>} customActions - List of position action contracts to deploy
+ */
+async function deployCustomPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config, customActions) {
+  for (const action of customActions) {
     const args = [
       flashlender.address,
       swapAction.address,
@@ -682,6 +723,7 @@ module.exports = {
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,
+  deployCustomPositionActions,
   deployVaultOracle,
   registerVaults,
   deployPools,

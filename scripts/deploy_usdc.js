@@ -870,7 +870,7 @@ async function redeployActions() {
 ((async () => {
   // Initialize deployment with impersonation
   // await impersonateDeployer();
-  await redeployActions();
+  // await redeployActions();
   // await deployPool();
   // await deployCore();
   // await deployVaults();

@@ -4,20 +4,18 @@ const toWad = ethers.utils.parseEther;
 
 module.exports = {
     Core: {
-        WETH: "0x0000000000000000000000000000000000000000",
+        WETH: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
         "PoolV3_LpBNB": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
         "VaultRegistry": "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
         "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
         "ProxyRegistry": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",
         "PoolQuotaKeeperV3": "0x7fC6f72E895F1ed110799f5d6594149e4A0B7Ff3",
         "GaugeV3": "0x0D7909318B497Da3060BcD371448E4629be2705D",
+        "Flashlender":"0x0FD87690fcd1Ae9245edB7de8c598AEcCFaf427c",
+        "PenpieHelper": "0x0000000000000000000000000000000000000000",
+        "SwapAction": "0x5f96431ee187983B00e53068B55A8011aea6b708",
+        "PoolAction": "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
 
-        Flashlender: {
-            constructorArguments: {
-                protocolFee_: toWad("0"),
-            },
-            initialDebtCeiling: toWad("100000000"),
-        },
         Actions: {
             SwapAction: {
                 constructorArguments: {

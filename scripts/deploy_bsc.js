@@ -26,6 +26,7 @@ const {
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,
+  deployCustomPositionActions,
   deployVaultOracle,
   registerVaults,
   deployPools,
@@ -301,8 +302,40 @@ async function deployInterestRateModel() {
   return LinearInterestRateModelV3;
 }
 
+
+async function redeployActions() {
+  const poolType = 'bnb';
+  const config = CONFIG_NETWORK;
+
+  // const swapAction = await deployContract(
+  //   'SwapAction',
+  //   `SwapAction_${poolType}`,
+  //   false,
+  //   ...Object.values(config.Core.Actions.SwapAction.constructorArguments)
+  // );
+
+  // const poolAction = await deployContract(
+  //   'PoolAction',
+  //   `PoolAction_${poolType}`,
+  //   false,
+  //   ...Object.values(config.Core.Actions.PoolAction.constructorArguments)
+  // );
+
+  const swapAction = await attachContract('SwapAction', CONFIG_NETWORK.Core.SwapAction);
+  const poolAction = await attachContract('PoolAction', CONFIG_NETWORK.Core.PoolAction);
+  const flashlender = await attachContract('Flashlender', CONFIG_NETWORK.Core.Flashlender);
+  const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
+
+  const positionActions = [
+    'PositionActionPendle',
+  ];
+
+  await deployCustomPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config, positionActions);
+}
+
 ((async () => {
-  await deployInterestRateModel();
+  // await deployInterestRateModel();
+  // await redeployActions();
   // await deployCore();
   // await deployVaults();
   // await registerVaults(CONFIG_NETWORK);

@@ -42,3 +42,33 @@ deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show
 
 # deploy-scroll    :; npx hardhat run scripts/Deploy.js --network scroll
 
+# Voter Management
+voters-help      :; npx hardhat run scripts/vote-manager.js help
+
+# Local Voter Management
+voters-list-local :; npx hardhat run scripts/vote-manager.js --network=local list-voters
+voters-add-local  :; npx hardhat run scripts/vote-manager.js --network=local add-voters
+voters-status-local :; npx hardhat run scripts/vote-manager.js --network=local check-voter-status
+
+# BSC Voter Management
+voters-list-bsc  :; npx hardhat run scripts/vote-manager.js --network=bsc list-voters
+voters-add-bsc   :; npx hardhat run scripts/vote-manager.js --network=bsc add-voters
+voters-status-bsc :; npx hardhat run scripts/vote-manager.js --network=bsc check-voter-status
+
+# Mainnet Voter Management
+voters-list-mainnet  :; npx hardhat run scripts/vote-manager.js --network=mainnet list-voters
+voters-add-mainnet   :; npx hardhat run scripts/vote-manager.js --network=mainnet add-voters
+voters-status-mainnet :; npx hardhat run scripts/vote-manager.js --network=mainnet check-voter-status
+
+# Voting (requires parameters) - Use these as templates and adjust the command line arguments
+# Example: make voters-vote-local ARGS="0 0x123... 0x456... 0 1000000"
+voters-vote-local    :; npx hardhat run scripts/vote-manager.js --network=local vote $(ARGS)
+voters-vote-bsc      :; npx hardhat run scripts/vote-manager.js --network=bsc vote $(ARGS)
+voters-vote-mainnet  :; npx hardhat run scripts/vote-manager.js --network=mainnet vote $(ARGS)
+
+# Vote for Rate (requires parameters) - Use these as templates and adjust the command line arguments
+# Example: make voters-rate-local ARGS="0 0x123... 0x456... 800 1000000"
+voters-rate-local    :; npx hardhat run scripts/vote-manager.js --network=local vote-for-rate $(ARGS)
+voters-rate-bsc      :; npx hardhat run scripts/vote-manager.js --network=bsc vote-for-rate $(ARGS)
+voters-rate-mainnet  :; npx hardhat run scripts/vote-manager.js --network=mainnet vote-for-rate $(ARGS)
+

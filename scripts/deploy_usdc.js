@@ -463,8 +463,12 @@ async function deployVaultOracle(key, config) {
     return await deploydeUSDOracle(key, config);
   }
 
-  if (config.oracle.type == "PendleLPOracle_sUSDe") {
-    return await deploysUSDeOracle(key, config);
+  if (config.oracle.type == "PendleLPOracle_eUSDe") {
+    return await deployeUSDeOracle(key, config);
+  }
+
+  if (config.oracle.type == "PendleLPOracle_cUSDO") {
+    return await deploycUSDOOracle(key, config);
   }
 
   console.log('Deploying oracle for', key);
@@ -546,13 +550,13 @@ async function deploydeUSDOracle(key, config) {
   return chainlinkCurveOracle.address;
 }
 
-async function deploysUSDeOracle(key, config) {
+async function deployeUSDeOracle(key, config) {
   console.log('Deploying sUSDe oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
   
-  const CombinedAggregatorV3Oracle = await deployContract(
+  const CombinedAggregatorV3OracleFeeds = await deployContract(
     'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle_sUSDe',
+    'CombinedAggregatorV3Oracle_eUSDe_feeds',
     false,
     oracleConfig.usde_aggregator,
     oracleConfig.usde_heartbeat,
@@ -560,11 +564,77 @@ async function deploysUSDeOracle(key, config) {
     oracleConfig.usdc_heartbeat,
     false
   );
+
+  const AggregatorV3Oracle4626 = await deployContract(
+    'AggregatorV3Oracle4626',
+    'AggregatorV3Oracle4626_eUSDe',
+    false,
+    oracleConfig.eUSDe_vault
+  );
+
+  const CombinedAggregatorV3Oracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_eUSDe',
+    false,
+    AggregatorV3Oracle4626.address,
+    86400,
+    CombinedAggregatorV3OracleFeeds.address,
+    86400,
+    true
+  );
+  
   console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
 
   const pendleLPOracle = await deployContract(
     'PendleLPOracle',
     'PendleLPOracle_sUSDe',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    CombinedAggregatorV3Oracle.address,
+    oracleConfig.stalePeriod
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  return pendleLPOracle.address;
+}
+
+async function deploycUSDOOracle(key, config) {
+  console.log('Deploying cUSDO oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  const AggregatorV3Oracle4626 = await deployContract(
+    'AggregatorV3Oracle4626',
+    'AggregatorV3Oracle4626_cUSDO',
+    false,
+    oracleConfig.cUSDO_vault
+  );
+
+  const pythAggregator = await deployContract(
+    'PythAggregatorV3',
+    'PythAggregatorV3',
+    false,
+    oracleConfig.pythPriceFeedsContract,
+    oracleConfig.pythFeedId
+  );
+
+  const CombinedAggregatorV3Oracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_cUSDO',
+    false,
+    AggregatorV3Oracle4626.address,
+    3600,
+    pythAggregator.address,
+    oracleConfig.heartbeat,
+    true
+  );
+  
+  console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
+
+  const pendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle_cUSDO',
     false,
     oracleConfig.ptOracle,
     oracleConfig.market,
@@ -873,8 +943,9 @@ async function redeployActions() {
   // await redeployActions();
   // await deployPool();
   // await deployCore();
-  // await deployVaults();
-  // await registerVaults();
+  await deployVaults();
+  await registerVaults(CONFIG_NETWORK);
+  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpUSD);
   // await deployGauge();
   // await deployGearbox();
   // await logVaults();

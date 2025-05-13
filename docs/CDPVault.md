@@ -102,6 +102,12 @@ The CDPVault is a Collateralized Debt Position (CDP) system that allows users to
    - Both CDPVault and PoolV3 contracts have been extensively audited
    - Gearbox contracts are market-tested and audited
    - Regular security reviews and updates
+   - Code arena contests: 
+      - https://code4rena.com/reports/2024-07-loopfi
+      - https://code4rena.com/reports/2024-07-loopfi
+   - Watchpug audits:
+      - https://notes.watchpug.com/p/1956031b374KRSUi
+      - https://notes.watchpug.com/p/195172e920dMC94
 
 2. **Risk Management**
    - Collateralization ratio enforcement

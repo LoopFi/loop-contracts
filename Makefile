@@ -37,6 +37,10 @@ deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainn
 deploy-mainnet-eth   	:; npx hardhat run scripts/deploy_eth.js --network mainnet
 deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
 
+# ACL Ownership
+acl-update-owner-anvil    :; npm run update-acl-owner
+acl-update-owner-tenderly :; npm run update-acl-owner-tenderly
+
 # TODO: uncomment these when ready
 # deploy-arbitrum  :; npx hardhat run scripts/Deploy.js --network arbitrum
 

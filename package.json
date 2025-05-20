@@ -27,7 +27,9 @@
     "deploy-balancer": "hardhat run ./scripts/deploy_balancer.js --network tenderly",
     "generate-ts-bindings": "node ./scripts/generate-ts-bindings.js",
     "generate-permit-sigs": "node ./scripts/generate-permit-sigs.js",
-    "tenderly-fund": "node ./scripts/tenderly-fund.js"
+    "tenderly-fund": "node ./scripts/tenderly-fund.js",
+    "update-acl-owner": "hardhat run ./scripts/update_acl_owner.js --network local",
+    "update-acl-owner-tenderly": "node ./scripts/update_acl_owner_tenderly.js"
   },
   "dependencies": {
     "@pythnetwork/pyth-sdk-solidity": "^4.0.0"

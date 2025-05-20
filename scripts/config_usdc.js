@@ -17,6 +17,9 @@ module.exports = {
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
     "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
     "PRBProxyRegistry": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+    "GaugeV3":"0x8D26E325205C53b204A9BEB46F88a98c3f0e7E13",
+    "PoolQuotaKeeperV3":"0x36CE68477cDF24571f7C8f5dF0DAB7Ed6E65dFcF",
+
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -144,7 +147,7 @@ module.exports = {
         type: "PendleLPOracle_eUSDe",
         deploymentArguments: {
           "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0x85667e484a32d884010cf16427d90049ccf46e97",
+          "market": "0xE93B4A93e80BD3065B290394264af5d82422ee70",
           "twap": 180,
           "eUSDe_vault": "0x90D2af7d622ca3141efA4d8f1F24d86E5974Cc8F",
           "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
@@ -154,7 +157,7 @@ module.exports = {
           "stalePeriod": 88400,
         },
       },
-      token: "0x85667e484a32d884010cf16427d90049ccf46e97",
+      token: "0xE93B4A93e80BD3065B290394264af5d82422ee70",
       poolAddress: "LpUSD",
       tokenSymbol: "LOOP-eUSDe",
       tokenScale: toWad("1.0"),
@@ -194,13 +197,12 @@ module.exports = {
         type: "PendleLPOracle_cUSDO",
         deploymentArguments: {
           "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0xa77c0de4d26b7c97d1d42abd6733201206122e25",
+          "market": "0xA77c0DE4d26B7C97D1D42ABD6733201206122E25",
           "twap": 180,
-          "cUSDO_vault": "0xaD55aebc9b8c03FC43cd9f62260391c13c23e7c0",
-          "pythPriceFeedsContract": "0x4305FB66699C3B2702D4d05CF36551390A4c69C6",
-          "pythFeedId": "0x8f218655050a1476b780185e89f19d2b1e1f49e9bd629efad6ac547a946bf6ab", // CUSD / USD feed id
-          "heartbeat": 3600,
-          "stalePeriod": 3600,
+          "curvePool": "0x90455bd11Ce8a67C57d467e634Dc142b8e4105Aa",
+          "k": 0,
+          "invert": true,
+          "stalePeriod": 1
         },
       },
       token: "0xa77c0de4d26b7c97d1d42abd6733201206122e25",

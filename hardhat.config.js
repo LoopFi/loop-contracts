@@ -3,7 +3,7 @@ require('@nomicfoundation/hardhat-foundry');
 require('@nomiclabs/hardhat-ethers');
 require('@openzeppelin/hardhat-upgrades');
 const tenderly = require('@tenderly/hardhat-tenderly');
-tenderly.setup({automaticVerifications: false});
+// tenderly.setup({automaticVerifications: false});
 
 const {subtask} = require('hardhat/config');
 const {TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS} = require('hardhat/builtin-tasks/task-names')
@@ -34,7 +34,8 @@ module.exports = {
     local: {
       url: 'http://127.0.0.1:8545',
       allowUnlimitedContractSize: true,
-      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      chainId: 1
     },
     hardhat: {
         allowUnlimitedContractSize: true,

@@ -16,6 +16,13 @@ module.exports = {
         "SwapAction": "0x5f96431ee187983B00e53068B55A8011aea6b708",
         "PoolAction": "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
 
+        "Flashlender_btcb": {
+            "constructorArguments": {
+              "protocolFee_": toWad('0')
+            },
+            "initialDebtCeiling": toWad('100000000'),
+          },
+
         Actions: {
             SwapAction: {
                 constructorArguments: {
@@ -38,7 +45,7 @@ module.exports = {
         },
         Treasury: {
             constructorArguments: {
-                payees: ["0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", "stakingLpEth"],
+                payees: ["0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", "stakingLpBTCB"],
                 shares: [200, 800],
                 admin: "deployer",
             },
@@ -48,12 +55,28 @@ module.exports = {
         },
     },
     Pools: {
-        LiquidityPool: {
-            wrappedToken: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // wBNB
-            name: "Loop BNB - lpBNB",
-            symbol: "lpBNB",
-            treasury: "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-            underlier: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        // LiquidityPool: {
+        //     wrappedToken: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // wBNB
+        //     name: "Loop BNB - lpBNB",
+        //     symbol: "lpBNB",
+        //     treasury: "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+        //     underlier: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        // },
+
+        LiquidityPoolBTCB: {
+            wrappedToken: "0x0000000000000000000000000000000000000000",
+            name: "Loop BTCB - lpBTCB",
+            symbol: "lpBTCB",
+            treasury: "0x0000000000000000000000000000000000000000",
+            underlier: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+            "interestRateModel": {
+                "U_1": 7000, // U_1
+                "U_2": 9000, // U_2
+                "R_base": 0, // R_base
+                "R_slope1": 612, // R_slope1
+                "R_slope2": 765, // R_slope2
+                "R_slope3": 2040, // R_slope3
+            },
         },
     },
     Vaults: {

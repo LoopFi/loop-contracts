@@ -30,6 +30,7 @@ const {
   deployVaultOracle,
   registerVaults,
   deployPools,
+  deployPoolWithType,
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -54,8 +55,29 @@ async function deployCore() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Pass CONFIG_NETWORK to deployPoolCore
-  const deployedCore = await deployPoolCore(CONFIG_NETWORK, 'eth');
+  const poolType = 'btcb';
+  
+  // Get addressProviderV3 from config
+  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
+  console.log('AddressProviderV3:', addressProviderV3.address);
+  
+  // Deploy the pool
+  const pool = await deployPoolWithType(
+    CONFIG_NETWORK, 
+    addressProviderV3, 
+    poolType, 
+    'LiquidityPoolBTCB', 
+    CONFIG_NETWORK.Pools.LiquidityPoolBTCB
+  );
+  console.log('Pool deployed at', pool.address);
+  
+  // Store the pool address in the config so deployPoolCore can use it
+  const poolKey = `PoolV3_LiquidityPoolBTCB_${poolType}`;
+  CONFIG_NETWORK.Core[poolKey] = pool.address;
+  console.log(`Stored pool address in CONFIG_NETWORK.Core.${poolKey}`);
+  
+  // Deploy core components for the pool
+  const deployedCore = await deployPoolCore(CONFIG_NETWORK, poolType, poolKey, []);
   console.log('Core deployment completed');
   return deployedCore;
 }
@@ -336,7 +358,7 @@ async function redeployActions() {
 ((async () => {
   // await deployInterestRateModel();
   // await redeployActions();
-  // await deployCore();
+  await deployCore();
   // await deployVaults();
   // await registerVaults(CONFIG_NETWORK);
   // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);

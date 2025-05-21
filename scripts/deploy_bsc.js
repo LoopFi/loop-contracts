@@ -98,8 +98,8 @@ async function deployVaults() {
     const vaultName = config.name || `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
-    // Deploy oracle using our updated deployVaultOracle function
-    const oracleAddress = await deployVaultOracle(key, config);
+    // Deploy oracle using our updated deployCustomVaultOracle function
+    const oracleAddress = await deployCustomVaultOracle(key, config);
     
     if (!oracleAddress) continue;
 
@@ -160,7 +160,7 @@ async function deployVaults() {
 
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
     const pool = await attachContract('PoolV3', poolAddress);
-    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    // await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
     
     console.log('------------------------------------');
 
@@ -343,7 +343,7 @@ async function redeployActions() {
   await deployCustomPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config, positionActions);
 }
 
-async function deployVaultOracle(key, config) {
+async function deployCustomVaultOracle(key, config) {
   if (!config.oracle) {
     console.log('No oracle defined for', key);
     return null;

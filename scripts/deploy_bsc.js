@@ -76,8 +76,13 @@ async function deployCore() {
   CONFIG_NETWORK.Core[poolKey] = pool.address;
   console.log(`Stored pool address in CONFIG_NETWORK.Core.${poolKey}`);
   
+  const positionActions = [
+    'PositionAction20',
+    'PositionAction4626',
+  ];
+
   // Deploy core components for the pool
-  const deployedCore = await deployPoolCore(CONFIG_NETWORK, poolType, poolKey, []);
+  const deployedCore = await deployPoolCore(CONFIG_NETWORK, poolType, poolKey, positionActions);
   console.log('Core deployment completed');
   return deployedCore;
 }

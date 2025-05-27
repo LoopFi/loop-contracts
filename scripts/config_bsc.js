@@ -6,6 +6,7 @@ module.exports = {
     Core: {
         WETH: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
         "PoolV3_LpBNB": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+        "PoolV3_LpBTC": "0xa02fcc8493856b5bd7fA5099f5a631A6cb77fBd1",
         "VaultRegistry": "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
         "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
         "ProxyRegistry": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",

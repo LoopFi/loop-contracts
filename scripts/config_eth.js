@@ -125,6 +125,49 @@ module.exports = {
         ]
       }
     },
+    "Vaults_tETH": {
+      name: "Vaults_tETH",
+      description: "This vault allows for borrowing and lending of assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "PendleLPOracleRate",
+        deploymentArguments: {
+            "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+            "market": "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+            "twap": 180
+        },
+      },
+      token: "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+      poolAddress: "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      tokenSymbol: "LOOP-tETH",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
+    },
   },
  
   "Tokenomics":{

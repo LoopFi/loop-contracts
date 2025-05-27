@@ -23,3 +23,7 @@ bindings
 
 # Secrets
 .env
+
+# Python
+__pycache__
+venv

@@ -411,7 +411,7 @@ async function deploySpectraInwstETHOracle(key, config) {
     // await deployCore();
     await deployVaults();
     await registerVaults(CONFIG_NETWORK);
-    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK);
+    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK, false);
     // await deployGearbox();
     // await logVaults();
     // await verifyAllDeployedContracts();

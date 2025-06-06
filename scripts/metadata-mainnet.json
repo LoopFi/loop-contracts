@@ -116,6 +116,20 @@
         "minRate": 100,
         "maxRate": 10000
       }
+    },
+    "0xb85095c4B18a7d16559A0bFd764F51F0d030587f": {
+      "contractName": "CDPVault_Vaults_tETH_January2026",
+      "name": "Vaults_tETH_January2026",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0xfD2429243Ca56f5a59194Cdba3A80a751Afb362B",
+      "token": "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
     }
   }
 }

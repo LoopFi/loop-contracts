@@ -735,27 +735,30 @@ async function fundAccount(address, amount) {
 }
 
 /**
- * Adds vaults to an existing gauge
+ * Generates raw transactions for adding vaults to an existing gauge (for multisig execution)
  * @param {string} poolAddress - The address of the pool
  * @param {Object} CONFIG_NETWORK - The network configuration
- * @returns {Promise<void>}
+ * @param {boolean} executeTransactions - Whether to execute transactions (default: false)
+ * @returns {Promise<Array>} - Array of transaction objects for multisig execution
  */
-async function deployGauge(poolAddress, CONFIG_NETWORK) {
+async function deployGauge(poolAddress, CONFIG_NETWORK, executeTransactions = false) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                        DEPLOYING GAUGE
+                        ${executeTransactions ? 'DEPLOYING' : 'GENERATING'} GAUGE TRANSACTIONS
 //////////////////////////////////////////////////////////////*/
   `);
 
   if (!poolAddress) {
     console.log('No pool address defined for gauge');
-    return;
+    return [];
   }
 
   const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
   const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
   const deploymentFilePath = await getDeploymentFilePath();
   const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+
+  const transactions = [];
 
   for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
     const vaultMetadata = await getVaultMetadata(vault.address);
@@ -771,32 +774,100 @@ async function deployGauge(poolAddress, CONFIG_NETWORK) {
 
     // Check if vault is already added to gauge
     if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
-      console.log(`Adding vault ${name} to gauge at address ${vault.address}`);
+      console.log(`${executeTransactions ? 'Adding' : 'Preparing'} vault ${name} to gauge at address ${vault.address}`);
       const tokenAddress = await vault.token();
-      console.log('Setting Credit Manager in QuotaKeeper for token:', tokenAddress);
-      await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-      console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
       
       const minRate = vaultMetadata.quotas.minRate;
       const maxRate = vaultMetadata.quotas.maxRate;
-      
-      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
-      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-      // Update the gauge status
-      deployment.vaults[name].addedToGauge = true;
-      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+      // Generate transaction for setting Credit Manager in QuotaKeeper
+      const setCreditManagerData = poolQuotaKeeperV3.interface.encodeFunctionData(
+        'setCreditManager',
+        [tokenAddress, vault.address]
+      );
+
+      transactions.push({
+        to: poolQuotaKeeperV3.address,
+        data: setCreditManagerData,
+        value: '0',
+        description: `Set Credit Manager in QuotaKeeper for token: ${tokenAddress}`,
+        functionName: 'setCreditManager',
+        parameters: {
+          tokenAddress,
+          vaultAddress: vault.address
+        }
+      });
+
+      // Generate transaction for adding quota token to GaugeV3
+      const addQuotaTokenData = gaugeV3.interface.encodeFunctionData(
+        'addQuotaToken',
+        [tokenAddress, minRate, maxRate]
+      );
+
+      transactions.push({
+        to: gaugeV3.address,
+        data: addQuotaTokenData,
+        value: '0',
+        description: `Add quota token to GaugeV3 for token: ${tokenAddress} (minRate: ${minRate}, maxRate: ${maxRate})`,
+        functionName: 'addQuotaToken',
+        parameters: {
+          tokenAddress,
+          minRate,
+          maxRate
+        }
+      });
+
+      if (executeTransactions) {
+        console.log('Setting Credit Manager in QuotaKeeper for token:', tokenAddress);
+        await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+        console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+        
+        console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+        await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+        console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+
+        // Update the gauge status
+        deployment.vaults[name].addedToGauge = true;
+        fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+      }
     } else {
       console.log(`${name} already added to gauge or not ready for gauge, skipping`);
     }
   }
 
-  // Unfreeze the epoch in Gauge
-  await gaugeV3.setFrozenEpoch(false);
-  console.log('Set frozen epoch to false in GaugeV3');
-  
-  console.log('Gauge and related configurations have been set.');
+  // Generate transaction for unfreezing the epoch in Gauge
+  const setFrozenEpochData = gaugeV3.interface.encodeFunctionData(
+    'setFrozenEpoch',
+    [false]
+  );
+
+  transactions.push({
+    to: gaugeV3.address,
+    data: setFrozenEpochData,
+    value: '0',
+    description: 'Set frozen epoch to false in GaugeV3',
+    functionName: 'setFrozenEpoch',
+    parameters: {
+      frozen: false
+    }
+  });
+
+  if (executeTransactions) {
+    // Unfreeze the epoch in Gauge
+    await gaugeV3.setFrozenEpoch(false);
+    console.log('Set frozen epoch to false in GaugeV3');
+    console.log('Gauge and related configurations have been set.');
+  } else {
+    console.log(`Generated ${transactions.length} transactions for multisig execution:`);
+    transactions.forEach((tx, index) => {
+      console.log(`\n${index + 1}. ${tx.description}`);
+      console.log(`   To: ${tx.to}`);
+      console.log(`   Data: ${tx.data}`);
+      console.log(`   Value: ${tx.value}`);
+    });
+  }
+
+  return transactions;
 }
 
 module.exports = {

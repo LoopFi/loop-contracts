@@ -681,6 +681,26 @@
         "false"
       ],
       "addedToRegistry": false
+    },
+    "PendleLPOracleRate_Vaults_tETH_January2026": {
+      "address": "0xfD2429243Ca56f5a59194Cdba3A80a751Afb362B",
+      "artifactName": "PendleLPOracleRate",
+      "constructorArgs": [
+        "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "180"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_tETH_January2026": {
+      "address": "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
     }
   },
   "vaults": {
@@ -867,6 +887,28 @@
       ],
       "addedToRegistry": true,
       "addedToGauge": true
+    },
+    "CDPVault_Vaults_tETH_January2026": {
+      "address": "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0xfD2429243Ca56f5a59194Cdba3A80a751Afb362B",
+          "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true
     }
   },
   "rewardManagers": {
@@ -972,6 +1014,18 @@
       "addedToRegistry": false,
       "vaultName": "CDPVault_Vaults_inwstETH",
       "vaultAddress": "0x03d30243138D45383F02BCA884D42068523bdE22"
+    },
+    "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F": {
+      "address": "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_tETH_January2026",
+      "vaultAddress": "0xb85095c4B18a7d16559A0bFd764F51F0d030587f"
     }
   }
 }

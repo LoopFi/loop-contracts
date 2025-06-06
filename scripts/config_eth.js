@@ -125,8 +125,8 @@ module.exports = {
     //     ]
     //   }
     // },
-    "Vaults_tETH": {
-      name: "Vaults_tETH",
+    "Vaults_tETH_January2026": {
+      name: "Vaults_tETH_January2026",
       description: "This vault allows for borrowing and lending of assets",
       type: "CDPVault",
       collateralType: "ERC20",

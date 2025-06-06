@@ -1,0 +1,46 @@
+{
+  "vaults": {
+    "0x03C07e6d561b664246058974dB31dbF1c1C0B416": {
+      "contractName": "CDPVault_CDPVault",
+      "name": "ClisBNB",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+      "oracle": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+      "token": "0x1d9d27f0b89181cf1593ac2b36a37b444eb66bee",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822": {
+      "contractName": "ClisBNB-v2",
+      "name": "ClisBNB-v2",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+      "oracle": "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+      "token": "0xBD577dDABb5a1672d3C786726b87A175de652b96",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0xF0F67671151FF8B9F2117BD3ac7406D9D3ee8f45": {
+      "contractName": "ynCoBTCk",
+      "name": "ynCoBTCk",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa02fcc8493856b5bd7fA5099f5a631A6cb77fBd1",
+      "oracle": "0x9DCE515E2537c356aBE55981428D58449D2D7140",
+      "token": "0x132376b153d3cFf94615fe25712DB12CaAADf547",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    }
+  }
+}

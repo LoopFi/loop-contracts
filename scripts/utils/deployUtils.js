@@ -771,6 +771,7 @@ async function deployGauge(poolAddress, CONFIG_NETWORK) {
 
     // Check if vault is already added to gauge
     if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
+      console.log(`Adding vault ${name} to gauge at address ${vault.address}`);
       const tokenAddress = await vault.token();
       console.log('Setting Credit Manager in QuotaKeeper for token:', tokenAddress);
       await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);

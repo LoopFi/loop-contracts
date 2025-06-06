@@ -1,0 +1,121 @@
+{
+  "vaults": {
+    "0x9BfCD3788f923186705259ae70A1192F601BeB47": {
+      "contractName": "CDPVault_SpectraVault",
+      "name": "ynETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVaultSpectra",
+      "collateralType": "ERC20",
+      "lrt": "0x09db87a538bd693e9d08544577d5ccfaa6373a48",
+      "lrtName": "ynETH",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0xeD4E4F000C5fc8cf22F2Bf2EA23E64F38a5Fa216",
+      "token": "0x2408569177553A427dd6956E1717f2fBE1a96F1D",
+      "tokenScale": "1000000000000000000",
+      "tokenSymbol": "LOOP-Spectra",
+      "tokenIcon": "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjRweCIgaGVpZ2h0PSIyNHB4IiB2aWV3Qm94PSIwIDAgMjQgMjQiIHZlcnNpb249IjEuMSI+CjxnIGlkPSJzdXJmYWNlMSI+CjxwYXRoIHN0eWxlPSIgc3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOm5vbnplcm87ZmlsbDpyZ2IoMTUuMjk0MTE4JSw0NS44ODIzNTMlLDc5LjIxNTY4NiUpO2ZpbGwtb3BhY2l0eToxOyIgZD0iTSAxMiAyNCBDIDE4LjY0ODQzOCAyNCAyNCAxOC42NDg0MzggMjQgMTIgQyAyNCA1LjM1MTU2MiAxOC42NDg0MzggMCAxMiAwIEMgNS4zNTE1NjIgMCAwIDUuMzUxNTYyIDAgMTIgQyAwIDE4LjY0ODQzOCA1LjM1MTU2MiAyNCAxMiAyNCBaIE0gMTIgMjQgIi8+CjxwYXRoIHN0eWxlPSIgc3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDpyZ2IoMTAwJSwxMDAlLDEwMCUpO2ZpbGwtb3BhY2l0eToxOyIgZD0iTSA1IDkuNTUwNzgxIEMgMy41NTA3ODEgMTMuMzk4NDM4IDUuNTUwNzgxIDE3Ljc1IDkuNDQ5MjE5IDE5LjE0ODQzOCBDIDkuNjAxNTYyIDE5LjI1IDkuNzUgMTkuNDQ5MjE5IDkuNzUgMTkuNjAxNTYyIEwgOS43NSAyMC4zMDA3ODEgQyA5Ljc1IDIwLjM5ODQzOCA5Ljc1IDIwLjQ0OTIxOSA5LjY5OTIxOSAyMC41IEMgOS42NTIzNDQgMjAuNjk5MjE5IDkuNDQ5MjE5IDIwLjgwMDc4MSA5LjI1IDIwLjY5OTIxOSBDIDYuNDQ5MjE5IDE5LjgwMDc4MSA0LjMwMDc4MSAxNy42NDg0MzggMy40MDIzNDQgMTQuODUxNTYyIEMgMS45MDIzNDQgMTAuMTAxNTYyIDQuNSA1LjA1MDc4MSA5LjI1IDMuNTUwNzgxIEMgOS4zMDA3ODEgMy41IDkuNDAyMzQ0IDMuNSA5LjQ0OTIxOSAzLjUgQyA5LjY1MjM0NCAzLjU1MDc4MSA5Ljc1IDMuNjk5MjE5IDkuNzUgMy44OTg0MzggTCA5Ljc1IDQuNjAxNTYyIEMgOS43NSA0Ljg1MTU2MiA5LjY1MjM0NCA1IDkuNDQ5MjE5IDUuMTAxNTYyIEMgNy40MDIzNDQgNS44NTE1NjIgNS43NSA3LjQ0OTIxOSA1IDkuNTUwNzgxIFogTSAxNC4zMDA3ODEgMy43NSBDIDE0LjM1MTU2MiAzLjU1MDc4MSAxNC41NTA3ODEgMy40NDkyMTkgMTQuNzUgMy41NTA3ODEgQyAxNy41IDQuNDQ5MjE5IDE5LjY5OTIxOSA2LjYwMTU2MiAyMC42MDE1NjIgOS40NDkyMTkgQyAyMi4xMDE1NjIgMTQuMTk5MjE5IDE5LjUgMTkuMjUgMTQuNzUgMjAuNzUgQyAxNC42OTkyMTkgMjAuODAwNzgxIDE0LjYwMTU2MiAyMC44MDA3ODEgMTQuNTUwNzgxIDIwLjgwMDc4MSBDIDE0LjM1MTU2MiAyMC43NSAxNC4yNSAyMC42MDE1NjIgMTQuMjUgMjAuMzk4NDM4IEwgMTQuMjUgMTkuNjk5MjE5IEMgMTQuMjUgMTkuNDQ5MjE5IDE0LjM1MTU2MiAxOS4zMDA3ODEgMTQuNTUwNzgxIDE5LjE5OTIxOSBDIDE2LjYwMTU2MiAxOC40NDkyMTkgMTguMjUgMTYuODUxNTYyIDE5IDE0Ljc1IEMgMjAuNDQ5MjE5IDEwLjg5ODQzOCAxOC40NDkyMTkgNi41NTA3ODEgMTQuNTUwNzgxIDUuMTQ4NDM4IEMgMTQuNDAyMzQ0IDUuMDUwNzgxIDE0LjI1IDQuODUxNTYyIDE0LjI1IDQuNjQ4NDM4IEwgMTQuMjUgMy45NDkyMTkgQyAxNC4yNSAzLjg1MTU2MiAxNC4yNSAzLjgwMDc4MSAxNC4zMDA3ODEgMy43NSBaIE0gMTIuMTQ4NDM4IDExLjMwMDc4MSBDIDE0LjI1IDExLjU1MDc4MSAxNS4zMDA3ODEgMTIuMTQ4NDM4IDE1LjMwMDc4MSAxMy44OTg0MzggQyAxNS4zMDA3ODEgMTUuMjUgMTQuMzAwNzgxIDE2LjMwMDc4MSAxMi44MDA3ODEgMTYuNTUwNzgxIEwgMTIuODAwNzgxIDE3Ljc1IEMgMTIuNzUgMTggMTIuNTk3NjU2IDE4LjE0ODQzOCAxMi4zOTg0MzggMTguMTQ4NDM4IEwgMTEuNjQ4NDM4IDE4LjE0ODQzOCBDIDExLjM5ODQzOCAxOC4xMDE1NjIgMTEuMjUgMTcuOTQ5MjE5IDExLjI1IDE3Ljc1IEwgMTEuMjUgMTYuNTUwNzgxIEMgOS41OTc2NTYgMTYuMzAwNzgxIDguODAwNzgxIDE1LjM5ODQzOCA4LjU5NzY1NiAxNC4xNDg0MzggTCA4LjU5NzY1NiAxNC4xMDE1NjIgQyA4LjU5NzY1NiAxMy44OTg0MzggOC43NSAxMy43NSA4Ljk0OTIxOSAxMy43NSBMIDkuODAwNzgxIDEzLjc1IEMgOS45NDkyMTkgMTMuNzUgMTAuMDk3NjU2IDEzLjg1MTU2MiAxMC4xNDg0MzggMTQuMDUwNzgxIEMgMTAuMzAwNzgxIDE0LjgwMDc4MSAxMC43NSAxNS4zNTE1NjIgMTIuMDUwNzgxIDE1LjM1MTU2MiBDIDEzIDE1LjM1MTU2MiAxMy42OTkyMTkgMTQuODAwNzgxIDEzLjY5OTIxOSAxNCBDIDEzLjY5OTIxOSAxMy4xOTkyMTkgMTMuMjUgMTIuODk4NDM4IDExLjg0NzY1NiAxMi42NDg0MzggQyA5Ljc1IDEyLjM5ODQzOCA4Ljc1IDExLjc1IDguNzUgMTAuMTAxNTYyIEMgOC43NSA4Ljg1MTU2MiA5LjY5OTIxOSA3Ljg1MTU2MiAxMS4xOTkyMTkgNy42NDg0MzggTCAxMS4xOTkyMTkgNi41IEMgMTEuMjUgNi4yNSAxMS4zOTg0MzggNi4xMDE1NjIgMTEuNTk3NjU2IDYuMTAxNTYyIEwgMTIuMzQ3NjU2IDYuMTAxNTYyIEMgMTIuNTk3NjU2IDYuMTQ4NDM4IDEyLjc1IDYuMzAwNzgxIDEyLjc1IDYuNSBMIDEyLjc1IDcuNjk5MjE5IEMgMTMuODk4NDM4IDcuODAwNzgxIDE0LjgwMDc4MSA4LjY0ODQzOCAxNSA5Ljc1IEwgMTUgOS44MDA3ODEgQyAxNSAxMCAxNC44NDc2NTYgMTAuMTQ4NDM4IDE0LjY0ODQzOCAxMC4xNDg0MzggTCAxMy44NDc2NTYgMTAuMTQ4NDM4IEMgMTMuNjk5MjE5IDEwLjE0ODQzOCAxMy41NTA3ODEgMTAuMDUwNzgxIDEzLjUgOS44OTg0MzggQyAxMy4yNSA5LjE0ODQzOCAxMi43NSA4Ljg1MTU2MiAxMS44NDc2NTYgOC44NTE1NjIgQyAxMC44NDc2NTYgOC44NTE1NjIgMTAuMzQ3NjU2IDkuMzAwNzgxIDEwLjM0NzY1NiAxMCBDIDEwLjM0NzY1NiAxMC42OTkyMTkgMTAuNjQ4NDM4IDExLjEwMTU2MiAxMi4xNDg0MzggMTEuMzAwNzgxIFogTSAxMi4xNDg0MzggMTEuMzAwNzgxICIvPgo8L2c+Cjwvc3ZnPgo=",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0xbb23b7ACdE2B3A2E6446B16Cd3Dd471b0d80342c": {
+      "contractName": "CDPVault_Vaults_deUSD",
+      "name": "Vaults_deUSD",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+      "oracle": "0xAD41991F8ab1EF3Af0D5eeBB51bA9Ac8CEDef599",
+      "token": "0x09d484B738dD85CE3953102453E91507982121d0",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x9c5EE26b9623cA864693C575a8fBc8933ae964E7": {
+      "contractName": "CDPVault_Vaults_ynETHx",
+      "name": "Vaults_ynETHx",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0x7dB5F465f22017feFaC665AC2e4F68385Ced7573",
+      "token": "0xBc48c48789031A130F957c59e07B7F987aA642dE",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x1438F04666C48957b1D7673684e4a1E505c80aF6": {
+      "contractName": "CDPVault_Vaults_tETH",
+      "name": "Vaults_tETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0x628eDEeCF43DB277b6a7a6248CE45a902fD7c705",
+      "token": "0xBDb8F9729d3194f75fD1A3D9bc4FFe0DDe3A404c",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x7A0734Fa26e188483aae3d4332F19404FEA87832": {
+      "contractName": "CDPVault_Vaults_uniETH",
+      "name": "Vaults_uniETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0x94d326CD33EF6557966cbFe5431D08480dbF78B2",
+      "token": "0xbba9baaa6b3107182147a12177e0f1ec46b8b072",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x868527fd3Fad53149be0e75eEeaBE4f008D27E81": {
+      "contractName": "CDPVault_Vaults_rswETH",
+      "name": "Vaults_rswETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0xa36591aF2c814dA214415CE5e94939c92b9cA18B",
+      "token": "0xfd5cf95e8b886ace955057ca4dc69466e793fbbe",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x314A8cB19b5F245C7f109f50F4FaA06cD70C7Aa4": {
+      "contractName": "CDPVault_Vaults_puffETH",
+      "name": "Vaults_puffETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0x6eBf783c454825d0809276ec313F086382e71958",
+      "token": "0x58612beb0e8a126735b19bb222cbc7fc2c162d2a",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x03d30243138D45383F02BCA884D42068523bdE22": {
+      "contractName": "CDPVault_Vaults_inwstETH",
+      "name": "Vaults_inwstETH",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "oracle": "0x737B291C1ded5b9cD43Eddd2872243b88600334c",
+      "token": "0x2cd244f1f9a856c251d276103862dd4325985d2a",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    }
+  }
+}

@@ -1,4 +1,5 @@
 const { ethers } = require('hardhat');
+const hre = require('hardhat');
 require('dotenv').config();
 
 // ACL contract details
@@ -23,13 +24,20 @@ async function main() {
     throw new Error("DEPLOYER_PRIVATE_KEY environment variable is required");
   }
 
-  // Get the provider
-  const provider = ethers.provider;
-
-  // Create wallet from private key and connect to provider
-  // Note: With hardhat, we'd normally use getSigners(), but we're using private key
-  // to be consistent with the Tenderly script
-  const deployerWallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+  // Get the provider - use raw ethers provider for anvil to avoid Hardhat's account management
+  let provider;
+  let deployerWallet;
+  
+  if (networkName === 'local' || networkName === 'localhost' || networkName === 'hardhat') {
+    // For anvil/local networks, use raw ethers provider to bypass Hardhat's account management
+    provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
+    deployerWallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+  } else {
+    // For other networks, use Hardhat's provider
+    provider = ethers.provider;
+    deployerWallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+  }
+  
   const newOwnerAddress = await deployerWallet.getAddress();
   console.log(`New owner will be: ${newOwnerAddress}`);
 
@@ -47,18 +55,37 @@ async function main() {
   
   // Impersonate the current owner
   console.log(`Impersonating current owner: ${currentOwnerFromContract}`);
-  await provider.send("anvil_impersonateAccount", [currentOwnerFromContract]);
   
-  // Create a signer for the impersonated account
-  const impersonatedSigner = await ethers.getImpersonatedSigner(currentOwnerFromContract);
+  let impersonatedSigner;
   
-  // Fund the impersonated account if necessary (on Anvil)
-  if (networkName === 'localhost' || networkName === 'hardhat') {
+  if (networkName === 'local' || networkName === 'localhost' || networkName === 'hardhat') {
+    // For anvil/local networks, use direct anvil impersonation
+    await provider.send("anvil_impersonateAccount", [currentOwnerFromContract]);
+    
+    // Set balance for the impersonated account using anvil
+    await provider.send("anvil_setBalance", [
+      currentOwnerFromContract,
+      "0xDE0B6B3A7640000" // 1 ETH in hex
+    ]);
+    console.log(`Set balance for impersonated account`);
+    
+    // Create signer using provider.getSigner for anvil
+    impersonatedSigner = provider.getSigner(currentOwnerFromContract);
+  } else {
+    // For other networks (like Tenderly), use Hardhat's impersonation
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [currentOwnerFromContract],
+    });
+    
+    // Fund the impersonated account if necessary
     await deployerWallet.sendTransaction({
       to: currentOwnerFromContract,
       value: ethers.utils.parseEther("1.0")
     });
     console.log(`Funded the impersonated account with 1 ETH`);
+    
+    impersonatedSigner = await ethers.getImpersonatedSigner(currentOwnerFromContract);
   }
   
   // Connect contract to impersonated signer
@@ -88,7 +115,14 @@ async function main() {
   }
   
   // Stop impersonating
-  await provider.send("anvil_stopImpersonatingAccount", [currentOwnerFromContract]);
+  if (networkName === 'local' || networkName === 'localhost' || networkName === 'hardhat') {
+    await provider.send("anvil_stopImpersonatingAccount", [currentOwnerFromContract]);
+  } else {
+    await hre.network.provider.request({
+      method: "hardhat_stopImpersonatingAccount",
+      params: [currentOwnerFromContract],
+    });
+  }
   console.log(`Stopped impersonating ${currentOwnerFromContract}`);
 }
 

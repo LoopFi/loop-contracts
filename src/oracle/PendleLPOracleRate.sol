@@ -22,6 +22,8 @@ contract PendleLPOracleRate is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     uint32 public immutable twapWindow;
     /// @notice Pendle Pt Oracle
     IPPYLpOracle public immutable ptOracle;
+    /// @notice Scale factor
+    uint256 public immutable scale;
 
     /*//////////////////////////////////////////////////////////////
                               STORAGE GAP
@@ -46,11 +48,13 @@ contract PendleLPOracleRate is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     constructor(
         address ptOracle_,
         address market_,
-        uint32 twap_
+        uint32 twap_,
+        uint256 scale_
     ) initializer {
         market = IPMarket(market_);
         twapWindow = twap_;
         ptOracle = IPPYLpOracle(ptOracle_);
+        scale = scale_;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -94,7 +98,7 @@ contract PendleLPOracleRate is IOracle, AccessControlUpgradeable, UUPSUpgradeabl
     function spot(address /* token */) external view virtual override returns (uint256 price) {
         bool isValidPtOracle = _validatePtOracle();
         if (!isValidPtOracle) revert PendleLPOracle__validatePtOracle_invalidValue();
-        return market.getLpToAssetRate(twapWindow);
+        return market.getLpToAssetRate(twapWindow) * scale;
     }
 
     /// @notice Returns the status of the oracle

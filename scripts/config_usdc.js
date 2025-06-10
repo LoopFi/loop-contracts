@@ -246,7 +246,8 @@ module.exports = {
           deploymentArguments: {
             "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
             "market": "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
-            "twap": 180
+            "twap": 180,
+            "scale": 1
           },
       },
       token: "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",

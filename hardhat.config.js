@@ -61,6 +61,16 @@ module.exports = {
     bsc: {
       url: process.env.BNB_RPC_URL,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY]
-    }
+    },
+    xdc: {
+      url: process.env.XDC_RPC_URL || "https://erpc.xinfin.network",
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      chainId: 50,
+    },
+    xdc_testnet: {
+      url: process.env.XDC_TESTNET_RPC_URL || "https://erpc.apothem.network",
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      chainId: 51,
+    },
   }
 };

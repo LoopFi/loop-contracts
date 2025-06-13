@@ -130,6 +130,34 @@
         "minRate": 100,
         "maxRate": 10000
       }
+    },
+    "0x16575edcB68613188D70b194b8FD89Df0f6eDFaE": {
+      "contractName": "CDPVault_Vaults_eUSDe",
+      "name": "Vaults_eUSDe",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+      "oracle": "0xF0bF7c46CF6B72e9049c4e66e0611EBB224a923e",
+      "token": "0xE93B4A93e80BD3065B290394264af5d82422ee70",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
+    },
+    "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83": {
+      "contractName": "CDPVault_Vaults_syrupUSDC",
+      "name": "Vaults_syrupUSDC",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+      "oracle": "0x61D8Ee53b7e0C1000Fc03D9e96222D6B123562C6",
+      "token": "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
     }
   }
 }

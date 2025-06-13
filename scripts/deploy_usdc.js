@@ -468,7 +468,7 @@ async function deploydeUSDOracle(key, config) {
 }
 
 async function deployeUSDeOracle(key, config) {
-  console.log('Deploying sUSDe oracle for', key);
+  console.log('Deploying eUSDe oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
   
   const CombinedAggregatorV3OracleFeeds = await deployContract(

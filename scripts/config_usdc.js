@@ -92,51 +92,51 @@ module.exports = {
   "Vendors": {
   },
   "Vaults": {
-    "Vaults_USR": {
-      name: "Vaults_USR",
-      description: "This vault allows for borrowing and lending of assets",
-      type: "CDPVault",
-      collateralType: "ERC20",
-      oracle: {
-        type: "PendleLPOracle",
-        deploymentArguments: {
-          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
-          "twap": 180,
-          "aggregator": "0x34ad75691e25A8E9b681AAA85dbeB7ef6561B42c", // usr-usd
-          "stalePeriod": 88400,
-        },
-      },
-      token: "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
-      poolAddress: "LpUSD",
-      tokenSymbol: "LOOP-USR",
-      tokenScale: toWad("1.0"),
-      protocolIcon: null,
-      deploymentArguments: {
-          constants: {
-              protocolFee: toWad("0.01"),
-          },
-          configs: {
-              debtFloor: toWad("1"),
-              liquidationRatio: toWad("1.1"),
-              liquidationPenalty: toWad("0.99"),
-              liquidationDiscount: toWad("0.98"),
-              roleAdmin: "deployer",
-              vaultAdmin: "deployer",
-              pauseAdmin: "deployer",
-          },
-          debtCeiling: toWad("100000000"),
-      },
-      quotas: {
-          minRate: 100,
-          maxRate: 10000,
-      },
-      "RewardManager": {
-        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
-        "constructorArguments": [
-        ]
-      }
-    },
+    // "Vaults_USR": {
+    //   name: "Vaults_USR",
+    //   description: "This vault allows for borrowing and lending of assets",
+    //   type: "CDPVault",
+    //   collateralType: "ERC20",
+    //   oracle: {
+    //     type: "PendleLPOracle",
+    //     deploymentArguments: {
+    //       "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+    //       "market": "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
+    //       "twap": 180,
+    //       "aggregator": "0x34ad75691e25A8E9b681AAA85dbeB7ef6561B42c", // usr-usd
+    //       "stalePeriod": 88400,
+    //     },
+    //   },
+    //   token: "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
+    //   poolAddress: "LpUSD",
+    //   tokenSymbol: "LOOP-USR",
+    //   tokenScale: toWad("1.0"),
+    //   protocolIcon: null,
+    //   deploymentArguments: {
+    //       constants: {
+    //           protocolFee: toWad("0.01"),
+    //       },
+    //       configs: {
+    //           debtFloor: toWad("1"),
+    //           liquidationRatio: toWad("1.1"),
+    //           liquidationPenalty: toWad("0.99"),
+    //           liquidationDiscount: toWad("0.98"),
+    //           roleAdmin: "deployer",
+    //           vaultAdmin: "deployer",
+    //           pauseAdmin: "deployer",
+    //       },
+    //       debtCeiling: toWad("100000000"),
+    //   },
+    //   quotas: {
+    //       minRate: 100,
+    //       maxRate: 10000,
+    //   },
+    //   "RewardManager": {
+    //     "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+    //     "constructorArguments": [
+    //     ]
+    //   }
+    // },
 
     "Vaults_eUSDe": {
       name: "Vaults_eUSDe",
@@ -188,53 +188,53 @@ module.exports = {
       }
     },
 
-    "Vaults_cUSDO": {
-      name: "Vaults_cUSDO",
-      description: "This vault allows for borrowing and lending of assets",
-      type: "CDPVault",
-      collateralType: "ERC20",
-      oracle: {
-        type: "PendleLPOracle_cUSDO",
-        deploymentArguments: {
-          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0xA77c0DE4d26B7C97D1D42ABD6733201206122E25",
-          "twap": 180,
-          "curvePool": "0x90455bd11Ce8a67C57d467e634Dc142b8e4105Aa",
-          "k": 0,
-          "invert": true,
-          "stalePeriod": 1
-        },
-      },
-      token: "0xa77c0de4d26b7c97d1d42abd6733201206122e25",
-      poolAddress: "LpUSD",
-      tokenSymbol: "LOOP-cUSDO",
-      tokenScale: toWad("1.0"),
-      protocolIcon: null,
-      deploymentArguments: {
-          constants: {
-              protocolFee: toWad("0.01"),
-          },
-          configs: {
-              debtFloor: toWad("1"),
-              liquidationRatio: toWad("1.1"),
-              liquidationPenalty: toWad("0.99"),
-              liquidationDiscount: toWad("0.98"),
-              roleAdmin: "deployer",
-              vaultAdmin: "deployer",
-              pauseAdmin: "deployer",
-          },
-          debtCeiling: toWad("100000000"),
-      },
-      quotas: {
-          minRate: 100,
-          maxRate: 10000,
-      },
-      "RewardManager": {
-        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
-        "constructorArguments": [
-        ]
-      }
-    },
+    // "Vaults_cUSDO": {
+    //   name: "Vaults_cUSDO",
+    //   description: "This vault allows for borrowing and lending of assets",
+    //   type: "CDPVault",
+    //   collateralType: "ERC20",
+    //   oracle: {
+    //     type: "PendleLPOracle_cUSDO",
+    //     deploymentArguments: {
+    //       "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+    //       "market": "0xA77c0DE4d26B7C97D1D42ABD6733201206122E25",
+    //       "twap": 180,
+    //       "curvePool": "0x90455bd11Ce8a67C57d467e634Dc142b8e4105Aa",
+    //       "k": 0,
+    //       "invert": true,
+    //       "stalePeriod": 1
+    //     },
+    //   },
+    //   token: "0xa77c0de4d26b7c97d1d42abd6733201206122e25",
+    //   poolAddress: "LpUSD",
+    //   tokenSymbol: "LOOP-cUSDO",
+    //   tokenScale: toWad("1.0"),
+    //   protocolIcon: null,
+    //   deploymentArguments: {
+    //       constants: {
+    //           protocolFee: toWad("0.01"),
+    //       },
+    //       configs: {
+    //           debtFloor: toWad("1"),
+    //           liquidationRatio: toWad("1.1"),
+    //           liquidationPenalty: toWad("0.99"),
+    //           liquidationDiscount: toWad("0.98"),
+    //           roleAdmin: "deployer",
+    //           vaultAdmin: "deployer",
+    //           pauseAdmin: "deployer",
+    //       },
+    //       debtCeiling: toWad("100000000"),
+    //   },
+    //   quotas: {
+    //       minRate: 100,
+    //       maxRate: 10000,
+    //   },
+    //   "RewardManager": {
+    //     "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+    //     "constructorArguments": [
+    //     ]
+    //   }
+    // },
 
     "Vaults_syrupUSDC": {
       name: "Vaults_syrupUSDC",
@@ -247,7 +247,7 @@ module.exports = {
             "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
             "market": "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
             "twap": 180,
-            "scale": 1
+            "scale": 1000000000000
           },
       },
       token: "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",

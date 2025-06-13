@@ -821,14 +821,14 @@ async function deployGauge(poolAddress, CONFIG_NETWORK, executeTransactions = fa
         console.log('Setting Credit Manager in QuotaKeeper for token:', tokenAddress);
         await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
         console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-        
-        console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-        await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
-        console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+      
+      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
 
-        // Update the gauge status
-        deployment.vaults[name].addedToGauge = true;
-        fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+      // Update the gauge status
+      deployment.vaults[name].addedToGauge = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
       }
     } else {
       console.log(`${name} already added to gauge or not ready for gauge, skipping`);
@@ -853,10 +853,10 @@ async function deployGauge(poolAddress, CONFIG_NETWORK, executeTransactions = fa
   });
 
   if (executeTransactions) {
-    // Unfreeze the epoch in Gauge
-    await gaugeV3.setFrozenEpoch(false);
-    console.log('Set frozen epoch to false in GaugeV3');
-    console.log('Gauge and related configurations have been set.');
+  // Unfreeze the epoch in Gauge
+  await gaugeV3.setFrozenEpoch(false);
+  console.log('Set frozen epoch to false in GaugeV3');
+  console.log('Gauge and related configurations have been set.');
   } else {
     console.log(`Generated ${transactions.length} transactions for multisig execution:`);
     transactions.forEach((tx, index) => {

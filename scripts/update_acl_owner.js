@@ -61,7 +61,7 @@ async function main() {
   if (networkName === 'local' || networkName === 'localhost' || networkName === 'hardhat') {
     // For anvil/local networks, use direct anvil impersonation
     await provider.send("anvil_impersonateAccount", [currentOwnerFromContract]);
-    
+  
     // Set balance for the impersonated account using anvil
     await provider.send("anvil_setBalance", [
       currentOwnerFromContract,
@@ -116,7 +116,7 @@ async function main() {
   
   // Stop impersonating
   if (networkName === 'local' || networkName === 'localhost' || networkName === 'hardhat') {
-    await provider.send("anvil_stopImpersonatingAccount", [currentOwnerFromContract]);
+  await provider.send("anvil_stopImpersonatingAccount", [currentOwnerFromContract]);
   } else {
     await hre.network.provider.request({
       method: "hardhat_stopImpersonatingAccount",

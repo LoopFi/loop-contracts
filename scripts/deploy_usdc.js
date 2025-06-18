@@ -43,6 +43,51 @@ const toWad = ethers.utils.parseEther;
 const fromWad = ethers.utils.formatEther;
 const toBytes32 = ethers.utils.formatBytes32String;
 
+// Helper function to generate raw transaction data for setCreditManagerDebtLimit
+function generateSetCreditManagerDebtLimitTxData(creditManagerAddress, debtLimit) {
+  const iface = new ethers.utils.Interface([
+    "function setCreditManagerDebtLimit(address creditManager, uint256 newLimit) external"
+  ]);
+  
+  return iface.encodeFunctionData("setCreditManagerDebtLimit", [
+    creditManagerAddress,
+    debtLimit
+  ]);
+}
+
+// Helper function to log multisig transaction data
+function logMultisigTransaction(poolAddress, creditManagerAddress, debtLimit, description) {
+  const txData = generateSetCreditManagerDebtLimitTxData(creditManagerAddress, debtLimit);
+  
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                    MULTISIG TRANSACTION REQUIRED
+//////////////////////////////////////////////////////////////*/
+  
+${description}
+
+Pool Address: ${poolAddress}
+Target Function: setCreditManagerDebtLimit(address,uint256)
+Credit Manager: ${creditManagerAddress}
+Debt Limit: ${debtLimit.toString()} (${fromWad(debtLimit)} tokens)
+
+RAW TRANSACTION DATA:
+${txData}
+
+SUMMARY FOR MULTISIG:
+- To: ${poolAddress}
+- Value: 0
+- Data: ${txData}
+- Description: ${description}
+
+/*//////////////////////////////////////////////////////////////
+                    END MULTISIG TRANSACTION
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  return txData;
+}
+
 // Add this helper function at the top level
 function getPoolSpecificName(baseName, poolIdentifier = 'usdc') {
   return `${baseName}_${poolIdentifier}`;
@@ -142,8 +187,14 @@ async function deployActions(pool, vaultRegistry) {
   );
   
   const UINT256_MAX = ethers.constants.MaxUint256;
-  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
-  console.log('Set credit manager debt limit for flashlender to max');
+  
+  // Generate multisig transaction data instead of executing directly
+  logMultisigTransaction(
+    pool.address,
+    flashlender.address,
+    UINT256_MAX,
+    "Set credit manager debt limit for flashlender to max"
+  );
   
   // Deploy PRBProxyRegistry (this one doesn't need pool suffix as it's chain-wide)
   const proxyRegistry = await attachContract('PRBProxyRegistry', CONFIG_NETWORK.Core.PRBProxyRegistry);
@@ -382,6 +433,10 @@ async function deployVaultOracle(key, config) {
 
   if (config.oracle.type == "PendleLPOracle_eUSDe") {
     return await deployeUSDeOracle(key, config);
+  }
+
+  if (config.oracle.type == "PendleLPOracle_sUSDf") {
+    return await deploysUSDfOracle(key, config);
   }
 
   if (config.oracle.type == "PendleLPOracle_cUSDO") {
@@ -635,6 +690,96 @@ async function deployWstUSROracle(key, config) {
   return pendleLPOracle.address;
 }
 
+async function deploysUSDfOracle(key, config) {
+  console.log('Deploying sUSDf oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  // Step 1: Deploy CombinedAggregatorV3Oracle for sUSDf/USDf -> USDf/USD (multiply)
+  // This gives us sUSDf/USD price
+  const sUSDfToUSDOracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_sUSDf_to_USD',
+    false,
+    oracleConfig.susdf_usdf_aggregator,
+    oracleConfig.susdf_usdf_heartbeat,
+    oracleConfig.usdf_usd_aggregator,
+    oracleConfig.usdf_usd_heartbeat,
+    true // multiply: sUSDf/USDf * USDf/USD = sUSDf/USD
+  );
+  console.log(`CombinedAggregatorV3Oracle sUSDf/USD deployed for ${key} at ${sUSDfToUSDOracle.address}`);
+
+  // Step 2: Deploy CombinedAggregatorV3Oracle for sUSDf/USD ÷ USDC/USD (divide)
+  // This gives us sUSDf/USDC price
+  const sUSDfToUSDCOracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_sUSDf_to_USDC',
+    false,
+    sUSDfToUSDOracle.address,
+    Math.max(oracleConfig.susdf_usdf_heartbeat, oracleConfig.usdf_usd_heartbeat),
+    oracleConfig.usdc_usd_aggregator,
+    oracleConfig.usdc_usd_heartbeat,
+    false // divide: sUSDf/USD ÷ USDC/USD = sUSDf/USDC
+  );
+  console.log(`CombinedAggregatorV3Oracle sUSDf/USDC deployed for ${key} at ${sUSDfToUSDCOracle.address}`);
+
+  // Step 3: Deploy PendleLPOracle using the final combined oracle
+  const pendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle_sUSDf',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    sUSDfToUSDCOracle.address,
+    oracleConfig.stalePeriod
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  // Store all contract deployments for verification
+  await storeContractDeployment(
+    false,
+    'CombinedAggregatorV3Oracle_sUSDf_to_USD',
+    sUSDfToUSDOracle.address,
+    'CombinedAggregatorV3Oracle',
+    [
+      oracleConfig.susdf_usdf_aggregator,
+      oracleConfig.susdf_usdf_heartbeat,
+      oracleConfig.usdf_usd_aggregator,
+      oracleConfig.usdf_usd_heartbeat,
+      true
+    ]
+  );
+
+  await storeContractDeployment(
+    false,
+    'CombinedAggregatorV3Oracle_sUSDf_to_USDC',
+    sUSDfToUSDCOracle.address,
+    'CombinedAggregatorV3Oracle',
+    [
+      sUSDfToUSDOracle.address,
+      Math.max(oracleConfig.susdf_usdf_heartbeat, oracleConfig.usdf_usd_heartbeat),
+      oracleConfig.usdc_usd_aggregator,
+      oracleConfig.usdc_usd_heartbeat,
+      false
+    ]
+  );
+
+  await storeContractDeployment(
+    false,
+    'PendleLPOracle_sUSDf',
+    pendleLPOracle.address,
+    'PendleLPOracle',
+    [
+      oracleConfig.ptOracle,
+      oracleConfig.market,
+      oracleConfig.twap,
+      sUSDfToUSDCOracle.address,
+      oracleConfig.stalePeriod
+    ]
+  );
+
+  return pendleLPOracle.address;
+}
 
 async function deployVaults(pool) {
   console.log(`
@@ -715,7 +860,14 @@ async function deployVaults(pool) {
 
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
     const pool = await attachContract('PoolV3', poolAddress);
-    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    
+    // Generate multisig transaction data instead of executing directly
+    logMultisigTransaction(
+      pool.address,
+      cdpVault.address,
+      config.deploymentArguments.debtCeiling,
+      `Set debt ceiling for ${vaultName} vault to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`
+    );
     
     console.log('------------------------------------');
 

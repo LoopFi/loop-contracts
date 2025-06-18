@@ -80,6 +80,65 @@
         "0xED166436559Fd3d7f44cb00CACDA96EB999D789e"
       ],
       "addedToRegistry": false
+    },
+    "LinearInterestRateModelV3_lpUSDCe": {
+      "address": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "8000",
+        "9500",
+        "0",
+        "1000",
+        "2000",
+        "50000",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolQuotaKeeperV3_lpUSDCe": {
+      "address": "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArgs": [
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2"
+      ],
+      "addedToRegistry": false
+    },
+    "LoopVoter_lpUSDCe": {
+      "address": "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+      "artifactName": "LoopVoter",
+      "constructorArgs": [
+        "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3",
+        "1750261602"
+      ],
+      "addedToRegistry": false
+    },
+    "GaugeV3_lpUSDCe": {
+      "address": "0xb4b083d1f9f5294F50C5118C6e8994369AcB6e51",
+      "artifactName": "GaugeV3",
+      "constructorArgs": [
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c"
+      ],
+      "addedToRegistry": false
+    },
+    "StakingLPUSDCE": {
+      "address": "0xe1987f6cD0b8823a033c29d640596757492479BD",
+      "artifactName": "StakingLPEth",
+      "constructorArgs": [
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "StakingLPUSDCE",
+        "slpUSDCE",
+        "10000"
+      ],
+      "addedToRegistry": false
+    },
+    "LockingLpUSDCE": {
+      "address": "0x0D7909318B497Da3060BcD371448E4629be2705D",
+      "artifactName": "Locking",
+      "constructorArgs": [
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2"
+      ],
+      "addedToRegistry": false
     }
   },
   "vaults": {
@@ -94,6 +153,20 @@
         "115792089237316195423570985008687907853269984665640564039457584007913129639935",
         "Loop Liquidity Pool - XDC",
         "lpXDC"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolV3_lpUSDCe": {
+      "address": "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+      "artifactName": "PoolV3",
+      "constructorArgs": [
+        "0x0000000000000000000000000000000000000000",
+        "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3",
+        "0xcc0587aebda397146cc828b445db130a94486e74",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop Liquidity Pool - USDC.e",
+        "lpUSDCe"
       ],
       "addedToRegistry": false
     }

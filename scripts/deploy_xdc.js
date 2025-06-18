@@ -94,17 +94,24 @@ async function finalizeDeployment() {
 async function deployPool() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                         DEPLOYING POOL
+                         DEPLOYING POOLS
 //////////////////////////////////////////////////////////////*/
   `);
 
+  // Deploy USDC Pool
+  console.log('\n--- Deploying USDC Pool ---');
+  await deploySinglePool('Pool LpUSDC');
+}
+
+async function deploySinglePool(poolKey) {
   // Get the pool config from CONFIG_NETWORK
-  const poolConfig = CONFIG_NETWORK.Pools['Pool LpXDC'];
+  const poolConfig = CONFIG_NETWORK.Pools[poolKey];
+  console.log(`Deploying pool: ${poolConfig.name} (${poolConfig.symbol})`);
   
   // Deploy the interest rate model first as it's required for pool deployment
   const interestRateModel = await deployContract(
     'LinearInterestRateModelV3',
-    'LinearInterestRateModelV3',
+    `LinearInterestRateModelV3_${poolConfig.symbol}`,
     false,
     poolConfig.interestRateModel.U_1,
     poolConfig.interestRateModel.U_2,
@@ -115,101 +122,96 @@ async function deployPool() {
     false
   );
 
-  console.log('LinearInterestRateModelV3 deployed at:', interestRateModel.address);
+  console.log(`LinearInterestRateModelV3 for ${poolConfig.symbol} deployed at:`, interestRateModel.address);
 
   // Deploy the PoolV3 contract
   const pool = await deployContract(
     'PoolV3',
-    'PoolV3_LpXDC',
+    `PoolV3_${poolConfig.symbol}`,
     true,
-    CONFIG_NETWORK.Core.WXDC, // weth_ (using WXDC)
+    poolConfig.wrappedToken, // weth_ (using WXDC for gas payments)
     CONFIG_NETWORK.Core.AddressProviderV3, // addressProvider_
-    poolConfig.wrappedToken, // underlyingToken_
+    poolConfig.underlier, // underlyingToken_
     interestRateModel.address, // interestRateModel_
     ethers.constants.MaxUint256, // totalDebtLimit_ (no limit initially)
     poolConfig.name, // name_
     poolConfig.symbol // symbol_
   );
 
-  console.log('PoolV3 deployed at:', pool.address);
+  console.log(`PoolV3 ${poolConfig.symbol} deployed at:`, pool.address);
 
   // Store the pool address in the config for future reference
-  CONFIG_NETWORK.Pools['Pool LpXDC'].poolAddress = pool.address;
+  CONFIG_NETWORK.Pools[poolKey].poolAddress = pool.address;
 
   // Deploy and set up the pool quota keeper
   const poolQuotaKeeper = await deployContract(
     'PoolQuotaKeeperV3',
-    'PoolQuotaKeeperV3_LpXDC',
+    `PoolQuotaKeeperV3_${poolConfig.symbol}`,
     false,
     pool.address // pool_
   );
 
-  console.log('PoolQuotaKeeperV3 deployed at:', poolQuotaKeeper.address);
+  console.log(`PoolQuotaKeeperV3 for ${poolConfig.symbol} deployed at:`, poolQuotaKeeper.address);
 
   // Set the pool quota keeper in the pool
   await pool.setPoolQuotaKeeper(poolQuotaKeeper.address);
-  console.log('Pool quota keeper set in pool');
-
-  // Store the pool quota keeper in the config
-  CONFIG_NETWORK.Core.PoolQuotaKeeperV3 = poolQuotaKeeper.address;
+  console.log(`Pool quota keeper set in ${poolConfig.symbol} pool`);
 
   // Get current block timestamp
   const blockNumber = await ethers.provider.getBlockNumber();
   const block = await ethers.provider.getBlock(blockNumber);
   const blockTimestamp = block.timestamp;
 
-  // Deploy LoopVoter
-  const voter = await deployContract(
-    'LoopVoter',
-    'LoopVoter',
-    false,
-    CONFIG_NETWORK.Core.AddressProviderV3, // addressProvider_
-    blockTimestamp // block.timestamp
-  );
-  console.log('LoopVoter deployed at:', voter.address);
-
-  // TODO: Set initial voting power for voting accounts
-  // await voter.setVotingPower(100, voter.address);
-
-  // Store voter address in config
-  CONFIG_NETWORK.Core.LoopVoter = voter.address;
+  // Deploy LoopVoter (shared across pools or pool-specific depending on requirements)
+  let voter;
+  if (!CONFIG_NETWORK.Core.LoopVoter) {
+    voter = await deployContract(
+      'LoopVoter',
+      `LoopVoter_${poolConfig.symbol}`,
+      false,
+      CONFIG_NETWORK.Core.AddressProviderV3, // addressProvider_
+      blockTimestamp // block.timestamp
+    );
+    console.log('LoopVoter deployed at:', voter.address);
+    CONFIG_NETWORK.Core.LoopVoter = voter.address;
+  } else {
+    voter = await attachContract('LoopVoter', CONFIG_NETWORK.Core.LoopVoter);
+    console.log('Using existing LoopVoter at:', voter.address);
+  }
 
   // Deploy GaugeV3 with voter
   const gauge = await deployContract(
     'GaugeV3',
-    'GaugeV3_LpXDC',
+    `GaugeV3_${poolConfig.symbol}`,
     false,
     pool.address, // pool_
     voter.address // voter_
   );
 
-  console.log('GaugeV3 deployed at:', gauge.address);
+  console.log(`GaugeV3 for ${poolConfig.symbol} deployed at:`, gauge.address);
 
   // Set the gauge in the pool quota keeper
   await poolQuotaKeeper.setGauge(gauge.address);
-  console.log('Gauge set in pool quota keeper');
-
-  // Store the gauge address in the config
-  CONFIG_NETWORK.Core.GaugeV3 = gauge.address;
+  console.log(`Gauge set in ${poolConfig.symbol} pool quota keeper`);
 
   // Deploy staking and locking contracts
   const { stakingLp, lockLp } = await deployStakingAndLockingLP(
     pool,
-    'XDC' // poolType parameter
+    poolConfig.symbol.replace('lp', '').toUpperCase() // poolType parameter (XDC or USDC)
   );
-  console.log('Staking contract deployed at:', stakingLp.address);
-  console.log('Locking contract deployed at:', lockLp.address);
+  console.log(`Staking contract for ${poolConfig.symbol} deployed at:`, stakingLp.address);
+  console.log(`Locking contract for ${poolConfig.symbol} deployed at:`, lockLp.address);
 
   // Set cooldown periods (7 days in seconds)
   const SEVEN_DAYS = 7 * 24 * 60 * 60;
   
   // Set cooldown duration for staking contract
   await stakingLp.setCooldownDuration(SEVEN_DAYS);
-  console.log('Set cooldown duration to 7 days for staking contract');
+  console.log(`Set cooldown duration to 7 days for ${poolConfig.symbol} staking contract`);
 
   // Set cooldown period for locking contract
   await lockLp.setCooldownPeriod(SEVEN_DAYS);
-  console.log('Set cooldown period to 7 days for locking contract');
+  console.log(`Set cooldown period to 7 days for ${poolConfig.symbol} locking contract`);
 
   return {
     pool,
@@ -410,19 +412,11 @@ async function main() {
     // Initialize deployment with account impersonation
     // const impersonatedSigner = await impersonateDeployer();
     
-    // Deploy address provider and ACL
-    const { acl, addressProvider, contractsRegister } = await deployAddressProvider();
-
+    // Deploy pools (XDC and USDC)
     await deployPool();
     
-    // // Deploy core contracts
+    // Deploy core contracts
     // const deployedCore = await deployCore();
-    
-    // // Deploy pool
-    // const { pool, interestRateModel, poolQuotaKeeper, gauge } = await deployPool();
-    
-    // // Deploy vaults
-    // await deployVaults();
     
     // // Finalize deployment
     // await finalizeDeployment();

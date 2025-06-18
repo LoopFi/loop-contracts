@@ -6,6 +6,7 @@ module.exports = {
     Core: {
         WETH: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
         "PoolV3_LpBNB": "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+        "PoolV3_LpBTC": "0xa02fcc8493856b5bd7fA5099f5a631A6cb77fBd1",
         "VaultRegistry": "0xcFad68BE82E5230C40b04629ee2AF6D1F0E25E93",
         "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
         "ProxyRegistry": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",
@@ -15,6 +16,13 @@ module.exports = {
         "PenpieHelper": "0x0000000000000000000000000000000000000000",
         "SwapAction": "0x5f96431ee187983B00e53068B55A8011aea6b708",
         "PoolAction": "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+
+        "Flashlender_btc": {
+            "constructorArguments": {
+              "protocolFee_": toWad('0')
+            },
+            "initialDebtCeiling": toWad('100000000'),
+          },
 
         Actions: {
             SwapAction: {
@@ -38,7 +46,7 @@ module.exports = {
         },
         Treasury: {
             constructorArguments: {
-                payees: ["0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", "stakingLpEth"],
+                payees: ["0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", "stakingLpBTC"],
                 shares: [200, 800],
                 admin: "deployer",
             },
@@ -48,33 +56,90 @@ module.exports = {
         },
     },
     Pools: {
-        LiquidityPool: {
-            wrappedToken: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // wBNB
-            name: "Loop BNB - lpBNB",
-            symbol: "lpBNB",
-            treasury: "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
-            underlier: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        // LiquidityPool: {
+        //     wrappedToken: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // wBNB
+        //     name: "Loop BNB - lpBNB",
+        //     symbol: "lpBNB",
+        //     treasury: "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+        //     underlier: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        // },
+
+        LiquidityPoolBTCB: {
+            wrappedToken: "0x0000000000000000000000000000000000000000",
+            name: "Loop BTC - lpBTC",
+            symbol: "lpBTC",
+            treasury: "0x0000000000000000000000000000000000000000",
+            underlier: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
+            "interestRateModel": {
+                "U_1": 7000, // U_1
+                "U_2": 9000, // U_2
+                "R_base": 0, // R_base
+                "R_slope1": 612, // R_slope1
+                "R_slope2": 765, // R_slope2
+                "R_slope3": 2040, // R_slope3
+            },
         },
     },
     Vaults: {
+        // CDPVault: {
+        //     name: "ClisBNB-v2",
+        //     description: "This vault allows for borrowing and lending of assets",
+        //     type: "CDPVault",
+        //     collateralType: "ERC20",
+        //     poolAddress: "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+        //     oracle: {
+        //         type: "ListaOracle",
+        //         deploymentArguments: {
+        //             ptOracle: "0x9a9fa8338dd5e5b2188006f1cd2ef26d921650c2",
+        //             listaStakeManager: "0x0000000000000000000000000000000000000000",
+        //             market: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
+        //             twap: "180",
+        //             stalePeriod: "1800",
+        //         },
+        //     },
+        //     token: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
+        //     tokenSymbol: "LOOP-ClisBNB",
+        //     tokenScale: toWad("1.0"),
+        //     protocolIcon: null,
+        //     deploymentArguments: {
+        //         constants: {
+        //             protocolFee: toWad("0.01"),
+        //         },
+        //         configs: {
+        //             debtFloor: toWad("1"),
+        //             liquidationRatio: toWad("1.1"),
+        //             liquidationPenalty: toWad("0.99"),
+        //             liquidationDiscount: toWad("0.98"),
+        //             roleAdmin: "deployer",
+        //             vaultAdmin: "deployer",
+        //             pauseAdmin: "deployer",
+        //         },
+        //         debtCeiling: toWad("100000000"),
+        //     },
+        //     quotas: {
+        //         minRate: 100,
+        //         maxRate: 10000,
+        //     },
+        //     "RewardManager": {
+        //         "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        //         "constructorArguments": [
+        //         ]
+        //     }
+        // },
+
         CDPVault: {
-            name: "ClisBNB-v2",
+            name: "ynCoBTCk",
             description: "This vault allows for borrowing and lending of assets",
             type: "CDPVault",
             collateralType: "ERC20",
-            poolAddress: "0xED166436559Fd3d7f44cb00CACDA96EB999D789e",
+            poolAddress: "LiquidityPoolBTCB",
             oracle: {
-                type: "ListaOracle",
+                type: "StaticOracle",
                 deploymentArguments: {
-                    ptOracle: "0x9a9fa8338dd5e5b2188006f1cd2ef26d921650c2",
-                    listaStakeManager: "0x0000000000000000000000000000000000000000",
-                    market: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
-                    twap: "180",
-                    stalePeriod: "1800",
                 },
             },
-            token: "0xBD577dDABb5a1672d3C786726b87A175de652b96",
-            tokenSymbol: "LOOP-ClisBNB",
+            token: "0x132376b153d3cFf94615fe25712DB12CaAADf547",
+            tokenSymbol: "LOOP-ynCoBTCk",
             tokenScale: toWad("1.0"),
             protocolIcon: null,
             deploymentArguments: {

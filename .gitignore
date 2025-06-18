@@ -10,8 +10,9 @@ artifacts
 cache_hardhat
 .openzeppelin
 deployments
-scripts/deployment-*
-scripts/metadata-*
+scripts/deployment-local.json
+scripts/metadata-local.json
+scripts/*.zip
 
 # Foundry
 cache
@@ -23,3 +24,7 @@ bindings
 
 # Secrets
 .env
+
+# Python
+__pycache__
+venv

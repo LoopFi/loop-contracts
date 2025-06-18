@@ -26,7 +26,7 @@ contract TEthFeedTest is Test {
             address(
                 new ERC1967Proxy(
                     address(
-                        new PendleLPOracleRate(ptOracle, market, twap)
+                        new PendleLPOracleRate(ptOracle, market, twap, 1)
                     ),
                     abi.encodeWithSelector(PendleLPOracleRate.initialize.selector, address(this), address(this))
                 )

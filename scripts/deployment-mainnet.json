@@ -1,0 +1,1164 @@
+{
+  "core": {
+    "LinearInterestRateModelV3": {
+      "address": "0x7B1673202EbF8A903C29e207639B90c37937A40E",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArguments": [
+        7000,
+        9000,
+        0,
+        2000,
+        2500,
+        60000,
+        false
+      ]
+    },
+    "ACL": {
+      "address": "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3",
+      "artifactName": "ACL",
+      "constructorArguments": []
+    },
+    "AddressProviderV3": {
+      "address": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+      "artifactName": "AddressProviderV3",
+      "constructorArguments": [
+        "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3"
+      ]
+    },
+    "ContractsRegister": {
+      "address": "0xFB1bA3Fc465E90a91f26a1F6cD8b6c3bb3264d30",
+      "artifactName": "ContractsRegister",
+      "constructorArguments": [
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D"
+      ]
+    },
+    "PoolV3": {
+      "address": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+      "artifactName": "PoolV3",
+      "constructorArguments": [
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x7B1673202EbF8A903C29e207639B90c37937A40E",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop Liquidity Pool - WETH",
+        "lpETH"
+      ]
+    },
+    "StakingLPEth": {
+      "address": "0x3976d71e7DdFBaB9bD120Ec281B7d35fa0F28528",
+      "artifactName": "StakingLPEth",
+      "constructorArguments": [
+        "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+        "StakingLPEth",
+        "slpETH"
+      ]
+    },
+    "LockingLPEth": {
+      "address": "0x110f00b890102A7534484db8b3C5695Bd49De27b",
+      "artifactName": "Locking",
+      "constructorArguments": [
+        "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab"
+      ]
+    },
+    "LockingWETH-lpETH": {
+      "address": "0x0FD87690fcd1Ae9245edB7de8c598AEcCFaf427c",
+      "artifactName": "Locking",
+      "constructorArguments": [
+        "0xdcb5ed405a9b11250def047ae8016008fae7d69b"
+      ]
+    },
+    "BTCPoolV3": {
+      "address": "0xD83B0a990ac3dBc9A5F3862b84883Da78F286283",
+      "artifactName": "PoolV3",
+      "constructorArguments": [
+        "0x0000000000000000000000000000000000000000",
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+        "0x7B1673202EbF8A903C29e207639B90c37937A40E",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop BTC",
+        "lpBTC"
+      ]
+    },
+    "Treasury": {
+      "address": "0x4F7280739Ba53591dE300277262CF7f7E038F24F",
+      "artifactName": "Treasury",
+      "constructorArguments": [
+        [
+          "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+          "0x3976d71e7DdFBaB9bD120Ec281B7d35fa0F28528"
+        ],
+        [
+          200,
+          800
+        ],
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+      ]
+    },
+    "VaultRegistry": {
+      "address": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+      "artifactName": "VaultRegistry",
+      "constructorArguments": []
+    },
+    "Flashlender": {
+      "address": "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+      "artifactName": "Flashlender",
+      "constructorArguments": [
+        "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+        "0"
+      ]
+    },
+    "PRBProxyRegistry": {
+      "address": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+      "artifactName": "PRBProxyRegistry",
+      "constructorArguments": []
+    },
+    "SwapAction": {
+      "address": "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+      "artifactName": "SwapAction",
+      "constructorArguments": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+        "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+      ]
+    },
+    "PoolAction": {
+      "address": "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+      "artifactName": "PoolAction",
+      "constructorArguments": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+      ]
+    },
+    "ERC165Plugin": {
+      "address": "0x03C07e6d561b664246058974dB31dbF1c1C0B416",
+      "artifactName": "ERC165Plugin",
+      "constructorArguments": []
+    },
+    "PositionAction20": {
+      "address": "0x708aCdDF6Fc6DD8aE218e90517d582adD12c553c",
+      "artifactName": "PositionAction20",
+      "constructorArguments": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionAction4626": {
+      "address": "0xb4b083d1f9f5294F50C5118C6e8994369AcB6e51",
+      "artifactName": "PositionAction4626",
+      "constructorArguments": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionActionPendle": {
+      "address": "0xbdb4C89F197E2D82e80D8Cb212E6e0Bb2AA9FeCE",
+      "artifactName": "PositionActionPendle",
+      "constructorArguments": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionActionTranchess": {
+      "address": "0xe1987f6cD0b8823a033c29d640596757492479BD",
+      "artifactName": "PositionActionTranchess",
+      "constructorArguments": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0x235e49CC709F9e262814795c00eabe73709ef8E2",
+        "0x27D139c70896124ad64bfe05B5bbb7F5CA1a4C46",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "SpectraYnETHOracle": {
+      "address": "0x7dB5F465f22017feFaC665AC2e4F68385Ced7573",
+      "artifactName": "SpectraYnETHOracle",
+      "constructorArgs": [
+        "0x81D461e0162Da7a470b882f39c4e1A97b9244aED",
+        "0x657d9aba1dbb59e53f9f3ecaa878447dcfc96dcb"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManagerSpectra": {
+      "address": "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArguments": [
+        "0x9BfCD3788f923186705259ae70A1192F601BeB47",
+        "0x2408569177553A427dd6956E1717f2fBE1a96F1D",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x335d354e8551086F780285FF886216af3f8aca9a"
+      ]
+    },
+    "LoopVoter": {
+      "address": "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+      "artifactName": "LoopVoter",
+      "constructorArguments": [
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        1734013727
+      ]
+    },
+    "GaugeV3": {
+      "address": "0x090052C12A5c744542b08006197C6824ACF00187",
+      "artifactName": "GaugeV3",
+      "constructorArguments": [
+        "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9"
+      ]
+    },
+    "PoolQuotaKeeperV3": {
+      "address": "0x3cc6e65d333DadD9113f227F4da07cF4F9D0eeF9",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArguments": [
+        "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab"
+      ]
+    },
+    "LinearInterestRateModelV3_LpUSD": {
+      "address": "0x68B3F4528Cbf41901Bf9f164B478B97aA0bE2b76",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "7000",
+        "9000",
+        "0",
+        "2000",
+        "2500",
+        "60000",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolV3_LpUSD": {
+      "address": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+      "artifactName": "PoolV3",
+      "constructorArgs": [
+        "0x0000000000000000000000000000000000000000",
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "0x68B3F4528Cbf41901Bf9f164B478B97aA0bE2b76",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop USD - lpUSD",
+        "lpUSD"
+      ],
+      "addedToRegistry": false
+    },
+    "LinearInterestRateModelV3_3": {
+      "address": "0x1Cff41bA783Ff17bC91cFa4e453F33c5bB18981D",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "7000",
+        "9000",
+        "0",
+        "600",
+        "2500",
+        "60000",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "StakingLPUsdc_usdc": {
+      "address": "0xBFB53910C935E837C74e6C4EF584557352d20fDe",
+      "artifactName": "StakingLPEth",
+      "constructorArgs": [
+        "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+        "StakingLPUsdc",
+        "slpUSDC",
+        "10000"
+      ],
+      "addedToRegistry": false
+    },
+    "LockingLpUsdc_usdc": {
+      "address": "0xACA47DE7910FD8f108B147d69ADDBaC6Cc18966E",
+      "artifactName": "Locking",
+      "constructorArgs": [
+        "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054"
+      ],
+      "addedToRegistry": false
+    },
+    "Treasury_usdc": {
+      "address": "0xE7893c7f5ce7c4D1a281070BF0E69EB7AD0a2C92",
+      "artifactName": "Treasury",
+      "constructorArgs": [
+        [
+          "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95",
+          "0xBFB53910C935E837C74e6C4EF584557352d20fDe"
+        ],
+        [
+          "200",
+          "800"
+        ],
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+      ],
+      "addedToRegistry": false
+    },
+    "Flashlender_usdc": {
+      "address": "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+      "artifactName": "Flashlender",
+      "constructorArgs": [
+        "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+        "0"
+      ],
+      "addedToRegistry": false
+    },
+    "SwapAction_usdc": {
+      "address": "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+      "artifactName": "SwapAction",
+      "constructorArgs": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        "0x888888888889758F76e7103c6CbF23ABbF58F946",
+        "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0xD733e545C65d539f588d7c3793147B497403F0d2"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolAction_usdc": {
+      "address": "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+      "artifactName": "PoolAction",
+      "constructorArgs": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0x888888888889758F76e7103c6CbF23ABbF58F946",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0xD733e545C65d539f588d7c3793147B497403F0d2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction20_usdc": {
+      "address": "0xc2d3Df55671A4B75F7ad2A95e9830c78d5530371",
+      "artifactName": "PositionAction20",
+      "constructorArgs": [
+        "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+        "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+        "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction4626_usdc": {
+      "address": "0x253faf1896Ffd6cf426d9605634d01132e509e30",
+      "artifactName": "PositionAction4626",
+      "constructorArgs": [
+        "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+        "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+        "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionPendle_usdc": {
+      "address": "0x25766c52876DA90c34b2bf6dBdde9d81792b630e",
+      "artifactName": "PositionActionPendle",
+      "constructorArgs": [
+        "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+        "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+        "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionTranchess_usdc": {
+      "address": "0xAa535aDDaa8bB13b55a695c0ad8d1560D8501576",
+      "artifactName": "PositionActionTranchess",
+      "constructorArgs": [
+        "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+        "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+        "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionPenpie_usdc": {
+      "address": "0xf932609326093481e8D01E3F2846277adfE38EF4",
+      "artifactName": "PositionActionPenpie",
+      "constructorArgs": [
+        "0x663A68f2B5ED9194EEC31C4Af57C384adB1886A2",
+        "0x0Cfdd887ebF057fF3Ca377643B365F5de90e8262",
+        "0x5b82253860cAD23EfED6F2286fFAef64E19EB320",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4"
+      ],
+      "addedToRegistry": false
+    },
+    "Combined4626AggregatorV3Oracle": {
+      "address": "0xE98F2D489cDFC1A560F0DF7C3C7d9Bb15B545c3e",
+      "artifactName": "Combined4626AggregatorV3Oracle",
+      "constructorArgs": [
+        "0x89F48f6671Ec1B1C4f6abE964EBdd21F4eb7076f",
+        "43200",
+        "0x5c5b196abe0d54485975d1ec29617d42d9198326"
+      ],
+      "addedToRegistry": false
+    },
+    "CombinedAggregatorV3Oracle": {
+      "address": "0xa0a201Ab59AAff96deC3bC59987CCb00F962c005",
+      "artifactName": "CombinedAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xE98F2D489cDFC1A560F0DF7C3C7d9Bb15B545c3e",
+        "43200",
+        "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "86400",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "ChainlinkCurveOracle": {
+      "address": "0xAD41991F8ab1EF3Af0D5eeBB51bA9Ac8CEDef599",
+      "artifactName": "ChainlinkCurveOracle",
+      "constructorArgs": [
+        "0xa0a201Ab59AAff96deC3bC59987CCb00F962c005",
+        "0xFb7c3C95f4C2C05F6eC7dcFE3e368a40eB338603",
+        "90000"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_deUSD": {
+      "address": "0x3DF7c0783b005478A4CF4aFa0FFF2B2b28A8fC33",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0xbb23b7ACdE2B3A2E6446B16Cd3Dd471b0d80342c",
+        "0x09d484B738dD85CE3953102453E91507982121d0",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false
+    },
+    "LoopVoter_usdc": {
+      "address": "0x3444C932d47675BfA2A9cf1be62276C6b7E17228",
+      "artifactName": "LoopVoter",
+      "constructorArgs": [
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "1742310431"
+      ],
+      "addedToRegistry": false
+    },
+    "GaugeV3_usdc": {
+      "address": "0x8D26E325205C53b204A9BEB46F88a98c3f0e7E13",
+      "artifactName": "GaugeV3",
+      "constructorArgs": [
+        "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+        "0x3444C932d47675BfA2A9cf1be62276C6b7E17228"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolQuotaKeeperV3_usdc": {
+      "address": "0x36CE68477cDF24571f7C8f5dF0DAB7Ed6E65dFcF",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArgs": [
+        "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054"
+      ],
+      "addedToRegistry": false
+    },
+    "SwapAction_eth": {
+      "address": "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+      "artifactName": "SwapAction",
+      "constructorArgs": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        "0x888888888889758F76e7103c6CbF23ABbF58F946",
+        "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0xD733e545C65d539f588d7c3793147B497403F0d2"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolAction_eth": {
+      "address": "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+      "artifactName": "PoolAction",
+      "constructorArgs": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0x888888888889758F76e7103c6CbF23ABbF58F946",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0xD733e545C65d539f588d7c3793147B497403F0d2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction20_eth": {
+      "address": "0x42fb393d47053fF119Bc22Bc99589f23A8617A74",
+      "artifactName": "PositionAction20",
+      "constructorArgs": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+        "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction4626_eth": {
+      "address": "0xA7567C40772C76Fd0805Fe7bd18C460385732843",
+      "artifactName": "PositionAction4626",
+      "constructorArgs": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+        "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionPendle_eth": {
+      "address": "0x89bA2c1d01e5e9233bD4Dc1F27b2d1Be87f9c9E4",
+      "artifactName": "PositionActionPendle",
+      "constructorArgs": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+        "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionTranchess_eth": {
+      "address": "0xB6A68Be333E332FA5974983abeEF84b61Ac35DC5",
+      "artifactName": "PositionActionTranchess",
+      "constructorArgs": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+        "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionPenpie_eth": {
+      "address": "0x95da462a48BD5D68cFa9EDb8221d639f2C26c2F3",
+      "artifactName": "PositionActionPenpie",
+      "constructorArgs": [
+        "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
+        "0xdEEDeAF1e898C062b634D1C7485984892Dc3BBDF",
+        "0x3790Fbb57ae1bd0d39dA6b664e6a8010ec296822",
+        "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_ynETHx": {
+      "address": "0x575362045408584c6F5169e28B88B61fe5B730bd",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0x9c5EE26b9623cA864693C575a8fBc8933ae964E7",
+        "0xBc48c48789031A130F957c59e07B7F987aA642dE",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false
+    },
+    "PendleLPOracleRate": {
+      "address": "0x61D8Ee53b7e0C1000Fc03D9e96222D6B123562C6",
+      "artifactName": "PendleLPOracleRate",
+      "constructorArgs": [
+        "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+        "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
+        "180",
+        "1000000000000"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_tETH": {
+      "address": "0xc85D1aFca2a3d719F67177D9713e1aa25d72178F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x1438F04666C48957b1D7673684e4a1E505c80aF6",
+        "0xBDb8F9729d3194f75fD1A3D9bc4FFe0DDe3A404c",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_uniETH": {
+      "address": "0x9DCE515E2537c356aBE55981428D58449D2D7140",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x7A0734Fa26e188483aae3d4332F19404FEA87832",
+        "0xbba9baaa6b3107182147a12177e0f1ec46b8b072",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_rswETH": {
+      "address": "0x4F36255e152345F8e7c92cD6dD90578d629A76E8",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x868527fd3Fad53149be0e75eEeaBE4f008D27E81",
+        "0xfd5cf95e8b886ace955057ca4dc69466e793fbbe",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_puffETH": {
+      "address": "0x12Eed43Fa8847A44565BeED43aa3F60c57656af3",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x314A8cB19b5F245C7f109f50F4FaA06cD70C7Aa4",
+        "0x58612beb0e8a126735b19bb222cbc7fc2c162d2a",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "AggregatorV3WstEthOracle_Vaults_inwstETH": {
+      "address": "0xDF2A035dBA272B4bDFe95aaC49e8671BD949a394",
+      "artifactName": "AggregatorV3WstEthOracle",
+      "constructorArgs": [
+        "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+      ],
+      "addedToRegistry": false
+    },
+    "CombinedAggregatorV3Oracle_Vaults_inwstETH": {
+      "address": "0x82A7E62b042ACF46E7b68904D52c863432532a9E",
+      "artifactName": "CombinedAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xDF2A035dBA272B4bDFe95aaC49e8671BD949a394",
+        "1",
+        "0x86392dC19c0b719886221c78AB11eb8Cf5c52812",
+        "86400",
+        "true"
+      ],
+      "addedToRegistry": false
+    },
+    "SpectraAggregatorV3Oracle_Impl_Vaults_inwstETH": {
+      "address": "0xA55027bB42e409e711B6C4c19Fe5f9a3b012fbb7",
+      "artifactName": "SpectraAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xE119bad8a35B999f65b1e5Fd48c626C327DAa16B",
+        "0xd89Fc47AacBB31E2bF23EC599F593A4876D8c18C",
+        "0x82A7E62b042ACF46E7b68904D52c863432532a9E",
+        "86400"
+      ],
+      "addedToRegistry": false
+    },
+    "SpectraAggregatorV3Oracle_Vaults_inwstETH": {
+      "address": "0x737B291C1ded5b9cD43Eddd2872243b88600334c",
+      "artifactName": "ERC1967Proxy",
+      "constructorArgs": [
+        "0xA55027bB42e409e711B6C4c19Fe5f9a3b012fbb7",
+        "0x485cc9550000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc0000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_inwstETH": {
+      "address": "0xD6daF3e355f465EEc557E40f7487b1bc75c344cd",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0x03d30243138D45383F02BCA884D42068523bdE22",
+        "0x2cd244f1f9a856c251d276103862dd4325985d2a",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false
+    },
+    "LinearInterestRateModelV3_4": {
+      "address": "0xf2bCb3Aca0B531351fe30c2f0514CD9A86B5003b",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "7000",
+        "9000",
+        "0",
+        "612",
+        "765",
+        "765",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "PendleLPOracleRate_Vaults_tETH_January2026": {
+      "address": "0xfD2429243Ca56f5a59194Cdba3A80a751Afb362B",
+      "artifactName": "PendleLPOracleRate",
+      "constructorArgs": [
+        "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "180"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_tETH_January2026": {
+      "address": "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "CombinedAggregatorV3Oracle_eUSDe_feeds": {
+      "address": "0xA7F3f6ca6410c1ec69073397221702aEa656A8B2",
+      "artifactName": "CombinedAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
+        "86400",
+        "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "86400",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "AggregatorV3Oracle4626_eUSDe": {
+      "address": "0xFd3B27e921422b40952E562247C11b08d5D4d06d",
+      "artifactName": "AggregatorV3Oracle4626",
+      "constructorArgs": [
+        "0x90D2af7d622ca3141efA4d8f1F24d86E5974Cc8F"
+      ],
+      "addedToRegistry": false
+    },
+    "CombinedAggregatorV3Oracle_eUSDe": {
+      "address": "0x2c57c746dCB4Fc6F16053f2DE434C18f899FcdBa",
+      "artifactName": "CombinedAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xFd3B27e921422b40952E562247C11b08d5D4d06d",
+        "86400",
+        "0xA7F3f6ca6410c1ec69073397221702aEa656A8B2",
+        "86400",
+        "true"
+      ],
+      "addedToRegistry": false
+    },
+    "PendleLPOracle_sUSDe": {
+      "address": "0xF0bF7c46CF6B72e9049c4e66e0611EBB224a923e",
+      "artifactName": "PendleLPOracle",
+      "constructorArgs": [
+        "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+        "0xE93B4A93e80BD3065B290394264af5d82422ee70",
+        "180",
+        "0x2c57c746dCB4Fc6F16053f2DE434C18f899FcdBa",
+        "88400"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_eUSDe": {
+      "address": "0x931958eF9EB0238f8661Dc2861B79455B5015fF6",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x16575edcB68613188D70b194b8FD89Df0f6eDFaE",
+        "0xE93B4A93e80BD3065B290394264af5d82422ee70",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_syrupUSDC": {
+      "address": "0xd6277E262805A2b69091404CDe62A9dC70c96702",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83",
+        "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
+    }
+  },
+  "vaults": {
+    "CDPVaultSpectra": {
+      "address": "0x9BfCD3788f923186705259ae70A1192F601BeB47",
+      "artifactName": "CDPVaultSpectra",
+      "addedToRegistry": true,
+      "addedToGauge": true,
+      "constructorArguments": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0xeD4E4F000C5fc8cf22F2Bf2EA23E64F38a5Fa216",
+          "0x2408569177553A427dd6956E1717f2fBE1a96F1D",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ]
+    },
+    "CDPVault_Vaults_deUSD": {
+      "address": "0xbb23b7ACdE2B3A2E6446B16Cd3Dd471b0d80342c",
+      "artifactName": "CDPVaultSpectra",
+      "constructorArgs": [
+        [
+          "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+          "0xAD41991F8ab1EF3Af0D5eeBB51bA9Ac8CEDef599",
+          "0x09d484B738dD85CE3953102453E91507982121d0",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_ynETHx": {
+      "address": "0x9c5EE26b9623cA864693C575a8fBc8933ae964E7",
+      "artifactName": "CDPVaultSpectra",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0x7dB5F465f22017feFaC665AC2e4F68385Ced7573",
+          "0xBc48c48789031A130F957c59e07B7F987aA642dE",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_tETH": {
+      "address": "0x1438F04666C48957b1D7673684e4a1E505c80aF6",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0x628eDEeCF43DB277b6a7a6248CE45a902fD7c705",
+          "0xBDb8F9729d3194f75fD1A3D9bc4FFe0DDe3A404c",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_uniETH": {
+      "address": "0x7A0734Fa26e188483aae3d4332F19404FEA87832",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0x94d326CD33EF6557966cbFe5431D08480dbF78B2",
+          "0xbba9baaa6b3107182147a12177e0f1ec46b8b072",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_rswETH": {
+      "address": "0x868527fd3Fad53149be0e75eEeaBE4f008D27E81",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0xa36591aF2c814dA214415CE5e94939c92b9cA18B",
+          "0xfd5cf95e8b886ace955057ca4dc69466e793fbbe",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_puffETH": {
+      "address": "0x314A8cB19b5F245C7f109f50F4FaA06cD70C7Aa4",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0x6eBf783c454825d0809276ec313F086382e71958",
+          "0x58612beb0e8a126735b19bb222cbc7fc2c162d2a",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_inwstETH": {
+      "address": "0x03d30243138D45383F02BCA884D42068523bdE22",
+      "artifactName": "CDPVaultSpectra",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0x737B291C1ded5b9cD43Eddd2872243b88600334c",
+          "0x2cd244f1f9a856c251d276103862dd4325985d2a",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    },
+    "CDPVault_Vaults_tETH_January2026": {
+      "address": "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
+          "0xfD2429243Ca56f5a59194Cdba3A80a751Afb362B",
+          "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true
+    },
+    "CDPVault_Vaults_eUSDe": {
+      "address": "0x16575edcB68613188D70b194b8FD89Df0f6eDFaE",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+          "0xF0bF7c46CF6B72e9049c4e66e0611EBB224a923e",
+          "0xE93B4A93e80BD3065B290394264af5d82422ee70",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true
+    },
+    "CDPVault_Vaults_syrupUSDC": {
+      "address": "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+          "0x61D8Ee53b7e0C1000Fc03D9e96222D6B123562C6",
+          "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true
+    }
+  },
+  "rewardManagers": {
+    "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852": {
+      "address": "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "vaultName": "CDPVaultSpectra",
+      "vaultAddress": "0x9BfCD3788f923186705259ae70A1192F601BeB47",
+      "constructorArguments": [
+        "0x9BfCD3788f923186705259ae70A1192F601BeB47",
+        "0x2408569177553A427dd6956E1717f2fBE1a96F1D",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x335d354e8551086F780285FF886216af3f8aca9a"
+      ]
+    },
+    "0x3DF7c0783b005478A4CF4aFa0FFF2B2b28A8fC33": {
+      "address": "0x3DF7c0783b005478A4CF4aFa0FFF2B2b28A8fC33",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0xbb23b7ACdE2B3A2E6446B16Cd3Dd471b0d80342c",
+        "0x09d484B738dD85CE3953102453E91507982121d0",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "deployer",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_deUSD",
+      "vaultAddress": "0xbb23b7ACdE2B3A2E6446B16Cd3Dd471b0d80342c"
+    },
+    "0x575362045408584c6F5169e28B88B61fe5B730bd": {
+      "address": "0x575362045408584c6F5169e28B88B61fe5B730bd",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0x9c5EE26b9623cA864693C575a8fBc8933ae964E7",
+        "0xBc48c48789031A130F957c59e07B7F987aA642dE",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "deployer",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_ynETHx",
+      "vaultAddress": "0x9c5EE26b9623cA864693C575a8fBc8933ae964E7"
+    },
+    "0xc85D1aFca2a3d719F67177D9713e1aa25d72178F": {
+      "address": "0xc85D1aFca2a3d719F67177D9713e1aa25d72178F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x1438F04666C48957b1D7673684e4a1E505c80aF6",
+        "0xBDb8F9729d3194f75fD1A3D9bc4FFe0DDe3A404c",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_tETH",
+      "vaultAddress": "0x1438F04666C48957b1D7673684e4a1E505c80aF6"
+    },
+    "0x9DCE515E2537c356aBE55981428D58449D2D7140": {
+      "address": "0x9DCE515E2537c356aBE55981428D58449D2D7140",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x7A0734Fa26e188483aae3d4332F19404FEA87832",
+        "0xbba9baaa6b3107182147a12177e0f1ec46b8b072",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_uniETH",
+      "vaultAddress": "0x7A0734Fa26e188483aae3d4332F19404FEA87832"
+    },
+    "0x4F36255e152345F8e7c92cD6dD90578d629A76E8": {
+      "address": "0x4F36255e152345F8e7c92cD6dD90578d629A76E8",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x868527fd3Fad53149be0e75eEeaBE4f008D27E81",
+        "0xfd5cf95e8b886ace955057ca4dc69466e793fbbe",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_rswETH",
+      "vaultAddress": "0x868527fd3Fad53149be0e75eEeaBE4f008D27E81"
+    },
+    "0x12Eed43Fa8847A44565BeED43aa3F60c57656af3": {
+      "address": "0x12Eed43Fa8847A44565BeED43aa3F60c57656af3",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x314A8cB19b5F245C7f109f50F4FaA06cD70C7Aa4",
+        "0x58612beb0e8a126735b19bb222cbc7fc2c162d2a",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_puffETH",
+      "vaultAddress": "0x314A8cB19b5F245C7f109f50F4FaA06cD70C7Aa4"
+    },
+    "0xD6daF3e355f465EEc557E40f7487b1bc75c344cd": {
+      "address": "0xD6daF3e355f465EEc557E40f7487b1bc75c344cd",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArgs": [
+        "0x03d30243138D45383F02BCA884D42068523bdE22",
+        "0x2cd244f1f9a856c251d276103862dd4325985d2a",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+        "deployer",
+        "0x38b9B4884a5581E96eD3882AA2f7449BC321786C"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_inwstETH",
+      "vaultAddress": "0x03d30243138D45383F02BCA884D42068523bdE22"
+    },
+    "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F": {
+      "address": "0x1eF2088a962585795231c2Ca6fd4D2e5f7A97C1F",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0xb85095c4B18a7d16559A0bFd764F51F0d030587f",
+        "0x3DAF20E46708E556570159Eaf98eeE53A1A5b8A4",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_tETH_January2026",
+      "vaultAddress": "0xb85095c4B18a7d16559A0bFd764F51F0d030587f"
+    },
+    "0x931958eF9EB0238f8661Dc2861B79455B5015fF6": {
+      "address": "0x931958eF9EB0238f8661Dc2861B79455B5015fF6",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x16575edcB68613188D70b194b8FD89Df0f6eDFaE",
+        "0xE93B4A93e80BD3065B290394264af5d82422ee70",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_eUSDe",
+      "vaultAddress": "0x16575edcB68613188D70b194b8FD89Df0f6eDFaE"
+    },
+    "0xd6277E262805A2b69091404CDe62A9dC70c96702": {
+      "address": "0xd6277E262805A2b69091404CDe62A9dC70c96702",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83",
+        "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_syrupUSDC",
+      "vaultAddress": "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83"
+    }
+  }
+}

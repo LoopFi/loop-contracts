@@ -1,0 +1,228 @@
+{
+  "core": {
+    "MockOracle": {
+      "address": "0xCEa1B2a1DDBA3a84C467743a45173f3469579a70",
+      "artifactName": "MockOracle",
+      "constructorArguments": []
+    },
+    "LinearInterestRateModelV3": {
+      "address": "0xC82cDB0CBF2A19d60b56e0D667dD9f95Eca3F388",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArguments": []
+    },
+    "ACL": {
+      "address": "0x6D1536000F443371A776619a0D183D623143b97a",
+      "artifactName": "ACL",
+      "constructorArguments": []
+    },
+    "AddressProviderV3": {
+      "address": "0x428eB3Dc1579Fe76791ece2Ea5Ef229B4A36B9E4",
+      "artifactName": "AddressProviderV3",
+      "constructorArguments": []
+    },
+    "ContractsRegister": {
+      "address": "0x6598bc04b50540353C86103b24b70564A9BB1221",
+      "artifactName": "ContractsRegister",
+      "constructorArguments": []
+    },
+    "PoolV3": {
+      "address": "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+      "artifactName": "PoolV3",
+      "constructorArguments": []
+    },
+    "StakingLPEth": {
+      "address": "0x3F551C25F542bf8CEB4595b1988503A7DF0E6243",
+      "artifactName": "StakingLPEth",
+      "constructorArguments": [
+        "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+        "StakingLPEth",
+        "slpETH"
+      ]
+    },
+    "LockingLPEth": {
+      "address": "0x66e6d601aB26Ed97D74f0447c55fbf14e7de6FFf",
+      "artifactName": "StakingLPEth",
+      "constructorArguments": [
+        "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+        "LockLPEth",
+        "llpETH"
+      ]
+    },
+    "Treasury": {
+      "address": "0x353f7E4657773D696464461C3620F05A794476F4",
+      "artifactName": "Treasury",
+      "constructorArguments": [
+        [
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x3F551C25F542bf8CEB4595b1988503A7DF0E6243"
+        ],
+        [
+          20,
+          80
+        ],
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+      ]
+    },
+    "VaultRegistry": {
+      "address": "0x6c17A373795f42976801D57008ADA17A7A2E5358",
+      "artifactName": "VaultRegistry",
+      "constructorArguments": []
+    },
+    "Flashlender": {
+      "address": "0x83A324b6fb49eb69e01871e7aE75b287958e987c",
+      "artifactName": "Flashlender",
+      "constructorArguments": [
+        "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+        "0"
+      ]
+    },
+    "PRBProxyRegistry": {
+      "address": "0x37B5A9a591752E98D23Cad470b4448458EB3e0d1",
+      "artifactName": "PRBProxyRegistry",
+      "constructorArguments": []
+    },
+    "SwapAction": {
+      "address": "0x0Cd4Adc27c51487508554E192D818338f1481F23",
+      "artifactName": "SwapAction",
+      "constructorArguments": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+        "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+      ]
+    },
+    "PoolAction": {
+      "address": "0x3BdbA121dbd5C72649AF3eABc2ca70D7a6721F0e",
+      "artifactName": "PoolAction",
+      "constructorArguments": [
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "0x00000000005BBB0EF59571E58418F9a4357b68A0",
+        "0x63BAEe33649E589Cc70435F898671461B624CBCc",
+        "0x3d20601ac0Ba9CAE4564dDf7870825c505B69F1a"
+      ]
+    },
+    "ERC165Plugin": {
+      "address": "0xB95F7D4910734C68a4cc6614b316ac2e6009CDae",
+      "artifactName": "ERC165Plugin",
+      "constructorArguments": []
+    },
+    "PositionAction20": {
+      "address": "0x49CE26BFeADC2394c6109ED5215B1bA56D152542",
+      "artifactName": "PositionAction20",
+      "constructorArguments": [
+        "0x83A324b6fb49eb69e01871e7aE75b287958e987c",
+        "0x0Cd4Adc27c51487508554E192D818338f1481F23",
+        "0x3BdbA121dbd5C72649AF3eABc2ca70D7a6721F0e",
+        "0x6c17A373795f42976801D57008ADA17A7A2E5358",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionAction4626": {
+      "address": "0x923fa9a8d03F49Bf383DD2605Ee8522eC11c555E",
+      "artifactName": "PositionAction4626",
+      "constructorArguments": [
+        "0x83A324b6fb49eb69e01871e7aE75b287958e987c",
+        "0x0Cd4Adc27c51487508554E192D818338f1481F23",
+        "0x3BdbA121dbd5C72649AF3eABc2ca70D7a6721F0e",
+        "0x6c17A373795f42976801D57008ADA17A7A2E5358",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionActionPendle": {
+      "address": "0x16e06639B2d99eb1211177eB133825b4b1E19c2C",
+      "artifactName": "PositionActionPendle",
+      "constructorArguments": [
+        "0x83A324b6fb49eb69e01871e7aE75b287958e987c",
+        "0x0Cd4Adc27c51487508554E192D818338f1481F23",
+        "0x3BdbA121dbd5C72649AF3eABc2ca70D7a6721F0e",
+        "0x6c17A373795f42976801D57008ADA17A7A2E5358",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "PositionActionTranchess": {
+      "address": "0x95Ed815C862FBa3AC4625435CE9451838d28b54f",
+      "artifactName": "PositionActionTranchess",
+      "constructorArguments": [
+        "0x83A324b6fb49eb69e01871e7aE75b287958e987c",
+        "0x0Cd4Adc27c51487508554E192D818338f1481F23",
+        "0x3BdbA121dbd5C72649AF3eABc2ca70D7a6721F0e",
+        "0x6c17A373795f42976801D57008ADA17A7A2E5358",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      ]
+    },
+    "SpectraYnETHOracle": {
+      "address": "0xc9D96Bf1e8Fab4d839e08844a0D89743dd9366cf",
+      "artifactName": "SpectraYnETHOracle",
+      "constructorArguments": [
+        "0x08DA2b1EA8f2098D44C8690dDAdCa3d816c7C0d5",
+        "0x09db87A538BD693E9d08544577d5cCfAA6373A48",
+        "0x6e0dccf49D095F8ea8920A8aF03D236FA167B7E0"
+      ]
+    },
+    "RewardManager": {
+      "address": "0xf6b57187F0a43D8b9d8dE15C94CAF43FE46A5675",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArguments": [
+        "0x762Ca29e5a83cA5A918FD9cD60Cef7B4B2cdD3AC",
+        "0x85F05383f7Cb67f35385F7bF3B74E68F4795CbB9",
+        "0xB2150334139721625004b40a1A5664207365e444"
+      ]
+    },
+    "MockVoter": {
+      "address": "0x9e852C6485A875F7e2A87B5fAd0B1361b6ab5Db5",
+      "artifactName": "MockVoter",
+      "constructorArguments": []
+    },
+    "GaugeV3": {
+      "address": "0x7566A3CE1FDD682dbDBDb48584252e2Cdd6E6fF1",
+      "artifactName": "GaugeV3",
+      "constructorArguments": [
+        "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+        "0x9e852C6485A875F7e2A87B5fAd0B1361b6ab5Db5"
+      ]
+    },
+    "PoolQuotaKeeperV3": {
+      "address": "0xd50Fc9Ec84F019613Ae5E9E2714c60F2aFf10a90",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArguments": [
+        "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7"
+      ]
+    },
+    "RewardManagerSpectra": {
+      "address": "0xe1CE99Ff1e475c34aDf57d17113beB7b3a3B2746",
+      "artifactName": "src/spectra-rewards/RewardManagerSpectra.sol:RewardManagerSpectra",
+      "constructorArguments": [
+        "0x4cFAF61629516f5173122F7D5D73c39af350Aae5",
+        "0x85F05383f7Cb67f35385F7bF3B74E68F4795CbB9",
+        "0x37B5A9a591752E98D23Cad470b4448458EB3e0d1",
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+        "0x335d354e8551086F780285FF886216af3f8aca9a"
+      ]
+    }
+  },
+  "vaults": {
+    "CDPVault_SpectraVault": {
+      "address": "0x4cFAF61629516f5173122F7D5D73c39af350Aae5",
+      "artifactName": "CDPVault",
+      "constructorArguments": [
+        [
+          "0xAFb1A97392e1993356Ad11a83de17B149F21Aab7",
+          "0xc9D96Bf1e8Fab4d839e08844a0D89743dd9366cf",
+          "0x85F05383f7Cb67f35385F7bF3B74E68F4795CbB9",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ]
+    }
+  }
+}

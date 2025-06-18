@@ -17,6 +17,9 @@ module.exports = {
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
     "VaultRegistry": "0x28ae6D200523E3af8372B689dfF6041a8bA019eD",
     "PRBProxyRegistry": "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95",
+    "GaugeV3":"0x8D26E325205C53b204A9BEB46F88a98c3f0e7E13",
+    "PoolQuotaKeeperV3":"0x36CE68477cDF24571f7C8f5dF0DAB7Ed6E65dFcF",
+
     "Actions": {
       "SwapAction": {
         "constructorArguments": {
@@ -89,28 +92,24 @@ module.exports = {
   "Vendors": {
   },
   "Vaults": {
-    // "Vaults_wstUSR": {
-    //   name: "Vaults_wstUSR",
+    // "Vaults_USR": {
+    //   name: "Vaults_USR",
     //   description: "This vault allows for borrowing and lending of assets",
     //   type: "CDPVault",
     //   collateralType: "ERC20",
     //   oracle: {
-    //     type: "WstUSR",
+    //     type: "PendleLPOracle",
     //     deploymentArguments: {
-    //       "pythPriceFeedsContract": "0x4305FB66699C3B2702D4d05CF36551390A4c69C6",
-    //       "feedIdUSRUSD": "0x10b013adec14c0fe839ca0fe54cec9e4d0b6c1585ac6d7e70010dac015e57f9c",
-    //       "wstUSRVault": "0x1202F5C7b4B9E47a1A484E8B270be34dbbC75055",
-    //       "chainlinkUSDCFeed": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
-    //       "usdcHeartbeat": 86400, // 24 hours
     //       "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-    //       "market": "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+    //       "market": "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
     //       "twap": 180,
-    //       "stalePeriod": 3600,
+    //       "aggregator": "0x34ad75691e25A8E9b681AAA85dbeB7ef6561B42c", // usr-usd
+    //       "stalePeriod": 88400,
     //     },
     //   },
-    //   token: "0x353d0b2efb5b3a7987fb06d30ad6160522d08426",
+    //   token: "0x35a18cd59a214c9e797e14b1191b700eea251f6a",
     //   poolAddress: "LpUSD",
-    //   tokenSymbol: "LOOP-wstUSR",
+    //   tokenSymbol: "LOOP-USR",
     //   tokenScale: toWad("1.0"),
     //   protocolIcon: null,
     //   deploymentArguments: {
@@ -139,17 +138,18 @@ module.exports = {
     //   }
     // },
 
-    "Vaults_sUSDe": {
-      name: "Vaults_sUSDe",
+    "Vaults_eUSDe": {
+      name: "Vaults_eUSDe",
       description: "This vault allows for borrowing and lending of assets",
       type: "CDPVault",
       collateralType: "ERC20",
       oracle: {
-        type: "PendleLPOracle_sUSDe",
+        type: "PendleLPOracle_eUSDe",
         deploymentArguments: {
           "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-          "market": "0xb162b764044697cf03617c2efbcb1f42e31e4766",
+          "market": "0xE93B4A93e80BD3065B290394264af5d82422ee70",
           "twap": 180,
+          "eUSDe_vault": "0x90D2af7d622ca3141efA4d8f1F24d86E5974Cc8F",
           "usde_aggregator": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
           "usde_heartbeat": 86400, // 24 hours
           "usdc_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
@@ -157,9 +157,9 @@ module.exports = {
           "stalePeriod": 88400,
         },
       },
-      token: "0xb162b764044697cf03617c2efbcb1f42e31e4766",
+      token: "0xE93B4A93e80BD3065B290394264af5d82422ee70",
       poolAddress: "LpUSD",
-      tokenSymbol: "LOOP-sUSDe",
+      tokenSymbol: "LOOP-eUSDe",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
       deploymentArguments: {
@@ -188,22 +188,69 @@ module.exports = {
       }
     },
 
+    // "Vaults_cUSDO": {
+    //   name: "Vaults_cUSDO",
+    //   description: "This vault allows for borrowing and lending of assets",
+    //   type: "CDPVault",
+    //   collateralType: "ERC20",
+    //   oracle: {
+    //     type: "PendleLPOracle_cUSDO",
+    //     deploymentArguments: {
+    //       "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+    //       "market": "0xA77c0DE4d26B7C97D1D42ABD6733201206122E25",
+    //       "twap": 180,
+    //       "curvePool": "0x90455bd11Ce8a67C57d467e634Dc142b8e4105Aa",
+    //       "k": 0,
+    //       "invert": true,
+    //       "stalePeriod": 1
+    //     },
+    //   },
+    //   token: "0xa77c0de4d26b7c97d1d42abd6733201206122e25",
+    //   poolAddress: "LpUSD",
+    //   tokenSymbol: "LOOP-cUSDO",
+    //   tokenScale: toWad("1.0"),
+    //   protocolIcon: null,
+    //   deploymentArguments: {
+    //       constants: {
+    //           protocolFee: toWad("0.01"),
+    //       },
+    //       configs: {
+    //           debtFloor: toWad("1"),
+    //           liquidationRatio: toWad("1.1"),
+    //           liquidationPenalty: toWad("0.99"),
+    //           liquidationDiscount: toWad("0.98"),
+    //           roleAdmin: "deployer",
+    //           vaultAdmin: "deployer",
+    //           pauseAdmin: "deployer",
+    //       },
+    //       debtCeiling: toWad("100000000"),
+    //   },
+    //   quotas: {
+    //       minRate: 100,
+    //       maxRate: 10000,
+    //   },
+    //   "RewardManager": {
+    //     "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+    //     "constructorArguments": [
+    //     ]
+    //   }
+    // },
+
     "Vaults_syrupUSDC": {
       name: "Vaults_syrupUSDC",
       description: "This vault allows for borrowing and lending of assets",
       type: "CDPVault",
       collateralType: "ERC20",
       oracle: {
-          type: "syrupUSDC",
+          type: "PendleLPOracleRate",
           deploymentArguments: {
-            "vault": "0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b",
             "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
-            "market": "0x580e40c15261f7baf18ea50f562118ae99361096",
+            "market": "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
             "twap": 180,
-            "stalePeriod": 3600,
+            "scale": 1000000000000
           },
       },
-      token: "0x580e40c15261f7baf18ea50f562118ae99361096",
+      token: "0x9a63fa80b5ddfd3cab23803fdb93ad2c18f3d5aa",
       tokenSymbol: "LOOP-syrupUSDC",
       poolAddress: "LpUSD",
       tokenScale: toWad("1.0"),

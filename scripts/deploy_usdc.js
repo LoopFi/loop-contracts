@@ -24,7 +24,8 @@ const {
   getPoolAddress,
   impersonateAccount,
   stopImpersonatingAccount,
-  deployPositionActions
+  deployPositionActions,
+  deployGauge
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -224,90 +225,6 @@ async function deployActions(pool, vaultRegistry) {
   return { flashlender, proxyRegistry, swapAction, poolAction };
 }
 
-async function deployGauge() {
-  console.log(`
-/*//////////////////////////////////////////////////////////////
-                        DEPLOYING GAUGE
-//////////////////////////////////////////////////////////////*/
-  `);
-
-  const {
-    AddressProviderV3: addressProviderV3,
-  } = await loadDeployedContracts();
-
-  const poolAddress = await getPoolAddress("LpUSD");
-  if (poolAddress == undefined || poolAddress == null) {
-    console.log('No pool address defined for gauge');
-    return;
-  }
-  console.log('GAUGE POOL ADDRESS:', poolAddress);
-
-  const liquidityPool = await attachContract('PoolV3', poolAddress);
-  const latestBlock = await ethers.provider.getBlock('latest');
-  const blockTimestamp = latestBlock.timestamp;
-  const firstEpochTimestamp = blockTimestamp + 300; // Start 5 minutes from now
-  
-  const voter = await deployContract('LoopVoter', getPoolSpecificName('LoopVoter'), false, addressProviderV3.address, firstEpochTimestamp);
-  console.log(`Voter deployed to: ${voter.address}`);
-
-  // Deploy GaugeV3 contract
-  const gaugeV3 = await deployContract(
-    'GaugeV3', 
-    getPoolSpecificName('GaugeV3'),
-    false, 
-    liquidityPool.address, 
-    voter.address
-  );
-  console.log(`GaugeV3 deployed to: ${gaugeV3.address}`);
-  
-  // Assuming quotaKeeper and other necessary contracts are already deployed and their addresses are known
-  const poolQuotaKeeperV3 = await deployContract(
-    'PoolQuotaKeeperV3', 
-    getPoolSpecificName('PoolQuotaKeeperV3'),
-    false, 
-    liquidityPool.address
-  );
-  await liquidityPool.setPoolQuotaKeeper(poolQuotaKeeperV3.address);
-
-  // Set Gauge in QuotaKeeper
-  await poolQuotaKeeperV3.setGauge(gaugeV3.address);
-  console.log('Set gauge in QuotaKeeper');
-
-  const { VaultRegistry: vaultRegistry } = await loadDeployedContracts()
-  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
-    const vaultMetadata = await getVaultMetadata(vault.address);
-    if (!vaultMetadata) {
-      console.log(`No metadata found for vault: ${vault.address}`);
-      continue;
-    }
-
-    if (vaultMetadata.pool.toLowerCase() != poolAddress.toLowerCase()) {
-      console.log(`Vault ${vault.address} is not associated with pool ${poolAddress}`);
-      continue;
-    }
-
-    const tokenAddress = await vault.token();
-    await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-    console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-    
-    const minRate = vaultMetadata.quotas.minRate;
-    const maxRate = vaultMetadata.quotas.maxRate;
-    
-    console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-    await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
-
-    console.log('Added quota token to GaugeV3 for token:', tokenAddress);
-  }
-
-  // Unfreeze the epoch in Gauge
-  await gaugeV3.setFrozenEpoch(false);
-  console.log('Set frozen epoch to false in GaugeV3');
-
-  //await quotaKeeper.updateRates();
-  
-  console.log('Gauge and related configurations have been set.');
-}
-
 async function deployGearboxCore() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
@@ -463,8 +380,12 @@ async function deployVaultOracle(key, config) {
     return await deploydeUSDOracle(key, config);
   }
 
-  if (config.oracle.type == "PendleLPOracle_sUSDe") {
-    return await deploysUSDeOracle(key, config);
+  if (config.oracle.type == "PendleLPOracle_eUSDe") {
+    return await deployeUSDeOracle(key, config);
+  }
+
+  if (config.oracle.type == "PendleLPOracle_cUSDO") {
+    return await deploycUSDOOracle(key, config);
   }
 
   console.log('Deploying oracle for', key);
@@ -546,13 +467,13 @@ async function deploydeUSDOracle(key, config) {
   return chainlinkCurveOracle.address;
 }
 
-async function deploysUSDeOracle(key, config) {
-  console.log('Deploying sUSDe oracle for', key);
+async function deployeUSDeOracle(key, config) {
+  console.log('Deploying eUSDe oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
   
-  const CombinedAggregatorV3Oracle = await deployContract(
+  const CombinedAggregatorV3OracleFeeds = await deployContract(
     'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle_sUSDe',
+    'CombinedAggregatorV3Oracle_eUSDe_feeds',
     false,
     oracleConfig.usde_aggregator,
     oracleConfig.usde_heartbeat,
@@ -560,6 +481,25 @@ async function deploysUSDeOracle(key, config) {
     oracleConfig.usdc_heartbeat,
     false
   );
+
+  const AggregatorV3Oracle4626 = await deployContract(
+    'AggregatorV3Oracle4626',
+    'AggregatorV3Oracle4626_eUSDe',
+    false,
+    oracleConfig.eUSDe_vault
+  );
+
+  const CombinedAggregatorV3Oracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_eUSDe',
+    false,
+    AggregatorV3Oracle4626.address,
+    86400,
+    CombinedAggregatorV3OracleFeeds.address,
+    86400,
+    true
+  );
+  
   console.log(`CombinedAggregatorV3Oracle deployed for ${key} at ${CombinedAggregatorV3Oracle.address}`);
 
   const pendleLPOracle = await deployContract(
@@ -573,6 +513,81 @@ async function deploysUSDeOracle(key, config) {
     oracleConfig.stalePeriod
   );
   console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  return pendleLPOracle.address;
+}
+
+async function deploycUSDOOracle(key, config) {
+  console.log('Deploying cUSDO oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  // Step 1: Deploy the AggregatorV3Curve
+  const curveOracle = await deployContract(
+    "AggregatorV3Curve",
+    "AggregatorV3Curve_cUSDO",
+    false,
+    oracleConfig.curvePool,
+    oracleConfig.k,
+    oracleConfig.invert // we want to invert to get cUSDO/USDC price (normalized)
+  );
+  console.log(`AggregatorV3Curve deployed for ${key} at ${curveOracle.address}`);
+
+  // Step 2: Deploy the PendleLPOracle implementation
+  const pendleLPOracleImpl = await deployContract(
+    "PendleLPOracle",
+    "PendleLPOracle_Impl_cUSDO",
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    curveOracle.address,
+    oracleConfig.stalePeriod // Use stalePeriod consistently
+  );
+  console.log(`PendleLPOracle implementation deployed for ${key} at ${pendleLPOracleImpl.address}`);
+
+  // Step 3: Deploy the proxy
+  const signer = await getSignerAddress();
+  
+  // Get the contract factory for the proxy
+  const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+  
+  // Create initialization data for the proxy
+  const initData = pendleLPOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+  
+  // Deploy the proxy
+  const proxy = await ERC1967Proxy.deploy(
+    pendleLPOracleImpl.address,
+    initData
+  );
+  await proxy.deployed();
+  
+  const pendleLPOracle = await ethers.getContractAt('PendleLPOracle', proxy.address);
+  console.log(`PendleLPOracle proxy deployed for ${key} at ${pendleLPOracle.address}`);
+
+  // Store deployments
+  await storeContractDeployment(
+    false,
+    'AggregatorV3Curve_cUSDO',
+    curveOracle.address,
+    'AggregatorV3Curve',
+    [oracleConfig.curvePool, oracleConfig.k, oracleConfig.invert]
+  );
+  
+  await storeContractDeployment(
+    false,
+    'PendleLPOracle_Impl_cUSDO',
+    pendleLPOracleImpl.address,
+    'PendleLPOracle',
+    [oracleConfig.ptOracle, oracleConfig.market, oracleConfig.twap, curveOracle.address, oracleConfig.stalePeriod]
+  );
+  
+  await storeContractDeployment(
+    false,
+    'PendleLPOracle_cUSDO',
+    pendleLPOracle.address,
+    'ERC1967Proxy',
+    [pendleLPOracleImpl.address, initData]
+  );
 
   return pendleLPOracle.address;
 }
@@ -873,9 +888,9 @@ async function redeployActions() {
   // await redeployActions();
   // await deployPool();
   // await deployCore();
-  // await deployVaults();
-  // await registerVaults();
-  // await deployGauge();
+  await deployVaults();
+  await registerVaults(CONFIG_NETWORK);
+  await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpUSD, CONFIG_NETWORK);
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();

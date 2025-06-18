@@ -31,6 +31,7 @@ const {
   deployPools,
   impersonateAccount,
   stopImpersonatingAccount,
+  deployGauge
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -252,63 +253,6 @@ async function deployVaults() {
   }
 }
 
-async function deployGauge(poolAddress) {
-  console.log(`
-/*//////////////////////////////////////////////////////////////
-                        DEPLOYING GAUGE
-//////////////////////////////////////////////////////////////*/
-  `);
-
-  if (!poolAddress) {
-    console.log('No pool address defined for gauge');
-    return;
-  }
-
-  const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
-  const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
-  const deploymentFilePath = await getDeploymentFilePath();
-  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
-
-  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
-    const vaultMetadata = await getVaultMetadata(vault.address);
-    if (!vaultMetadata) {
-      console.log(`No metadata found for vault: ${vault.address}`);
-      continue;
-    }
-
-    if (vaultMetadata.pool.toLowerCase() != poolAddress.toLowerCase()) {
-      console.log(`Vault ${vault.address} is not associated with pool ${poolAddress}`);
-      continue;
-    }
-
-    // Check if vault is already added to gauge
-    if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
-      const tokenAddress = await vault.token();
-      await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
-      console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
-      
-      const minRate = vaultMetadata.quotas.minRate;
-      const maxRate = vaultMetadata.quotas.maxRate;
-      
-      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
-      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
-      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
-
-      // Update the gauge status
-      deployment.vaults[name].addedToGauge = true;
-      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
-    } else {
-      console.log(`${name} already added to gauge or not ready for gauge, skipping`);
-    }
-  }
-
-  // Unfreeze the epoch in Gauge
-  await gaugeV3.setFrozenEpoch(false);
-  console.log('Set frozen epoch to false in GaugeV3');
-  
-  console.log('Gauge and related configurations have been set.');
-}
-
 async function deployInterestRateModel() {
 
   //default values
@@ -467,7 +411,7 @@ async function deploySpectraInwstETHOracle(key, config) {
     // await deployCore();
     await deployVaults();
     await registerVaults(CONFIG_NETWORK);
-    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH);
+    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK, false);
     // await deployGearbox();
     // await logVaults();
     // await verifyAllDeployedContracts();

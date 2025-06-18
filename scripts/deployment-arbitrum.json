@@ -1,0 +1,48 @@
+{
+  "core": {
+    "LinearInterestRateModelV3": {
+      "address": "0x57Be2EcEcbA1D852e05f7c9Bc7626Bbbc9b5cBFd",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArguments": [
+        8500,
+        9500,
+        1000,
+        2000,
+        3000,
+        4000,
+        false
+      ]
+    },
+    "ACL": {
+      "address": "0x611a45F43fBF65c688d2d2Cf2C39eD26127eb28e",
+      "artifactName": "ACL",
+      "constructorArguments": []
+    },
+    "AddressProviderV3": {
+      "address": "0xDdf2Ec4773D70BB4d5f399aA5c6C65a149f71E2F",
+      "artifactName": "AddressProviderV3",
+      "constructorArguments": [
+        "0x611a45F43fBF65c688d2d2Cf2C39eD26127eb28e"
+      ]
+    },
+    "ContractsRegister": {
+      "address": "0xBFD78d798243952dE992FB42449afbD3b3e2f024",
+      "artifactName": "ContractsRegister",
+      "constructorArguments": [
+        "0xDdf2Ec4773D70BB4d5f399aA5c6C65a149f71E2F"
+      ]
+    },
+    "PoolV3": {
+      "address": "0x20CB8B88989D061a5c73c1aB7eB543a977689849",
+      "artifactName": "PoolV3",
+      "constructorArguments": [
+        "0xDdf2Ec4773D70BB4d5f399aA5c6C65a149f71E2F",
+        "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+        "0x57Be2EcEcbA1D852e05f7c9Bc7626Bbbc9b5cBFd",
+        "100000000000000000000000000",
+        "Loop Liquidity Pool - WETH",
+        "lpETH"
+      ]
+    }
+  }
+}

@@ -30,6 +30,7 @@ const {
   deployVaultOracle,
   registerVaults,
   deployPools,
+  deployPoolWithType,
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -54,8 +55,34 @@ async function deployCore() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Pass CONFIG_NETWORK to deployPoolCore
-  const deployedCore = await deployPoolCore(CONFIG_NETWORK, 'eth');
+  const poolType = 'btc';
+  
+  // Get addressProviderV3 from config
+  const addressProviderV3 = await attachContract('AddressProviderV3', CONFIG_NETWORK.Core.AddressProviderV3);
+  console.log('AddressProviderV3:', addressProviderV3.address);
+  
+  // Deploy the pool
+  const pool = await deployPoolWithType(
+    CONFIG_NETWORK, 
+    addressProviderV3, 
+    poolType, 
+    'LiquidityPoolBTCB', 
+    CONFIG_NETWORK.Pools.LiquidityPoolBTCB
+  );
+  console.log('Pool deployed at', pool.address);
+  
+  // Store the pool address in the config so deployPoolCore can use it
+  const poolKey = `PoolV3_LiquidityPoolBTCB_${poolType}`;
+  CONFIG_NETWORK.Core[poolKey] = pool.address;
+  console.log(`Stored pool address in CONFIG_NETWORK.Core.${poolKey}`);
+  
+  const positionActions = [
+    'PositionAction20',
+    'PositionAction4626',
+  ];
+
+  // Deploy core components for the pool
+  const deployedCore = await deployPoolCore(CONFIG_NETWORK, poolType, poolKey, positionActions);
   console.log('Core deployment completed');
   return deployedCore;
 }
@@ -76,20 +103,8 @@ async function deployVaults() {
     const vaultName = config.name || `CDPVault_${key}`;
     console.log('deploying vault ', vaultName);
 
-    // Deploy oracle using the common function with CONFIG_NETWORK
-    const oracleAddress = await deployVaultOracle(key, config, {
-      'tETH': async (key, config) => {
-        // ETH-specific tETH oracle deployment logic here if needed
-        const oracleConfig = config.oracle.deploymentArguments;
-        const deployedOracle = await deployContract(
-          config.oracle.type,
-          config.oracle.type,
-          false,
-          ...Object.values(oracleConfig)
-        );
-        return deployedOracle.address;
-      }
-    }, CONFIG_NETWORK);
+    // Deploy oracle using our updated deployCustomVaultOracle function
+    const oracleAddress = await deployCustomVaultOracle(key, config);
     
     if (!oracleAddress) continue;
 
@@ -116,7 +131,7 @@ async function deployVaults() {
     const poolAddress = await getPoolAddress(config.poolAddress);
     if (!poolAddress) {
       console.log(`ERROR: Could not find pool address for ${config.poolAddress}`);
-      return;
+      continue;
     }
 
     // Verify this is actually a Pool contract
@@ -126,7 +141,7 @@ async function deployVaults() {
       console.log(`Verified pool at ${poolAddress} with underlying token: ${underlyingToken}`);
     } catch (error) {
       console.error(`ERROR: Address ${poolAddress} is not a valid PoolV3 contract:`, error.message);
-      return;
+      continue;
     }
 
     console.log(`Proceeding with vault deployment using pool: ${poolAddress}`);
@@ -150,7 +165,7 @@ async function deployVaults() {
 
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
     const pool = await attachContract('PoolV3', poolAddress);
-    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    // await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
     
     console.log('------------------------------------');
 
@@ -333,12 +348,91 @@ async function redeployActions() {
   await deployCustomPositionActions(flashlender, swapAction, poolAction, vaultRegistry, poolType, config, positionActions);
 }
 
+async function deployCustomVaultOracle(key, config) {
+  if (!config.oracle) {
+    console.log('No oracle defined for', key);
+    return null;
+  }
+
+  const oracleType = config.oracle.type;
+  
+  if (oracleType === "StaticOracle") {
+    return await deployStaticOracle(key, config);
+  }
+  
+  console.log('Deploying default oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+  const deployedOracle = await deployContract(
+    oracleType,
+    oracleType+'_'+key,
+    false,
+    ...Object.values(oracleConfig)
+  );
+  return deployedOracle.address;
+}
+
+/**
+ * Deploys a StaticOracle contract as a proxy
+ * @param {string} key - Identifier for the deployment
+ * @param {Object} config - Configuration for the deployment
+ * @returns {string} The address of the deployed StaticOracle proxy
+ */
+async function deployStaticOracle(key, config) {
+  console.log('Deploying StaticOracle for', key);
+  
+  // Step 1: Deploy the StaticOracle implementation
+  const staticOracleImpl = await deployContract(
+    'StaticOracle',
+    `StaticOracle_Impl_${key}`,
+    false
+  );
+  console.log(`StaticOracle implementation deployed for ${key} at ${staticOracleImpl.address}`);
+
+  // Step 2: Deploy the proxy
+  const signer = await getSignerAddress();
+  
+  // Get the contract factory for the proxy
+  const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+  
+  // Create initialization data for the proxy
+  const initData = staticOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+  
+  // Deploy the proxy
+  const proxy = await ERC1967Proxy.deploy(
+    staticOracleImpl.address,
+    initData
+  );
+  await proxy.deployed();
+  
+  const staticOracle = await ethers.getContractAt('StaticOracle', proxy.address);
+  console.log(`StaticOracle proxy deployed for ${key} at ${staticOracle.address}`);
+
+  // Store deployment records
+  await storeContractDeployment(
+    false,
+    `StaticOracle_Impl_${key}`,
+    staticOracleImpl.address,
+    'StaticOracle',
+    []
+  );
+  
+  await storeContractDeployment(
+    false,
+    `StaticOracle_${key}`,
+    staticOracle.address,
+    'ERC1967Proxy',
+    [staticOracleImpl.address, initData]
+  );
+
+  return staticOracle.address;
+}
+
 ((async () => {
   // await deployInterestRateModel();
   // await redeployActions();
-  // await deployCore();
-  // await deployVaults();
-  // await registerVaults(CONFIG_NETWORK);
+  await deployCore();
+  await deployVaults();
+  await registerVaults(CONFIG_NETWORK);
   // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);
   // await deployGearbox();
   // await logVaults();

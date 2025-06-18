@@ -322,15 +322,14 @@ async function loadDeployedRewardManagers() {
   return rewardManagers;
 }
 
-// Add new deployment utility functions
-
 /**
  * Deploys core contracts including staking, locking LP, treasury, and actions
  * @param {Object} config - The network configuration object
  * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {string} poolKey - The key of the pool in config.Core (e.g., 'PoolV3_LpUSD')
  * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
  */
-async function deployPoolCore(config, poolType, customPositionActions) {
+async function deployPoolCore(config, poolType, poolKey, customPositionActions) {
   const signer = await getSignerAddress();
   
   if (hre.network.name == 'tenderly') {
@@ -338,7 +337,13 @@ async function deployPoolCore(config, poolType, customPositionActions) {
   }
 
   const addressProviderV3 = await attachContract('AddressProviderV3', config.Core.AddressProviderV3);
-  const pool = await attachContract('PoolV3', config.Core.PoolV3_LpUSD);
+  
+  // Use the poolKey parameter to get the pool address
+  if (!config.Core[poolKey]) {
+    throw new Error(`Pool key "${poolKey}" not found in config.Core`);
+  }
+  const pool = await attachContract('PoolV3', config.Core[poolKey]);
+  console.log(`Using pool ${poolKey} at address: ${pool.address}`);
 
   const { stakingLp, lockLp } = await deployStakingAndLockingLP(pool, poolType);
   console.log('staking lp property name', `stakingLp${poolType.toUpperCase()}`);
@@ -405,12 +410,14 @@ async function deployStakingAndLockingLP(pool, poolType) {
  * @returns {Object} The deployed action contracts
  */
 async function deployActions(pool, vaultRegistry, poolType, config, customPositionActions) {
+  const flashlenderName = `Flashlender_${poolType}`;
+  const flashlenderConfig = config.Core[flashlenderName];
   const flashlender = await deployContract(
     'Flashlender',
-    `Flashlender_${poolType}`,
+    flashlenderName,
     false,
     pool.address,
-    config.Core.Flashlender.constructorArguments.protocolFee_
+    flashlenderConfig.constructorArguments.protocolFee_
   );
 
   const UINT256_MAX = ethers.constants.MaxUint256;
@@ -579,55 +586,81 @@ async function registerVaults(config) {
  * Deploys pools with their interest rate models
  * @param {Object} config - The network configuration object
  * @param {Contract} addressProviderV3 - The address provider contract
+ * @returns {Array} Deployed pools
  */
 async function deployPools(config, addressProviderV3) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                        DEPLOYING POOLS
+                      DEPLOYING POOLS
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  const pools = [];
+  
+  // Deploy each pool individually using deployPoolWithType
+  for (const [poolKey, poolConfig] of Object.entries(config.Pools)) {
+    const pool = await deployPoolWithType(config, addressProviderV3, '', poolKey, poolConfig);
+    pools.push(pool);
+  }
+  
+  return pools;
+}
+
+/**
+ * Deploys a single pool with its interest rate model and a pool type suffix
+ * @param {Object} config - The network configuration object (for globals like Gearbox config)
+ * @param {Contract} addressProviderV3 - The address provider contract
+ * @param {string} poolType - The pool type identifier (e.g., 'eth', 'usdc')
+ * @param {string} poolKey - The key identifier for the pool
+ * @param {Object} poolConfig - The specific pool configuration
+ * @returns {Object} The deployed pool
+ */
+async function deployPoolWithType(config, addressProviderV3, poolType, poolKey, poolConfig) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+               DEPLOYING POOL: ${poolKey} (${poolType.toUpperCase()})
 //////////////////////////////////////////////////////////////*/
   `);
 
-  const pools = [];
+  // Use pool type in the deployment names
+  const interestModelName = `LinearInterestRateModelV3_${poolKey}`;
+  const poolName = `PoolV3_${poolKey}`;
+
+  // Deploy LinearInterestRateModelV3 for this pool
+  const LinearInterestRateModelV3 = await deployContract(
+    'LinearInterestRateModelV3',
+    interestModelName,
+    false,
+    poolConfig.interestRateModel.U_1,
+    poolConfig.interestRateModel.U_2,
+    poolConfig.interestRateModel.R_base,
+    poolConfig.interestRateModel.R_slope1,
+    poolConfig.interestRateModel.R_slope2,
+    poolConfig.interestRateModel.R_slope3,
+    poolConfig.interestRateModel.isBorrowingMoreU2Forbidden || false
+  );
+
+  // Deploy PoolV3 contract
+  const PoolV3 = await deployContract(  
+    'PoolV3',
+    poolName,
+    false,
+    poolConfig.wrappedToken,
+    addressProviderV3.address,
+    poolConfig.underlier,
+    LinearInterestRateModelV3.address,
+    poolConfig.initialDebtCeiling || config.Core.Gearbox.initialGlobalDebtCeiling,
+    poolConfig.name,
+    poolConfig.symbol
+  );
+
+  console.log(`Pool ${poolKey} (${poolType}) Deployed at ${PoolV3.address}`);
   
-  for (const [poolKey, poolConfig] of Object.entries(config.Pools)) {
-    // Deploy LinearInterestRateModelV3 for this pool
-    const LinearInterestRateModelV3 = await deployContract(
-      'LinearInterestRateModelV3',
-      `LinearInterestRateModelV3_${poolKey}`,
-      false,
-      poolConfig.interestRateModel.U_1,
-      poolConfig.interestRateModel.U_2,
-      poolConfig.interestRateModel.R_base,
-      poolConfig.interestRateModel.R_slope1,
-      poolConfig.interestRateModel.R_slope2,
-      poolConfig.interestRateModel.R_slope3,
-      poolConfig.interestRateModel.isBorrowingMoreU2Forbidden || false
-    );
+  // Verify on Tenderly
+  await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
+  await verifyOnTenderly('PoolV3', PoolV3.address);
 
-    // Deploy PoolV3 contract
-    const PoolV3 = await deployContract(
-      'PoolV3',
-      `PoolV3_${poolKey}`,
-      false,
-      poolConfig.wrappedToken,
-      addressProviderV3.address,
-      poolConfig.underlier,
-      LinearInterestRateModelV3.address,
-      poolConfig.initialDebtCeiling || config.Core.Gearbox.initialGlobalDebtCeiling,
-      poolConfig.name,
-      poolConfig.symbol
-    );
-
-    console.log(`Pool ${poolKey} Deployed at ${PoolV3.address}`);
-    
-    // Only verify on Tenderly, don't call storeContractDeployment again
-    await verifyOnTenderly('LinearInterestRateModelV3', LinearInterestRateModelV3.address);
-    await verifyOnTenderly('PoolV3', PoolV3.address);
-
-    pools.push(PoolV3);
-  }
-
-  return pools;
+  return PoolV3;
 }
 
 /**
@@ -701,6 +734,142 @@ async function fundAccount(address, amount) {
   console.log(`Funded account: ${address}`);
 }
 
+/**
+ * Generates raw transactions for adding vaults to an existing gauge (for multisig execution)
+ * @param {string} poolAddress - The address of the pool
+ * @param {Object} CONFIG_NETWORK - The network configuration
+ * @param {boolean} executeTransactions - Whether to execute transactions (default: false)
+ * @returns {Promise<Array>} - Array of transaction objects for multisig execution
+ */
+async function deployGauge(poolAddress, CONFIG_NETWORK, executeTransactions = false) {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                        ${executeTransactions ? 'DEPLOYING' : 'GENERATING'} GAUGE TRANSACTIONS
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  if (!poolAddress) {
+    console.log('No pool address defined for gauge');
+    return [];
+  }
+
+  const gaugeV3 = await attachContract('GaugeV3', CONFIG_NETWORK.Core.GaugeV3);
+  const poolQuotaKeeperV3 = await attachContract('PoolQuotaKeeperV3', CONFIG_NETWORK.Core.PoolQuotaKeeperV3);
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+
+  const transactions = [];
+
+  for (const [name, vault] of Object.entries(await loadDeployedVaults())) {
+    const vaultMetadata = await getVaultMetadata(vault.address);
+    if (!vaultMetadata) {
+      console.log(`No metadata found for vault: ${vault.address}`);
+      continue;
+    }
+
+    if (vaultMetadata.pool.toLowerCase() != poolAddress.toLowerCase()) {
+      console.log(`Vault ${vault.address} is not associated with pool ${poolAddress}`);
+      continue;
+    }
+
+    // Check if vault is already added to gauge
+    if (deployment.vaults[name] && !deployment.vaults[name].addedToGauge) {
+      console.log(`${executeTransactions ? 'Adding' : 'Preparing'} vault ${name} to gauge at address ${vault.address}`);
+      const tokenAddress = await vault.token();
+      
+      const minRate = vaultMetadata.quotas.minRate;
+      const maxRate = vaultMetadata.quotas.maxRate;
+
+      // Generate transaction for setting Credit Manager in QuotaKeeper
+      const setCreditManagerData = poolQuotaKeeperV3.interface.encodeFunctionData(
+        'setCreditManager',
+        [tokenAddress, vault.address]
+      );
+
+      transactions.push({
+        to: poolQuotaKeeperV3.address,
+        data: setCreditManagerData,
+        value: '0',
+        description: `Set Credit Manager in QuotaKeeper for token: ${tokenAddress}`,
+        functionName: 'setCreditManager',
+        parameters: {
+          tokenAddress,
+          vaultAddress: vault.address
+        }
+      });
+
+      // Generate transaction for adding quota token to GaugeV3
+      const addQuotaTokenData = gaugeV3.interface.encodeFunctionData(
+        'addQuotaToken',
+        [tokenAddress, minRate, maxRate]
+      );
+
+      transactions.push({
+        to: gaugeV3.address,
+        data: addQuotaTokenData,
+        value: '0',
+        description: `Add quota token to GaugeV3 for token: ${tokenAddress} (minRate: ${minRate}, maxRate: ${maxRate})`,
+        functionName: 'addQuotaToken',
+        parameters: {
+          tokenAddress,
+          minRate,
+          maxRate
+        }
+      });
+
+      if (executeTransactions) {
+        console.log('Setting Credit Manager in QuotaKeeper for token:', tokenAddress);
+        await poolQuotaKeeperV3.setCreditManager(tokenAddress, vault.address);
+        console.log('Set Credit Manager in QuotaKeeper for token:', tokenAddress);
+      
+      console.log('Setting quota rates for token:', tokenAddress, 'minRate:', minRate, 'maxRate:', maxRate);
+      await gaugeV3.addQuotaToken(tokenAddress, minRate, maxRate);
+      console.log('Added quota token to GaugeV3 for token:', tokenAddress);
+
+      // Update the gauge status
+      deployment.vaults[name].addedToGauge = true;
+      fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+      }
+    } else {
+      console.log(`${name} already added to gauge or not ready for gauge, skipping`);
+    }
+  }
+
+  // Generate transaction for unfreezing the epoch in Gauge
+  const setFrozenEpochData = gaugeV3.interface.encodeFunctionData(
+    'setFrozenEpoch',
+    [false]
+  );
+
+  transactions.push({
+    to: gaugeV3.address,
+    data: setFrozenEpochData,
+    value: '0',
+    description: 'Set frozen epoch to false in GaugeV3',
+    functionName: 'setFrozenEpoch',
+    parameters: {
+      frozen: false
+    }
+  });
+
+  if (executeTransactions) {
+  // Unfreeze the epoch in Gauge
+  await gaugeV3.setFrozenEpoch(false);
+  console.log('Set frozen epoch to false in GaugeV3');
+  console.log('Gauge and related configurations have been set.');
+  } else {
+    console.log(`Generated ${transactions.length} transactions for multisig execution:`);
+    transactions.forEach((tx, index) => {
+      console.log(`\n${index + 1}. ${tx.description}`);
+      console.log(`   To: ${tx.to}`);
+      console.log(`   Data: ${tx.data}`);
+      console.log(`   Value: ${tx.value}`);
+    });
+  }
+
+  return transactions;
+}
+
 module.exports = {
   getSignerAddress,
   getDeploymentFilePath,
@@ -727,7 +896,9 @@ module.exports = {
   deployVaultOracle,
   registerVaults,
   deployPools,
+  deployPoolWithType,
   impersonateAccount,
   stopImpersonatingAccount,
   fundAccount,
+  deployGauge
 }; 

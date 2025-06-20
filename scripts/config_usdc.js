@@ -199,8 +199,6 @@ module.exports = {
           "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
           "market": "0x45f163e583d34b8e276445dd3da9ae077d137d72", // The LP token market
           "twap": 180,
-          "susdf_usdf_aggregator": "0xe471bc940AA9831a0AeA21E6F40C1A1236EB4BB3", // sUSDf/USDf Chainlink Oracle
-          "susdf_usdf_heartbeat": 86400, // 24 hours
           "usdf_usd_aggregator": "0xb177857a1799aA5F7fEb5799Fdf12CbE8fdF78B1", // USDf/USD Chainlink Oracle
           "usdf_usd_heartbeat": 86400, // 24 hours
           "usdc_usd_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6", // USDC/USD Chainlink Oracle
@@ -211,6 +209,56 @@ module.exports = {
       token: "0x45f163e583d34b8e276445dd3da9ae077d137d72",
       poolAddress: "LpUSD",
       tokenSymbol: "LOOP-sUSDf",
+      tokenScale: toWad("1.0"),
+      protocolIcon: null,
+      deploymentArguments: {
+          constants: {
+              protocolFee: toWad("0.01"),
+          },
+          configs: {
+              debtFloor: toWad("1"),
+              liquidationRatio: toWad("1.1"),
+              liquidationPenalty: toWad("0.99"),
+              liquidationDiscount: toWad("0.98"),
+              roleAdmin: "deployer",
+              vaultAdmin: "deployer",
+              pauseAdmin: "deployer",
+          },
+          debtCeiling: toWad("100000000"),
+      },
+      quotas: {
+          minRate: 100,
+          maxRate: 10000,
+      },
+      "RewardManager": {
+        "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        "constructorArguments": [
+        ]
+      }
+    },
+
+    "Vaults_sUSDa": {
+      name: "Vaults_sUSDa",
+      description: "This vault allows for borrowing and lending of sUSDa assets",
+      type: "CDPVault",
+      collateralType: "ERC20",
+      oracle: {
+        type: "PendleLPOracle_sUSDa",
+        deploymentArguments: {
+          "ptOracle": "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+          "market": "0xab39fb8e28def89e5df77c2788a811d881d7fc8e", // sUSDa market token
+          "twap": 180,
+          "pythPriceFeedsContract": "0x4305FB66699C3B2702D4d05CF36551390A4c69C6", // Pyth price feeds contract on mainnet
+          "feedIdUSDaUSD": "0x3a1050a3c03354c94ed44acf808327f05b7f9d610f38644684f5ce4796cce27b", // USDa/USD Pyth feed ID
+          "pyth_heartbeat": 3600, // 1 hour for Pyth feeds
+          "usdc_usd_aggregator": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6", // USDC/USD Chainlink Oracle
+          "usdc_usd_heartbeat": 86400, // 24 hours
+          "stalePeriod": 88400,
+        },
+      },
+      token: "0xab39fb8e28def89e5df77c2788a811d881d7fc8e", // sUSDa market token address
+      poolAddress: "LpUSD",
+      tokenSymbol: "LOOP-sUSDa",
       tokenScale: toWad("1.0"),
       protocolIcon: null,
       deploymentArguments: {

@@ -93,7 +93,7 @@ function getPoolSpecificName(baseName, poolIdentifier = 'usdc') {
   return `${baseName}_${poolIdentifier}`;
 }
 
-async function deployCore() {
+async function deployCore(executeDirectly = false) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                          DEPLOYING CORE
@@ -131,8 +131,8 @@ async function deployCore() {
   const vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
   console.log('Vault Registry deployed to:', vaultRegistry.address);
 
-  // Deploy actions with the vault registry
-  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry);
+  // Deploy actions with the vault registry and executeDirectly flag
+  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, executeDirectly);
   
   console.log('------------------------------------');
 }
@@ -170,7 +170,7 @@ async function deployStakingAndLockingLP(pool) {
   return { stakingLpUsdc, lockLpUsdc };
 }
 
-async function deployActions(pool, vaultRegistry) {
+async function deployActions(pool, vaultRegistry, executeDirectly = false) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                       DEPLOYING ACTIONS
@@ -188,13 +188,31 @@ async function deployActions(pool, vaultRegistry) {
   
   const UINT256_MAX = ethers.constants.MaxUint256;
   
-  // Generate multisig transaction data instead of executing directly
-  logMultisigTransaction(
-    pool.address,
-    flashlender.address,
-    UINT256_MAX,
-    "Set credit manager debt limit for flashlender to max"
-  );
+  // Either execute directly or generate multisig transaction data
+  if (executeDirectly) {
+    try {
+      console.log(`Executing setCreditManagerDebtLimit for flashlender directly...`);
+      await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
+      console.log(`✅ Successfully set credit manager debt limit for flashlender to max`);
+    } catch (error) {
+      console.error(`❌ Failed to set flashlender debt limit directly:`, error.message);
+      console.log(`Falling back to multisig transaction generation...`);
+      logMultisigTransaction(
+        pool.address,
+        flashlender.address,
+        UINT256_MAX,
+        "Set credit manager debt limit for flashlender to max"
+      );
+    }
+  } else {
+    // Generate multisig transaction data
+    logMultisigTransaction(
+      pool.address,
+      flashlender.address,
+      UINT256_MAX,
+      "Set credit manager debt limit for flashlender to max"
+    );
+  }
   
   // Deploy PRBProxyRegistry (this one doesn't need pool suffix as it's chain-wide)
   const proxyRegistry = await attachContract('PRBProxyRegistry', CONFIG_NETWORK.Core.PRBProxyRegistry);
@@ -437,6 +455,10 @@ async function deployVaultOracle(key, config) {
 
   if (config.oracle.type == "PendleLPOracle_sUSDf") {
     return await deploysUSDfOracle(key, config);
+  }
+
+  if (config.oracle.type == "PendleLPOracle_sUSDa") {
+    return await deploysUSDaOracle(key, config);
   }
 
   if (config.oracle.type == "PendleLPOracle_cUSDO") {
@@ -694,35 +716,21 @@ async function deploysUSDfOracle(key, config) {
   console.log('Deploying sUSDf oracle for', key);
   const oracleConfig = config.oracle.deploymentArguments;
 
-  // Step 1: Deploy CombinedAggregatorV3Oracle for sUSDf/USDf -> USDf/USD (multiply)
-  // This gives us sUSDf/USD price
-  const sUSDfToUSDOracle = await deployContract(
+  // Step 1: Deploy CombinedAggregatorV3Oracle for USDf/USD ÷ USDC/USD (divide)
+  // This gives us USDf/USDC price (since Pendle getLpToAssetRate returns price in USDf terms)
+  const usdFToUSDCOracle = await deployContract(
     'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle_sUSDf_to_USD',
+    'CombinedAggregatorV3Oracle_USDf_to_USDC',
     false,
-    oracleConfig.susdf_usdf_aggregator,
-    oracleConfig.susdf_usdf_heartbeat,
     oracleConfig.usdf_usd_aggregator,
     oracleConfig.usdf_usd_heartbeat,
-    true // multiply: sUSDf/USDf * USDf/USD = sUSDf/USD
-  );
-  console.log(`CombinedAggregatorV3Oracle sUSDf/USD deployed for ${key} at ${sUSDfToUSDOracle.address}`);
-
-  // Step 2: Deploy CombinedAggregatorV3Oracle for sUSDf/USD ÷ USDC/USD (divide)
-  // This gives us sUSDf/USDC price
-  const sUSDfToUSDCOracle = await deployContract(
-    'CombinedAggregatorV3Oracle',
-    'CombinedAggregatorV3Oracle_sUSDf_to_USDC',
-    false,
-    sUSDfToUSDOracle.address,
-    Math.max(oracleConfig.susdf_usdf_heartbeat, oracleConfig.usdf_usd_heartbeat),
     oracleConfig.usdc_usd_aggregator,
     oracleConfig.usdc_usd_heartbeat,
-    false // divide: sUSDf/USD ÷ USDC/USD = sUSDf/USDC
+    false // divide: USDf/USD ÷ USDC/USD = USDf/USDC
   );
-  console.log(`CombinedAggregatorV3Oracle sUSDf/USDC deployed for ${key} at ${sUSDfToUSDCOracle.address}`);
+  console.log(`CombinedAggregatorV3Oracle USDf/USDC deployed for ${key} at ${usdFToUSDCOracle.address}`);
 
-  // Step 3: Deploy PendleLPOracle using the final combined oracle
+  // Step 2: Deploy PendleLPOracle using the USDf/USDC oracle
   const pendleLPOracle = await deployContract(
     'PendleLPOracle',
     'PendleLPOracle_sUSDf',
@@ -730,7 +738,7 @@ async function deploysUSDfOracle(key, config) {
     oracleConfig.ptOracle,
     oracleConfig.market,
     oracleConfig.twap,
-    sUSDfToUSDCOracle.address,
+    usdFToUSDCOracle.address,
     oracleConfig.stalePeriod
   );
   console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
@@ -738,26 +746,12 @@ async function deploysUSDfOracle(key, config) {
   // Store all contract deployments for verification
   await storeContractDeployment(
     false,
-    'CombinedAggregatorV3Oracle_sUSDf_to_USD',
-    sUSDfToUSDOracle.address,
+    'CombinedAggregatorV3Oracle_USDf_to_USDC',
+    usdFToUSDCOracle.address,
     'CombinedAggregatorV3Oracle',
     [
-      oracleConfig.susdf_usdf_aggregator,
-      oracleConfig.susdf_usdf_heartbeat,
       oracleConfig.usdf_usd_aggregator,
       oracleConfig.usdf_usd_heartbeat,
-      true
-    ]
-  );
-
-  await storeContractDeployment(
-    false,
-    'CombinedAggregatorV3Oracle_sUSDf_to_USDC',
-    sUSDfToUSDCOracle.address,
-    'CombinedAggregatorV3Oracle',
-    [
-      sUSDfToUSDOracle.address,
-      Math.max(oracleConfig.susdf_usdf_heartbeat, oracleConfig.usdf_usd_heartbeat),
       oracleConfig.usdc_usd_aggregator,
       oracleConfig.usdc_usd_heartbeat,
       false
@@ -773,7 +767,7 @@ async function deploysUSDfOracle(key, config) {
       oracleConfig.ptOracle,
       oracleConfig.market,
       oracleConfig.twap,
-      sUSDfToUSDCOracle.address,
+      usdFToUSDCOracle.address,
       oracleConfig.stalePeriod
     ]
   );
@@ -781,12 +775,98 @@ async function deploysUSDfOracle(key, config) {
   return pendleLPOracle.address;
 }
 
-async function deployVaults(pool) {
+async function deploysUSDaOracle(key, config) {
+  console.log('Deploying sUSDa oracle for', key);
+  const oracleConfig = config.oracle.deploymentArguments;
+
+  // Step 1: Deploy PythAggregatorV3 for USDa/USD
+  const pythAggregator = await deployContract(
+    'PythAggregatorV3',
+    'PythAggregatorV3_USDa_USD',
+    false,
+    oracleConfig.pythPriceFeedsContract,
+    oracleConfig.feedIdUSDaUSD
+  );
+  console.log(`PythAggregatorV3 USDa/USD deployed for ${key} at ${pythAggregator.address}`);
+
+  // Step 2: Deploy CombinedAggregatorV3Oracle for USDa/USD ÷ USDC/USD (divide)
+  // This gives us USDa/USDC price (since Pendle getLpToAssetRate returns price in USDa terms)
+  const usdAToUSDCOracle = await deployContract(
+    'CombinedAggregatorV3Oracle',
+    'CombinedAggregatorV3Oracle_USDa_to_USDC',
+    false,
+    pythAggregator.address,
+    oracleConfig.pyth_heartbeat,
+    oracleConfig.usdc_usd_aggregator,
+    oracleConfig.usdc_usd_heartbeat,
+    false // divide: USDa/USD ÷ USDC/USD = USDa/USDC
+  );
+  console.log(`CombinedAggregatorV3Oracle USDa/USDC deployed for ${key} at ${usdAToUSDCOracle.address}`);
+
+  // Step 3: Deploy PendleLPOracle using the USDa/USDC oracle
+  const pendleLPOracle = await deployContract(
+    'PendleLPOracle',
+    'PendleLPOracle_sUSDa',
+    false,
+    oracleConfig.ptOracle,
+    oracleConfig.market,
+    oracleConfig.twap,
+    usdAToUSDCOracle.address,
+    oracleConfig.stalePeriod
+  );
+  console.log(`PendleLPOracle deployed for ${key} at ${pendleLPOracle.address}`);
+
+  // Store all contract deployments for verification
+  await storeContractDeployment(
+    false,
+    'PythAggregatorV3_USDa_USD',
+    pythAggregator.address,
+    'PythAggregatorV3',
+    [
+      oracleConfig.pythPriceFeedsContract,
+      oracleConfig.feedIdUSDaUSD
+    ]
+  );
+
+  await storeContractDeployment(
+    false,
+    'CombinedAggregatorV3Oracle_USDa_to_USDC',
+    usdAToUSDCOracle.address,
+    'CombinedAggregatorV3Oracle',
+    [
+      pythAggregator.address,
+      oracleConfig.pyth_heartbeat,
+      oracleConfig.usdc_usd_aggregator,
+      oracleConfig.usdc_usd_heartbeat,
+      false
+    ]
+  );
+
+  await storeContractDeployment(
+    false,
+    'PendleLPOracle_sUSDa',
+    pendleLPOracle.address,
+    'PendleLPOracle',
+    [
+      oracleConfig.ptOracle,
+      oracleConfig.market,
+      oracleConfig.twap,
+      usdAToUSDCOracle.address,
+      oracleConfig.stalePeriod
+    ]
+  );
+
+  return pendleLPOracle.address;
+}
+
+async function deployVaults(executeDirectly = false) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING VAULTS
 //////////////////////////////////////////////////////////////*/
   `);
+
+  console.log(`Execution mode: ${executeDirectly ? 'Direct execution' : 'Multisig transaction generation'}`);
 
   const signer = await getSignerAddress();
   const {
@@ -861,13 +941,31 @@ async function deployVaults(pool) {
     console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
     const pool = await attachContract('PoolV3', poolAddress);
     
-    // Generate multisig transaction data instead of executing directly
-    logMultisigTransaction(
-      pool.address,
-      cdpVault.address,
-      config.deploymentArguments.debtCeiling,
-      `Set debt ceiling for ${vaultName} vault to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`
-    );
+    // Either execute directly or generate multisig transaction data
+    if (executeDirectly) {
+      try {
+        console.log(`Executing setCreditManagerDebtLimit directly...`);
+        await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+        console.log(`✅ Successfully set debt ceiling for ${vaultName} to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`);
+      } catch (error) {
+        console.error(`❌ Failed to set debt ceiling directly:`, error.message);
+        console.log(`Falling back to multisig transaction generation...`);
+        logMultisigTransaction(
+          pool.address,
+          cdpVault.address,
+          config.deploymentArguments.debtCeiling,
+          `Set debt ceiling for ${vaultName} vault to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`
+        );
+      }
+    } else {
+      // Generate multisig transaction data
+      logMultisigTransaction(
+        pool.address,
+        cdpVault.address,
+        config.deploymentArguments.debtCeiling,
+        `Set debt ceiling for ${vaultName} vault to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`
+      );
+    }
     
     console.log('------------------------------------');
 
@@ -1035,17 +1133,57 @@ async function redeployActions() {
 }
 
 ((async () => {
-  // Initialize deployment with impersonation
+  // CONFIGURATION: Set this flag based on your deployment scenario
+  // - Set to 'true' if you are the pool owner and want to execute transactions directly
+  // - Set to 'false' if you need to generate transaction data for a multisig wallet
+  const EXECUTE_DIRECTLY = false; // Change to true if you're the pool owner
+  
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                    DEPLOYMENT CONFIGURATION
+//////////////////////////////////////////////////////////////*/
+
+Execution Mode: ${EXECUTE_DIRECTLY ? 'DIRECT EXECUTION' : 'MULTISIG TRANSACTION GENERATION'}
+
+${EXECUTE_DIRECTLY ? 
+  '⚠️  DIRECT MODE: Will attempt to execute setCreditManagerDebtLimit directly.\n   Use this only if you are the pool owner.' : 
+  '📋 MULTISIG MODE: Will generate transaction data for multisig execution.\n   Use this when the pool is owned by a multisig wallet.'
+}
+
+/*//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Initialize deployment with impersonation (uncomment if needed)
   // await impersonateDeployer();
+  
+  // Deploy various components (uncomment as needed)
   // await redeployActions();
   // await deployPool();
-  // await deployCore();
-  await deployVaults();
+  // await deployCore(EXECUTE_DIRECTLY);  // Pass the flag to deployCore
+  
+  // Deploy vaults with the execution flag
+  await deployVaults(EXECUTE_DIRECTLY);
+  
+  // Register vaults and deploy gauge
   await registerVaults(CONFIG_NETWORK);
   await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpUSD, CONFIG_NETWORK);
+  
+  // Other deployment functions (uncomment as needed)
   // await deployGearbox();
   // await logVaults();
   // await verifyAllDeployedContracts();
+  
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                    DEPLOYMENT COMPLETED
+//////////////////////////////////////////////////////////////*/
+
+Mode used: ${EXECUTE_DIRECTLY ? 'Direct execution' : 'Multisig transaction generation'}
+${!EXECUTE_DIRECTLY ? 
+  '\n📋 Check the output above for multisig transaction data to execute.' : 
+  '\n✅ Transactions were executed directly.'
+}
+  `);
 })()).catch((error) => {
   console.error(error);
   process.exitCode = 1;

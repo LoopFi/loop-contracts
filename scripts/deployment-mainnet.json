@@ -995,7 +995,8 @@
           "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
         ]
       ],
-      "addedToRegistry": true
+      "addedToRegistry": true,
+      "addedToGauge": true
     },
     "CDPVault_Vaults_syrupUSDC": {
       "address": "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83",
@@ -1017,7 +1018,8 @@
           "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
         ]
       ],
-      "addedToRegistry": true
+      "addedToRegistry": true,
+      "addedToGauge": true
     }
   },
   "rewardManagers": {

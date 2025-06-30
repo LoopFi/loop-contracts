@@ -37,7 +37,7 @@ deploy-tenderly-usdc :; npx hardhat run scripts/deploy_usdc.js --network tenderl
 deploy-xdc       :; npx hardhat run scripts/deploy_xdc.js --network xdc --show-stack-traces
 deploy-xdc-testnet:; npx hardhat run scripts/deploy_xdc.js --network xdc_testnet --show-stack-traces
 
-deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainnet
+# deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainnet
 # deploy-mainnet-eth   	:; npx hardhat run scripts/deploy_eth.js --network mainnet
 # deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
 

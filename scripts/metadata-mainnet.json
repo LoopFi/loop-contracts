@@ -158,6 +158,20 @@
         "minRate": 100,
         "maxRate": 10000
       }
+    },
+    "0x078dbc4815a13acd3c6bb19fcdddb4aefd086137": {
+      "contractName": "CDPVault_Vaults_sUSDf",
+      "name": "Vaults_sUSDf",
+      "description": "This vault allows for borrowing and lending of sUSDf assets",
+      "artifactName": "CDPVault",
+      "pool": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+      "oracle": "0x078f2b1ee5ef03079c1ebc0275d922dd6ad47216",
+      "token": "0x45f163e583d34b8e276445dd3da9ae077d137d72",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
     }
   }
 }

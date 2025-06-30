@@ -192,7 +192,7 @@ async function deployActions(pool, vaultRegistry, executeDirectly = false) {
   if (executeDirectly) {
     try {
       console.log(`Executing setCreditManagerDebtLimit for flashlender directly...`);
-      await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
+  await pool.setCreditManagerDebtLimit(flashlender.address, UINT256_MAX);
       console.log(`✅ Successfully set credit manager debt limit for flashlender to max`);
     } catch (error) {
       console.error(`❌ Failed to set flashlender debt limit directly:`, error.message);
@@ -945,7 +945,7 @@ async function deployVaults(executeDirectly = false) {
     if (executeDirectly) {
       try {
         console.log(`Executing setCreditManagerDebtLimit directly...`);
-        await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
         console.log(`✅ Successfully set debt ceiling for ${vaultName} to ${fromWad(config.deploymentArguments.debtCeiling)} tokens`);
       } catch (error) {
         console.error(`❌ Failed to set debt ceiling directly:`, error.message);

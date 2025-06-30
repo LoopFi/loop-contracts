@@ -766,6 +766,40 @@
         "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
       ],
       "addedToRegistry": false
+    },
+    "CombinedAggregatorV3Oracle_USDf_to_USDC": {
+      "address": "0x4e4167d4697039e9d89207f1c01f7e2034abff0b",
+      "artifactName": "CombinedAggregatorV3Oracle",
+      "constructorArgs": [
+        "0xb177857a1799aA5F7fEb5799Fdf12CbE8fdF78B1",
+        "86400",
+        "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "86400",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "PendleLPOracle_sUSDf": {
+      "address": "0x078f2b1ee5ef03079c1ebc0275d922dd6ad47216",
+      "artifactName": "PendleLPOracle",
+      "constructorArgs": [
+        "0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2",
+        "0x45f163e583d34b8e276445dd3da9ae077d137d72",
+        "180",
+        "0x4e4167d4697039e9d89207f1c01f7e2034abff0b",
+        "88400"
+      ],
+      "addedToRegistry": false
+    },
+    "RewardManager_Vaults_sUSDf": {
+      "address": "0xa816f126fc4637d43f65cc77c381dbca24da5d95",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x078dbc4815a13acd3c6bb19fcdddb4aefd086137",
+        "0x45f163e583d34b8e276445dd3da9ae077d137d72",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false
     }
   },
   "vaults": {
@@ -1020,6 +1054,28 @@
       ],
       "addedToRegistry": true,
       "addedToGauge": true
+    },
+    "CDPVault_Vaults_sUSDf": {
+      "address": "0x078dbc4815a13acd3c6bb19fcdddb4aefd086137",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
+          "0x078f2b1ee5ef03079c1ebc0275d922dd6ad47216",
+          "0x45f163e583d34b8e276445dd3da9ae077d137d72",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000000",
+          "1100000000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true
     }
   },
   "rewardManagers": {
@@ -1161,6 +1217,18 @@
       "addedToRegistry": false,
       "vaultName": "CDPVault_Vaults_syrupUSDC",
       "vaultAddress": "0x18C15607C91C6FC51DB6429e7Fdf5f6165dEED83"
+    },
+    "0xa816f126fc4637d43f65cc77c381dbca24da5d95": {
+      "address": "0xa816f126fc4637d43f65cc77c381dbca24da5d95",
+      "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+      "constructorArgs": [
+        "0x078dbc4815a13acd3c6bb19fcdddb4aefd086137",
+        "0x45f163e583d34b8e276445dd3da9ae077d137d72",
+        "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
+      ],
+      "addedToRegistry": false,
+      "vaultName": "CDPVault_Vaults_sUSDf",
+      "vaultAddress": "0x078dbc4815a13acd3c6bb19fcdddb4aefd086137"
     }
   }
 }

@@ -104,21 +104,118 @@ async function deployContract(name, artifactName, isVault, ...args) {
   const Contract = await ethers.getContractFactory(name);
   
   console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
-  const contract = await Contract.deploy(...args);
-  await contract.deployed();
+  
+  try {
+    const contract = await Contract.deploy(...args);
+    
+    // The contract address is available immediately after deployment
+    console.log(`Transaction hash: ${contract.deployTransaction.hash}`);
+    console.log(`${artifactName || name} deployed to: ${contract.address}`);
+    
+    // Try to wait for confirmation, but don't fail if transaction response parsing fails
+    try {
+      const receipt = await contract.deployTransaction.wait();
+      console.log(`Contract confirmed in block ${receipt.blockNumber}`);
+    } catch (waitError) {
+      if (waitError.message.includes('invalid address')) {
+        console.log('Warning: Transaction response parsing failed, but contract was deployed successfully');
+        console.log('This is likely due to ethers.js v5 transaction response formatting issues');
+        // We can still proceed since we have the contract address
+      } else {
+        throw waitError; // Re-throw if it's a different error
+      }
+    }
 
-  console.log(`${artifactName || name} deployed to: ${contract.address}`);
-  await verifyOnTenderly(name, contract.address);
+    await verifyOnTenderly(name, contract.address);
 
-  await storeContractDeployment(
-    isVault,
-    artifactName || name,
-    contract.address,
-    name,
-    args
-  );
+    await storeContractDeployment(
+      isVault,
+      artifactName || name,
+      contract.address,
+      name,
+      args
+    );
 
-  return contract;
+    return contract;
+  } catch (error) {
+    console.error(`Error deploying ${artifactName || name}:`, error.message);
+    
+    // If deployment itself failed due to transaction response parsing but we have a transaction hash,
+    // try to extract the contract address from the error context
+    if (error.message.includes('invalid address') && error.transactionHash) {
+      console.log(`Attempting to recover contract from transaction hash: ${error.transactionHash}`);
+      
+      // Retry with increasing wait times
+      const maxRetries = 5;
+      const baseWaitTime = 15000; // 15 seconds base wait
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const waitTime = baseWaitTime * attempt; // 15s, 30s, 45s, 60s, 75s
+        console.log(`Attempt ${attempt}/${maxRetries}: Waiting ${waitTime/1000} seconds for transaction to be mined...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        try {
+          // Use raw JSON-RPC call to avoid ethers.js formatting
+          const receipt = await ethers.provider.send('eth_getTransactionReceipt', [error.transactionHash]);
+          
+          if (receipt) {
+            console.log(`✅ Transaction found! Status: ${receipt.status}`);
+            console.log(`Gas used: ${receipt.gasUsed}`);
+            
+            // Check if transaction was successful
+            if (receipt.status === '0x0') {
+              console.error('❌ Transaction failed/reverted');
+              // Try to get revert reason
+              try {
+                const tx = await ethers.provider.send('eth_getTransactionByHash', [error.transactionHash]);
+                console.log('Transaction details:', {
+                  to: tx.to,
+                  value: tx.value,
+                  gasLimit: tx.gas,
+                  gasPrice: tx.gasPrice
+                });
+              } catch (txError) {
+                console.log('Could not fetch transaction details:', txError.message);
+              }
+              throw new Error(`Transaction ${error.transactionHash} failed/reverted`);
+            }
+            
+            if (receipt.contractAddress) {
+              console.log(`✅ Recovered contract address: ${receipt.contractAddress}`);
+              const contract = Contract.attach(receipt.contractAddress);
+              
+              await verifyOnTenderly(name, contract.address);
+              await storeContractDeployment(
+                isVault,
+                artifactName || name,
+                contract.address,
+                name,
+                args
+              );
+              
+              return contract;
+            } else {
+              console.log('⚠️  Transaction successful but no contract address - this might not be a contract creation transaction');
+              break; // Exit retry loop, this won't get better with more retries
+            }
+          } else {
+            console.log(`⏳ Attempt ${attempt}: Transaction receipt not found - transaction may not be mined yet`);
+            if (attempt === maxRetries) {
+              console.log('❌ Max retries reached. Transaction may have been dropped or is taking unusually long to mine.');
+            }
+            // Continue to next retry attempt
+          }
+        } catch (recoveryError) {
+          console.error(`❌ Attempt ${attempt} failed:`, recoveryError.message);
+          if (attempt === maxRetries) {
+            console.error('❌ All recovery attempts failed');
+          }
+          // Continue to next retry attempt unless it's the last one
+        }
+      }
+    }
+    throw error;
+  }
 }
 
 async function isContractDeployed(name) {

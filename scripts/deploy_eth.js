@@ -259,14 +259,28 @@ async function deployInterestRateModel() {
   const U_1 = 7000; // U_1
   const U_2 = 9000; // U_2
   const R_base = 0; // R_base
-  const R_slope1 = 2000; // R_slope1
-  const R_slope2 = 2500; // R_slope2
-  const R_slope3 = 60000; // R_slope3
-  const version = 3;
+  const R_slope1 = 612; // R_slope1
+  const R_slope2 = 765; // R_slope2
+  const R_slope3 = 765; // R_slope3
+  const version = 5;
 
   //decrease factor for slopes
-  const decreaseFactor = 0.85; // 15% decrease
-  
+  const decreaseFactor = 0.7; // 30% decrease
+
+  // Round up the decreased values using Math.ceil
+  const R_slope1_decreased = Math.ceil(R_slope1 * decreaseFactor);
+  const R_slope2_decreased = Math.ceil(R_slope2 * decreaseFactor);
+  const R_slope3_decreased = Math.ceil(R_slope3 * decreaseFactor);
+
+  console.log('Deploying LinearInterestRateModelV3');
+  console.log('U_1:', U_1);
+  console.log('U_2:', U_2);
+  console.log('R_base:', R_base);
+  console.log('R_slope1:', R_slope1_decreased, `(${R_slope1} * ${decreaseFactor} rounded up)`);
+  console.log('R_slope2:', R_slope2_decreased, `(${R_slope2} * ${decreaseFactor} rounded up)`);
+  console.log('R_slope3:', R_slope3_decreased, `(${R_slope3} * ${decreaseFactor} rounded up)`);
+  console.log('version:', version);
+
   const LinearInterestRateModelV3 = await deployContract(
     'LinearInterestRateModelV3',
     `LinearInterestRateModelV3_${version}`,
@@ -274,9 +288,9 @@ async function deployInterestRateModel() {
     U_1,
     U_2,
     R_base,
-    R_slope1 * decreaseFactor,
-    R_slope2 * decreaseFactor,
-    R_slope3 * decreaseFactor,
+    R_slope1_decreased,
+    R_slope2_decreased,
+    R_slope3_decreased,
     false
   );
 
@@ -407,11 +421,13 @@ async function deploySpectraInwstETHOracle(key, config) {
     // Initialize deployment with impersonation
     // uncomment this to deploy as the impersonated account, only supported on local deployment(anvil)
     // await impersonateDeployer();
+
+    await deployInterestRateModel();
     
     // await deployCore();
-    await deployVaults();
-    await registerVaults(CONFIG_NETWORK);
-    await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK, false);
+    // await deployVaults();
+    // await registerVaults(CONFIG_NETWORK);
+    // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK, false);
     // await deployGearbox();
     // await logVaults();
     // await verifyAllDeployedContracts();

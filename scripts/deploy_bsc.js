@@ -163,13 +163,13 @@ async function deployVaults() {
 
     console.log('CDPVault deployed for', vaultName, 'at', cdpVault.address);
 
-    console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
-    const pool = await attachContract('PoolV3', poolAddress);
+    // console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
+    // const pool = await attachContract('PoolV3', poolAddress);
     // await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
-    
-    console.log('------------------------------------');
 
-    console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
+    // console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
+
+    console.log('------------------------------------');
 
     const rewardManager = await deployContract(
       config.RewardManager.artifactName,
@@ -430,7 +430,7 @@ async function deployStaticOracle(key, config) {
 ((async () => {
   // await deployInterestRateModel();
   // await redeployActions();
-  await deployCore();
+  // await deployCore();
   await deployVaults();
   await registerVaults(CONFIG_NETWORK);
   // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpBNB);

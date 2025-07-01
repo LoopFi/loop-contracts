@@ -800,6 +800,20 @@
         "0xC63e9279410d37C0A25D094e26Cddbb73aEd7d95"
       ],
       "addedToRegistry": false
+    },
+    "LinearInterestRateModelV3_5": {
+      "address": "0xf1bd478d854d29a59d701d93bf3bbbe5e2e879ea",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "7000",
+        "9000",
+        "0",
+        "429",
+        "536",
+        "536",
+        "false"
+      ],
+      "addedToRegistry": false
     }
   },
   "vaults": {

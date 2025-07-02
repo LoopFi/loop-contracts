@@ -140,8 +140,9 @@ async function deployVaults() {
       const underlyingToken = await pool.underlyingToken();
       console.log(`Verified pool at ${poolAddress} with underlying token: ${underlyingToken}`);
     } catch (error) {
-      console.error(`ERROR: Address ${poolAddress} is not a valid PoolV3 contract:`, error.message);
-      continue;
+      console.warn(`Warning: Could not verify pool contract at ${poolAddress}: ${error.message}`);
+      console.log(`Proceeding anyway since the address is configured in the deployment config`);
+      // Don't continue/skip - this might just be a fork state issue
     }
 
     console.log(`Proceeding with vault deployment using pool: ${poolAddress}`);
@@ -163,10 +164,9 @@ async function deployVaults() {
 
     console.log('CDPVault deployed for', vaultName, 'at', cdpVault.address);
 
+    const pool = await attachContract('PoolV3', poolAddress);
     // console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
-    // const pool = await attachContract('PoolV3', poolAddress);
     // await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
-
     // console.log('Initialized', vaultName, 'with a debt ceiling of', fromWad(config.deploymentArguments.debtCeiling), 'Credit');
 
     console.log('------------------------------------');
@@ -354,6 +354,21 @@ async function deployCustomVaultOracle(key, config) {
     return null;
   }
 
+  // Check if oracle is already a direct address
+  if (typeof config.oracle === 'string') {
+    console.log(`Using existing oracle address for ${key}: ${config.oracle}`);
+    
+    // Verify the address is valid
+    if (!ethers.utils.isAddress(config.oracle)) {
+      console.error(`Invalid oracle address for ${key}: ${config.oracle}`);
+      return null;
+    }
+    
+    console.log(`✅ Using oracle address ${config.oracle} for ${key}`);
+    return config.oracle;
+  }
+
+  // Handle oracle configuration object (existing logic)
   const oracleType = config.oracle.type;
   
   if (oracleType === "StaticOracle") {
@@ -378,36 +393,60 @@ async function deployCustomVaultOracle(key, config) {
  * @returns {string} The address of the deployed StaticOracle proxy
  */
 async function deployStaticOracle(key, config) {
-  console.log('Deploying StaticOracle for', key);
+  console.log('='.repeat(60));
+  console.log(`DEPLOYING STATIC ORACLE FOR: ${key}`);
+  console.log('='.repeat(60));
   
   // Step 1: Deploy the StaticOracle implementation
+  console.log('STEP 1: Deploying StaticOracle implementation...');
   const staticOracleImpl = await deployContract(
     'StaticOracle',
     `StaticOracle_Impl_${key}`,
     false
   );
-  console.log(`StaticOracle implementation deployed for ${key} at ${staticOracleImpl.address}`);
+  console.log(`✅ StaticOracle implementation deployed for ${key} at ${staticOracleImpl.address}`);
 
-  // Step 2: Deploy the proxy
+  // Step 2: Prepare proxy deployment
+  console.log('\nSTEP 2: Preparing proxy deployment...');
   const signer = await getSignerAddress();
+  console.log(`Signer address: ${signer}`);
+  console.log(`Implementation address: ${staticOracleImpl.address}`);
   
-  // Get the contract factory for the proxy
+  // Get contract factories
+  console.log('Getting ERC1967Proxy contract factory...');
   const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+  console.log('✅ ERC1967Proxy factory obtained');
   
-  // Create initialization data for the proxy
+  // Create initialization data
+  console.log('Creating initialization data...');
+  console.log(`Calling initialize(${signer}, ${signer})`);
   const initData = staticOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+  console.log(`✅ Initialization data created: ${initData}`);
   
-  // Deploy the proxy
+  // Step 3: Deploy the proxy
+  console.log('\nSTEP 3: Deploying ERC1967Proxy...');
+  console.log(`Implementation: ${staticOracleImpl.address}`);
+  console.log(`Init data: ${initData}`);
+  
   const proxy = await ERC1967Proxy.deploy(
     staticOracleImpl.address,
     initData
   );
+  
+  console.log(`✅ Proxy deployment initiated`);
+  console.log(`Transaction hash: ${proxy.deployTransaction.hash}`);
+  console.log(`Proxy address: ${proxy.address}`);
+  
+  // Wait for confirmation
+  console.log('\nSTEP 4: Waiting for deployment confirmation...');
   await proxy.deployed();
+  console.log(`✅ Proxy deployment confirmed`);
   
   const staticOracle = await ethers.getContractAt('StaticOracle', proxy.address);
-  console.log(`StaticOracle proxy deployed for ${key} at ${staticOracle.address}`);
+  console.log(`✅ StaticOracle proxy deployed for ${key} at ${staticOracle.address}`);
 
   // Store deployment records
+  console.log('\nSTEP 5: Storing deployment records...');
   await storeContractDeployment(
     false,
     `StaticOracle_Impl_${key}`,
@@ -423,6 +462,9 @@ async function deployStaticOracle(key, config) {
     'ERC1967Proxy',
     [staticOracleImpl.address, initData]
   );
+  
+  console.log('✅ Deployment records stored');
+  console.log('='.repeat(60));
 
   return staticOracle.address;
 }

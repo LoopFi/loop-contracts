@@ -39,7 +39,7 @@ deploy-xdc-testnet:; npx hardhat run scripts/deploy_xdc.js --network xdc_testnet
 
 # deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainnet
 # deploy-mainnet-eth   	:; npx hardhat run scripts/deploy_eth.js --network mainnet
-# deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
+deploy-bsc       		:; npx hardhat run scripts/deploy_bsc.js --network bsc --show-stack-traces
 
 # ACL Ownership
 acl-update-owner-anvil    :; npm run update-acl-owner

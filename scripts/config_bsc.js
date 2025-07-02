@@ -174,11 +174,7 @@ module.exports = {
             type: "CDPVault",
             collateralType: "ERC20",
             poolAddress: "LiquidityPoolBTCB",
-            oracle: {
-                type: "StaticOracle",
-                deploymentArguments: {
-                },
-            },
+            oracle: "0x9DCE515E2537c356aBE55981428D58449D2D7140",
             token: "0x918b3aa73e2D42D96CF64CBdB16838985992dAbc",
             tokenSymbol: "LOOP-coBTC",
             tokenScale: toWad("1.0"),

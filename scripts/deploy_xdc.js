@@ -406,6 +406,13 @@ async function deployAddressProvider() {
     contractsRegister
   };
 }
+async function performTransactions() {
+  const signer = await getSignerAddress();
+  const poolAddress = "0x235e49CC709F9e262814795c00eabe73709ef8E2";
+  const pool = await attachContract('PoolV3', poolAddress);
+  await pool.setLock(false);
+  console.log('Pool unlocked');
+}
 
 async function main() {
   try {
@@ -413,7 +420,9 @@ async function main() {
     // const impersonatedSigner = await impersonateDeployer();
     
     // Deploy pools (XDC and USDC)
-    await deployPool();
+    // await deployPool();
+
+    await performTransactions();
     
     // Deploy core contracts
     // const deployedCore = await deployCore();

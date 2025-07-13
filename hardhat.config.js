@@ -2,6 +2,7 @@ require('dotenv').config();
 require('@nomicfoundation/hardhat-foundry');
 require('@nomiclabs/hardhat-ethers');
 require('@openzeppelin/hardhat-upgrades');
+require('@nomiclabs/hardhat-etherscan');
 const tenderly = require('@tenderly/hardhat-tenderly');
 // tenderly.setup({automaticVerifications: false});
 
@@ -23,6 +24,24 @@ module.exports = {
         runs: 100
       }
     }
+  },
+  etherscan: {
+    apiKey: {
+      xdc: process.env.XDC_ETHERSCAN_API_KEY,
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      bsc: process.env.BSC_ETHERSCAN_API_KEY,
+      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
+    },
+    customChains: [
+      {
+        network: "xdc",
+        chainId: 50,
+        urls: {
+          apiURL: "https://api.xdcscan.com/api",
+          browserURL: "https://xdcscan.com"
+        }
+      }
+    ]
   },
   tenderly: {
     username: process.env.TENDERLY_USERNAME,

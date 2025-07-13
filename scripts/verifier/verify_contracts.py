@@ -164,18 +164,11 @@ def verify_contract(address, artifact_name, constructor_args, chain_id, ethersca
         if formatted_args:
             command.extend(["--constructor-args", formatted_args])
 
-        # Use custom verifier for XDC (chain ID 50), etherscan for others
-        if chain_id == 50:  # XDC Network
-            command.extend([
-                "--verifier", "custom",
-                "--verifier-url", "https://api.blocksscan.io/api",
-                "--etherscan-api-key", etherscan_key,
-            ])
-        else:
-            command.extend([
-                "--verifier", "etherscan",
-                "--etherscan-api-key", etherscan_key,
-            ])
+        # Use etherscan verifier for all chains (including XDC)
+        command.extend([
+            "--verifier", "etherscan",
+            "--etherscan-api-key", etherscan_key,
+        ])
         
         command.extend([
             "--compiler-version", f"v{settings['solc_version']}"

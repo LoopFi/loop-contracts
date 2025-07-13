@@ -35,6 +35,9 @@ CONTRACT_PATHS = {
     # Core contracts
     "LinearInterestRateModelV3": "lib/core-v3/contracts/pool/LinearInterestRateModelV3.sol:LinearInterestRateModelV3",
     "ACL": "lib/core-v2/contracts/core/ACL.sol:ACL",
+    "AddressProviderV3": "lib/core-v3/contracts/core/AddressProviderV3.sol:AddressProviderV3",
+    "ContractsRegister": "lib/core-v3/contracts/core/ContractsRegister.sol:ContractsRegister",
+    "PoolQuotaKeeperV3": "lib/core-v3/contracts/pool/PoolQuotaKeeperV3.sol:PoolQuotaKeeperV3",
     
     # Reward managers
     "RewardManager": "src/pendle-rewards/RewardManager.sol:RewardManager",
@@ -46,13 +49,10 @@ CONTRACT_PATHS = {
     "SpectraYnETHOracle": "src/oracle/SpectraYnETHOracle.sol:SpectraYnETHOracle",
     
     # Core system contracts
-    "AddressProviderV3": "src/AddressProviderV3.sol:AddressProviderV3",
-    "ContractsRegister": "src/ContractsRegister.sol:ContractsRegister",
     "PoolV3": "src/PoolV3.sol:PoolV3",
     "VaultRegistry": "src/VaultRegistry.sol:VaultRegistry",
     "CDPVault": "src/CDPVault.sol:CDPVault",
     "Treasury": "src/Treasury.sol:Treasury",
-    "PoolQuotaKeeperV3": "src/quotas/PoolQuotaKeeperV3.sol:PoolQuotaKeeperV3",
     
     # Proxy/Action contracts
     "BaseAction": "src/proxy/BaseAction.sol:BaseAction",
@@ -78,8 +78,8 @@ CONTRACT_PATHS = {
     "Locking": "src/staking/Locking.sol:Locking",
     
     # Voter and Gauge
-    "LoopVoter": "src/voting/LoopVoter.sol:LoopVoter",
-    "GaugeV3": "src/voting/GaugeV3.sol:GaugeV3",
+    "LoopVoter": "src/quotas/LoopVoter.sol:LoopVoter",
+    "GaugeV3": "src/quotas/GaugeV3.sol:GaugeV3",
     
     # Oracles
     "PendleLPOracleRate": "src/oracle/PendleLPOracleRate.sol:PendleLPOracleRate",
@@ -104,7 +104,7 @@ def format_constructor_args(args, contract_name=None):
     if not constructor_sig:
         print(f"Warning: No constructor signature found for {contract_name}, using raw arguments")
         return " ".join(str(arg) for arg in args)
-
+                
     # Use cast abi-encode to format the arguments
     try:
         command = ["cast", "abi-encode", f"constructor({constructor_sig})"] + [str(arg) for arg in args]
@@ -153,20 +153,24 @@ def verify_contract(address, artifact_name, constructor_args, chain_id, ethersca
         
         # Build command
         command = [
-            "forge", "verify-contract",
+        "forge", "verify-contract",
             address,
             contract_path,
-            "--chain-id", str(chain_id),
+        "--chain-id", str(chain_id),
             "--num-of-optimizations", str(settings['optimizer_runs']),
-            "--watch"
-        ]
-
+        "--watch"
+    ]
+    
         if formatted_args:
             command.extend(["--constructor-args", formatted_args])
 
+        # Use etherscan verifier for all chains (including XDC)
         command.extend([
             "--verifier", "etherscan",
             "--etherscan-api-key", etherscan_key,
+        ])
+        
+        command.extend([
             "--compiler-version", f"v{settings['solc_version']}"
         ])
 
@@ -218,7 +222,7 @@ def verify_all_contracts(deployment_file, chain_id, etherscan_key, settings, del
         if "core" in data:
             print("\nChecking core contracts...")
             for name, contract in data["core"].items():
-                if contract.get("address", "").lower() == specific_address:
+                if contract.get("address", "").lower() == specific_address.lower():
                     found = True
                     print(f"\nFound matching contract in core: {name}")
                     success, output = verify_contract(
@@ -239,7 +243,7 @@ def verify_all_contracts(deployment_file, chain_id, etherscan_key, settings, del
         if not found and "vaults" in data:
             print("\nChecking vault contracts...")
             for name, contract in data["vaults"].items():
-                if contract.get("address", "").lower() == specific_address:
+                if contract.get("address", "").lower() == specific_address.lower():
                     found = True
                     print(f"\nFound matching contract in vaults: {name}")
                     success, output = verify_contract(
@@ -260,7 +264,7 @@ def verify_all_contracts(deployment_file, chain_id, etherscan_key, settings, del
         if not found and "rewardManagers" in data:
             print("\nChecking reward manager contracts...")
             for address, contract in data["rewardManagers"].items():
-                if contract.get("address", "").lower() == specific_address:
+                if contract.get("address", "").lower() == specific_address.lower():
                     found = True
                     print(f"\nFound matching contract in reward managers: {contract.get('vaultName', 'RewardManager')}")
                     success, output = verify_contract(
@@ -356,7 +360,7 @@ def verify_all_contracts(deployment_file, chain_id, etherscan_key, settings, del
                 
                 print(f"Waiting {delay} seconds before next verification...")
                 time.sleep(delay)
-
+        
     print("\nVerification Summary:")
     print(f"Successfully verified: {len(verified)} contracts")
     print(f"Failed to verify: {len(failed)} contracts")
@@ -365,7 +369,7 @@ def verify_all_contracts(deployment_file, chain_id, etherscan_key, settings, del
         print("\nFailed verifications:")
         for name, info in failed.items():
             print(f"- {name} ({info['address']}): {info['error']}")
-
+    
     return verified, failed
 
 def main():
@@ -376,10 +380,10 @@ def main():
     parser.add_argument('--delay', type=int, default=5, help='Delay between verifications in seconds')
     parser.add_argument('--address', help='Specific contract address to verify')
     args = parser.parse_args()
-
+    
     # Use default settings
     settings = DEFAULT_SETTINGS
-
+    
     verify_all_contracts(args.deployment_file, args.chain_id, args.etherscan_key, settings, args.delay, args.address)
     
     return 0

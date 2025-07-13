@@ -41,6 +41,20 @@
         "minRate": 100,
         "maxRate": 10000
       }
+    },
+    "0xbba7abb9f1de1fc55c2e6b85a7197a26ce71c8b7": {
+      "contractName": "coBTC",
+      "name": "coBTC",
+      "description": "This vault allows for borrowing and lending of assets",
+      "artifactName": "CDPVault",
+      "pool": "0xa02fcc8493856b5bd7fA5099f5a631A6cb77fBd1",
+      "oracle": "0x9DCE515E2537c356aBE55981428D58449D2D7140",
+      "token": "0x918b3aa73e2D42D96CF64CBdB16838985992dAbc",
+      "tokenScale": "1000000000000000000",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 10000
+      }
     }
   }
 }

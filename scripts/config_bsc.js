@@ -127,19 +127,56 @@ module.exports = {
         //     }
         // },
 
-        CDPVault: {
-            name: "ynCoBTCk",
+        // ynCoBTCk: {
+        //     name: "ynCoBTCk",
+        //     description: "This vault allows for borrowing and lending of assets",
+        //     type: "CDPVault",
+        //     collateralType: "ERC20",
+        //     poolAddress: "LiquidityPoolBTCB",
+        //     oracle: {
+        //         type: "StaticOracle",
+        //         deploymentArguments: {
+        //         },
+        //     },
+        //     token: "0x132376b153d3cFf94615fe25712DB12CaAADf547",
+        //     tokenSymbol: "LOOP-ynCoBTCk",
+        //     tokenScale: toWad("1.0"),
+        //     protocolIcon: null,
+        //     deploymentArguments: {
+        //         constants: {
+        //             protocolFee: toWad("0.01"),
+        //         },
+        //         configs: {
+        //             debtFloor: toWad("1"),
+        //             liquidationRatio: toWad("1.1"),
+        //             liquidationPenalty: toWad("0.99"),
+        //             liquidationDiscount: toWad("0.98"),
+        //             roleAdmin: "deployer",
+        //             vaultAdmin: "deployer",
+        //             pauseAdmin: "deployer",
+        //         },
+        //         debtCeiling: toWad("100000000"),
+        //     },
+        //     quotas: {
+        //         minRate: 100,
+        //         maxRate: 10000,
+        //     },
+        //     "RewardManager": {
+        //         "artifactName": "src/pendle-rewards/RewardManager.sol:RewardManager",
+        //         "constructorArguments": [
+        //         ]
+        //     }
+        // },
+
+        coBTC: {
+            name: "coBTC",
             description: "This vault allows for borrowing and lending of assets",
             type: "CDPVault",
             collateralType: "ERC20",
             poolAddress: "LiquidityPoolBTCB",
-            oracle: {
-                type: "StaticOracle",
-                deploymentArguments: {
-                },
-            },
-            token: "0x132376b153d3cFf94615fe25712DB12CaAADf547",
-            tokenSymbol: "LOOP-ynCoBTCk",
+            oracle: "0x9DCE515E2537c356aBE55981428D58449D2D7140",
+            token: "0x918b3aa73e2D42D96CF64CBdB16838985992dAbc",
+            tokenSymbol: "LOOP-coBTC",
             tokenScale: toWad("1.0"),
             protocolIcon: null,
             deploymentArguments: {

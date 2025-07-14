@@ -50,7 +50,7 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
     }
 
     enum EligibilityModes {
-        // check on al0l rToken transfers
+        // check on all rToken transfers
         FULL,
         // only check on Claim
         LIMITED,
@@ -519,6 +519,10 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
         if (eligibilityMode != EligibilityModes.DISABLED) {
             if (!eligibleDataProvider.isEligibleForRewards(_user)) revert EligibleRequired();
             checkAndProcessEligibility(_user, true, true);
+        }
+
+        if (msg.sender != _user) {
+            revert NotAllowed();
         }
 
         _updateEmissions();

@@ -17,8 +17,6 @@ interface IMultiFeeDistribution is IFeeDistribution {
 
     function lockInfo(address user) external view returns (LockedBalance[] memory);
 
-    function autocompoundEnabled(address user) external view returns (bool);
-
     function defaultLockIndex(address _user) external view returns (uint256);
 
     function autoRelockDisabled(address user) external view returns (bool);

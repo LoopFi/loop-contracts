@@ -327,6 +327,7 @@ contract ChefIncentivesControllerTest is TestBase {
         );
 
         vm.expectRevert(ChefIncentivesController.NothingToVest.selector);
+        vm.prank(user);
         incentivesController.claim(user, vaults);
 
         vm.mockCall(
@@ -344,6 +345,7 @@ contract ChefIncentivesControllerTest is TestBase {
             abi.encodeWithSelector(IMultiFeeDistribution.vestTokens.selector, user, 1000 ether),
             abi.encode(true)
         );
+        vm.prank(user);
         incentivesController.claim(user, vaults);
     }
 

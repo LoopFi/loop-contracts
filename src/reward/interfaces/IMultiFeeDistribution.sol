@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import "./LockedBalance.sol";
 import "./IFeeDistribution.sol";
@@ -46,6 +45,8 @@ interface IMultiFeeDistribution is IFeeDistribution {
     function claimFromConverter(address) external;
 
     function vestTokens(address user, uint256 amount, bool withPenalty) external;
+
+    function getAllRewards() external;
 }
 
 interface IMFDPlus is IMultiFeeDistribution {

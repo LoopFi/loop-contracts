@@ -34,8 +34,11 @@ contract PositionActionPenpie is PositionAction {
         address poolAction_,
         address vaultRegistry_,
         address weth_,
+        address multiFeeDistribution_,
+        address loopToken_,
+        address poolHelper_,
         address penpieHelper_
-    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_, weth_) {
+    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_, weth_, multiFeeDistribution_, loopToken_, poolHelper_) {
         penpieHelper = IPendleMarketDepositHelper(penpieHelper_);
         penpieStaking = penpieHelper.pendleStaking();
     }

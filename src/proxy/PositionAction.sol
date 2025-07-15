@@ -13,6 +13,8 @@ import {SwapAction, SwapParams, SwapType} from "./SwapAction.sol";
 import {PoolAction, PoolActionParams} from "./PoolAction.sol";
 import {IVaultRegistry} from "../interfaces/IVaultRegistry.sol";
 import {IWETH} from "../reward/interfaces/IWETH.sol";
+import {IMultiFeeDistribution} from "../reward/interfaces/IMultiFeeDistribution.sol";
+import {IPoolHelper} from "../reward/interfaces/IPoolHelper.sol";
 
 import {IFlashlender, IERC3156FlashBorrower, ICreditFlashBorrower} from "../interfaces/IFlashlender.sol";
 
@@ -40,6 +42,22 @@ struct CreditParams {
     address creditor;
     // optional swap from underlying token to arbitrary token
     SwapParams auxSwap;
+}
+
+/// @notice Struct containing parameters for loop token staking
+struct LoopStakingParams {
+    // whether loop staking is enabled for this operation
+    bool enabled;
+    // amount of loop tokens to stake
+    uint256 loopAmount;
+    // amount of ETH to convert to WETH and add to the pool
+    uint256 ethAmount;
+    // lock type index for staking (determines lock period and multiplier)
+    uint256 lockTypeIndex;
+    // address to transfer loop tokens from (if different from msg.sender)
+    address tokenHolder;
+    // minimum LP amount to receive from pool joining
+    uint256 minLpAmount;
 }
 
 /// @notice General parameters relevant for both increasing and decreasing leverage
@@ -104,6 +122,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     PoolAction public immutable poolAction;
     /// @notice The WETH contract
     IWETH public immutable WETH;
+    /// @notice The MultiFeeDistribution contract for loop token staking
+    IMultiFeeDistribution public immutable multiFeeDistribution;
+    /// @notice The loop token contract
+    IERC20 public immutable loopToken;
+    /// @notice The pool helper contract for managing LP tokens
+    IPoolHelper public immutable poolHelper;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -124,12 +148,23 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     error PositionAction__onCreditFlashLoan__invalidSender();
     error PositionAction__onlyDelegatecall();
     error PositionAction__unregisteredVault();
+    error PositionAction__loopStaking_invalidAmount();
+    error PositionAction__loopStaking_insufficientLpReceived();
 
     /*//////////////////////////////////////////////////////////////
                              INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address flashlender_, address swapAction_, address poolAction_, address vaultRegistry_, address weth_) {
+    constructor(
+        address flashlender_, 
+        address swapAction_, 
+        address poolAction_, 
+        address vaultRegistry_, 
+        address weth_,
+        address multiFeeDistribution_,
+        address loopToken_,
+        address poolHelper_
+    ) {
         if (
             flashlender_ == address(0) ||
             swapAction_ == address(0) ||
@@ -145,6 +180,9 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         swapAction = SwapAction(swapAction_);
         poolAction = PoolAction(poolAction_);
         WETH = IWETH(weth_);
+        multiFeeDistribution = IMultiFeeDistribution(multiFeeDistribution_);
+        loopToken = IERC20(loopToken_);
+        poolHelper = IPoolHelper(poolHelper_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -214,8 +252,137 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     function _onDecreaseLever(LeverParams memory leverParams, uint256 subCollateral) internal virtual returns (uint256);
 
     /*//////////////////////////////////////////////////////////////
+                           LOOP STAKING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Stakes loop tokens in the MultiFeeDistribution contract
+    /// @param stakingParams The loop staking parameters
+    /// @param onBehalfOf Address to stake for
+    function _handleLoopStaking(
+        LoopStakingParams calldata stakingParams,
+        address onBehalfOf
+    ) internal {
+        if (!stakingParams.enabled) return;
+        
+        // Validate that at least one amount is provided
+        if (stakingParams.loopAmount == 0 && stakingParams.ethAmount == 0) {
+            revert PositionAction__loopStaking_invalidAmount();
+        }
+
+        // Handle ETH→WETH conversion and determine actual amounts to use
+        uint256 wethAmount = _processEthForStaking(stakingParams.ethAmount);
+        uint256 loopAmount = _processLoopTokensForStaking(stakingParams.loopAmount, stakingParams.tokenHolder);
+
+        // Join the pool with available tokens
+        uint256 lpAmount = _joinPoolForStaking(wethAmount, loopAmount);
+
+        // Validate minimum LP amount received
+        if (lpAmount < stakingParams.minLpAmount) {
+            revert PositionAction__loopStaking_insufficientLpReceived();
+        }
+
+        // Stake LP tokens in MultiFeeDistribution
+        _stakeLpTokens(lpAmount, onBehalfOf, stakingParams.lockTypeIndex);
+    }
+
+    /// @notice Processes ETH sent or transfers WETH for staking
+    /// @param requestedEthAmount The amount of ETH/WETH requested in params
+    /// @return wethAmount The actual WETH amount available for pool joining
+    function _processEthForStaking(uint256 requestedEthAmount) internal returns (uint256 wethAmount) {
+        if (msg.value > 0 && requestedEthAmount > 0) {
+            // Both ETH sent and ETH amount specified - they should match
+            if (msg.value != requestedEthAmount) {
+                revert PositionAction__loopStaking_invalidAmount();
+            }
+            WETH.deposit{value: msg.value}();
+            return msg.value;
+        } else if (msg.value > 0) {
+            // ETH sent but no ethAmount specified - use all sent ETH
+            WETH.deposit{value: msg.value}();
+            return msg.value;
+        } else if (requestedEthAmount > 0) {
+            // No ETH sent but ethAmount specified - transfer WETH from user
+            WETH.transferFrom(msg.sender, address(this), requestedEthAmount);
+            return requestedEthAmount;
+        }
+        
+        return 0; // No ETH/WETH to process
+    }
+
+    /// @notice Processes loop token transfers for staking
+    /// @param loopAmount Amount of loop tokens needed
+    /// @param tokenHolder Address to transfer tokens from
+    /// @return actualLoopAmount The amount of loop tokens available
+    function _processLoopTokensForStaking(uint256 loopAmount, address tokenHolder) internal returns (uint256 actualLoopAmount) {
+        if (loopAmount == 0) return 0;
+
+        address source = tokenHolder == address(0) ? msg.sender : tokenHolder;
+        if (source != address(this)) {
+            loopToken.safeTransferFrom(source, address(this), loopAmount);
+        }
+        
+        return loopAmount;
+    }
+
+    /// @notice Joins the pool with available WETH and loop tokens
+    /// @param wethAmount Amount of WETH available
+    /// @param loopAmount Amount of loop tokens available  
+    /// @return lpAmount Amount of LP tokens received
+    function _joinPoolForStaking(uint256 wethAmount, uint256 loopAmount) internal returns (uint256 lpAmount) {
+        if (wethAmount > 0 && loopAmount > 0) {
+            // Both WETH and loop tokens - join with both
+            WETH.approve(address(poolHelper), wethAmount);
+            loopToken.forceApprove(address(poolHelper), loopAmount);
+            return poolHelper.zapTokens(wethAmount, loopAmount);
+            
+        } else if (loopAmount > 0) {
+            // Only loop tokens - calculate required WETH and join balanced
+            uint256 requiredWeth = poolHelper.quoteFromToken(loopAmount);
+            WETH.transferFrom(msg.sender, address(this), requiredWeth);
+            
+            WETH.approve(address(poolHelper), requiredWeth);
+            loopToken.forceApprove(address(poolHelper), loopAmount);
+            return poolHelper.zapTokens(requiredWeth, loopAmount);
+            
+        } else if (wethAmount > 0) {
+            // Only WETH - join with WETH only
+            WETH.approve(address(poolHelper), wethAmount);
+            return poolHelper.zapWETH(wethAmount);
+        }
+        
+        // This should never happen due to validation in _handleLoopStaking
+        revert PositionAction__loopStaking_invalidAmount();
+    }
+
+    /// @notice Stakes LP tokens in MultiFeeDistribution
+    /// @param lpAmount Amount of LP tokens to stake
+    /// @param onBehalfOf Address to stake for
+    /// @param lockTypeIndex Lock duration index
+    function _stakeLpTokens(uint256 lpAmount, address onBehalfOf, uint256 lockTypeIndex) internal {
+        IERC20 lpToken = IERC20(poolHelper.lpTokenAddr());
+        lpToken.forceApprove(address(multiFeeDistribution), lpAmount);
+        multiFeeDistribution.stake(lpAmount, onBehalfOf, lockTypeIndex);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                              ENTRY POINTS
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Adds collateral to a CDP Vault with optional loop token staking
+    /// @param position The CDP Vault position
+    /// @param vault The CDP Vault
+    /// @param collateralParams The collateral parameters
+    /// @param loopStakingParams The loop staking parameters
+    function depositWithLoopStaking(
+        address position,
+        address vault,
+        CollateralParams calldata collateralParams,
+        LoopStakingParams calldata loopStakingParams,
+        PermitParams calldata permitParams
+    ) external onlyRegisteredVault(vault) onlyDelegatecall {
+        _deposit(vault, position, collateralParams, permitParams);
+        _handleLoopStaking(loopStakingParams, position);
+    }
 
     /// @notice Adds collateral to a CDP Vault
     /// @param position The CDP Vault position
@@ -268,6 +435,25 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         _repay(vault, position, creditParams, permitParams);
     }
 
+    /// @notice Adds collateral and debt to a CDP Vault with optional loop token staking
+    /// @param position The CDP Vault position
+    /// @param vault The CDP Vault
+    /// @param collateralParams The collateral parameters
+    /// @param creditParams The credit parameters
+    /// @param loopStakingParams The loop staking parameters
+    function depositAndBorrowWithLoopStaking(
+        address position,
+        address vault,
+        CollateralParams calldata collateralParams,
+        CreditParams calldata creditParams,
+        LoopStakingParams calldata loopStakingParams,
+        PermitParams calldata permitParams
+    ) external onlyRegisteredVault(vault) onlyDelegatecall {
+        _deposit(vault, position, collateralParams, permitParams);
+        _borrow(vault, position, creditParams);
+        _handleLoopStaking(loopStakingParams, position);
+    }
+
     /// @notice Adds collateral and debt to a CDP Vault
     /// @param position The CDP Vault position
     /// @param vault The CDP Vault
@@ -299,6 +485,12 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
     ) external onlyRegisteredVault(vault) onlyDelegatecall {
         _repay(vault, position, creditParams, permitParams);
         _withdraw(vault, position, collateralParams);
+    }
+
+    /// @notice Claims loop token rewards from MultiFeeDistribution
+    /// @param onBehalfOf Address to claim rewards for
+    function claimLoopRewards(address onBehalfOf) external onlyDelegatecall {
+        multiFeeDistribution.getAllRewards();
     }
 
     /// @notice Allows for multiple calls to be made to cover use cases not covered by the other functions

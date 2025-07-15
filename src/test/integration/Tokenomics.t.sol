@@ -18,6 +18,7 @@ import {EligibilityDataProvider} from "../../reward/EligibilityDataProvider.sol"
 import {MultiFeeDistribution} from "../../reward/MultiFeeDistribution.sol";
 import {LockedBalance, EarnedBalance} from "../../reward/interfaces/LockedBalance.sol";
 import {VaultRegistry} from "../../VaultRegistry.sol";
+import {MockChainlinkOracle} from "../MockChainlinkOracle.sol";
 
 contract MockPriceProvider is IPriceProvider {
     // Returns the latest price in ether.
@@ -183,6 +184,7 @@ contract TokenomicsTest is IntegrationTestBase {
     MockPriceProvider public priceProvider;
 
     ERC20Mock public loopToken;
+    MockChainlinkOracle public mockCollateralOracle;
 
     RadiantDeployHelper public radiantDeployHelper;
 
@@ -227,6 +229,10 @@ contract TokenomicsTest is IntegrationTestBase {
         // setup the vault registry
         vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
         createGaugeAndSetGauge(address(vault));
+
+        // Setup mock oracle for collateral token (returns 1 USD in 18 decimals)
+        mockCollateralOracle = new MockChainlinkOracle(18, 1e18);
+        vaultRegistry.setTokenOracle(address(token), mockCollateralOracle);
 
         multiFeeDistribution = MultiFeeDistribution(
             address(
@@ -475,7 +481,8 @@ contract TokenomicsTest is IntegrationTestBase {
         lockInfo = multiFeeDistribution.lockInfo(user);
         assertEq(lockInfo.length, 1);
 
-        // can be called by anyone
+        // claim must be called by the user themselves
+        vm.prank(user);
         incentivesController.claim(user, vaults);
 
         (uint256 totalVesting, uint256 unlocked, EarnedBalance[] memory earnedBalances) = multiFeeDistribution
@@ -540,7 +547,7 @@ contract TokenomicsTest is IntegrationTestBase {
         assertEq(lockInfo.length, 3);
     }
 
-    function test_rugRewards() public {
+    function test_rewardAttackScenario() public {
         _registerRewards(1_000_000 ether);
         address rugger = vm.addr(uint256(keccak256("rugger")));
 
@@ -574,6 +581,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
         for (uint i = 0; i < 20; ++i) {
             randomUser = vm.addr(uint256(keccak256(abi.encode("user", i))));
+            vm.prank(randomUser);
             incentivesController.claim(randomUser, vaults);
         }
 

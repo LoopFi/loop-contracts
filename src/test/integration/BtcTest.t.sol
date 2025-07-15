@@ -119,7 +119,10 @@ contract BtcTest is IntegrationTestBase {
             address(swapAction),
             address(poolAction),
             address(vaultRegistry),
-            address(0)
+            address(0),
+            address(0), // multiFeeDistribution
+            address(0), // loopToken
+            address(0)  // poolHelper
         );
 
         vm.label({account: address(liquidityPool), newLabel: "Liquidity Pool"});

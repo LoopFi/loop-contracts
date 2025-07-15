@@ -85,7 +85,10 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
             address(swapAction),
             address(poolAction),
             address(vaultRegistry),
-            address(mockWETH)
+            address(mockWETH),
+            address(0), // multiFeeDistribution
+            address(0), // loopToken
+            address(0)  // poolHelper
         );
 
         // pendlePoolIdArrayIn.push(stablePoolId);

@@ -74,6 +74,14 @@ contract EligibilityDataProviderTest is TestBase {
         );
     }
 
+    function _mockTotalCollateralUSD(address user, uint256 totalCollateralUSD) internal {
+        vm.mockCall(
+            mockVaultRegistry,
+            abi.encodeWithSelector(IVaultRegistry.getUserTotalCollateralUSD.selector, user),
+            abi.encode(totalCollateralUSD)
+        );
+    }
+
     function test_deploy() public {
         assertEq(address(eligibilityDataProvider.vaultRegistry()), address(mockVaultRegistry));
         assertEq(address(eligibilityDataProvider.multiFeeDistribution()), address(mockMultiFeeDistribution));
@@ -166,24 +174,24 @@ contract EligibilityDataProviderTest is TestBase {
     function test_requiredUsdValue(address user, uint128 lockedAmount) public {
         _mockBalances(user, lockedAmount);
         _mockLPPrice(WAD);
-        uint256 totalNormalDebt = uint256(lockedAmount) * 20;
-        _mockTotalNormalDebt(user, totalNormalDebt);
+        uint256 totalCollateralUSD = uint256(lockedAmount) * 20;
+        _mockTotalCollateralUSD(user, totalCollateralUSD);
 
         uint256 ratio = eligibilityDataProvider.requiredDepositRatio();
         uint256 divisor = eligibilityDataProvider.RATIO_DIVISOR();
-        uint256 required = (totalNormalDebt * ratio) / divisor;
+        uint256 required = (totalCollateralUSD * ratio) / divisor;
 
         assertEq(eligibilityDataProvider.requiredUsdValue(user), required);
     }
 
     function test_isEligibleForRewards(address user) public {
-        uint256 totalNormalDebt = 100 ether;
+        uint256 totalCollateralUSD = 100 ether;
         _mockLPPrice(WAD);
-        _mockTotalNormalDebt(user, totalNormalDebt);
+        _mockTotalCollateralUSD(user, totalCollateralUSD);
 
         uint256 ratio = eligibilityDataProvider.requiredDepositRatio();
         uint256 divisor = eligibilityDataProvider.RATIO_DIVISOR();
-        uint256 required = (totalNormalDebt * ratio) / divisor;
+        uint256 required = (totalCollateralUSD * ratio) / divisor;
 
         uint256 lockedAmount = required;
         _mockBalances(user, uint128(lockedAmount));
@@ -205,14 +213,14 @@ contract EligibilityDataProviderTest is TestBase {
     }
 
     function test_lastEligibleTime_returnsZeroIfNotEligible(address user) public {
-        _mockTotalNormalDebt(user, 100 ether);
+        _mockTotalCollateralUSD(user, 100 ether);
         _mockBalances(user, 0);
 
         assertEq(eligibilityDataProvider.lastEligibleTime(user), 0);
     }
 
     function test_lastEligibleTime_returnsTimestamp(address user) public {
-        _mockTotalNormalDebt(user, 100 ether);
+        _mockTotalCollateralUSD(user, 100 ether);
         uint256 required = eligibilityDataProvider.requiredUsdValue(user);
         _mockBalances(user, required);
 
@@ -231,7 +239,7 @@ contract EligibilityDataProviderTest is TestBase {
     }
 
     function test_lastEligibleTime_multiple_returnsTimestamp(address user) public {
-        _mockTotalNormalDebt(user, 100 ether);
+        _mockTotalCollateralUSD(user, 100 ether);
         uint256 required = eligibilityDataProvider.requiredUsdValue(user);
         _mockBalances(user, required);
 
@@ -262,8 +270,8 @@ contract EligibilityDataProviderTest is TestBase {
 
         vm.mockCall(mockPriceProvider, abi.encodeWithSelector(IPriceProvider.update.selector), abi.encode());
 
-        uint256 totalNormalDebt = 1000 ether;
-        _mockTotalNormalDebt(user, totalNormalDebt);
+        uint256 totalCollateralUSD = 1000 ether;
+        _mockTotalCollateralUSD(user, totalCollateralUSD);
         _mockBalances(user, eligibilityDataProvider.requiredUsdValue(user));
 
         bool isEligible = eligibilityDataProvider.isEligibleForRewards(user);
@@ -290,8 +298,8 @@ contract EligibilityDataProviderTest is TestBase {
 
         vm.mockCall(mockPriceProvider, abi.encodeWithSelector(IPriceProvider.update.selector), abi.encode());
 
-        uint256 totalNormalDebt = 1000 ether;
-        _mockTotalNormalDebt(user, totalNormalDebt);
+        uint256 totalCollateralUSD = 1000 ether;
+        _mockTotalCollateralUSD(user, totalCollateralUSD);
         _mockBalances(user, eligibilityDataProvider.requiredUsdValue(user));
 
         address cic = address(0x123);

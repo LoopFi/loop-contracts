@@ -292,7 +292,8 @@ contract MultiFeeDistributionTest is TestBase {
         vm.prank(sender);
         multiFeeDistribution.setAutocompound(value, slippage);
 
-        assertEq(value, multiFeeDistribution.autocompoundDisabled(sender));
+        // If value is true (enable autocompound), then autocompoundDisabled should be false
+        assertEq(!value, multiFeeDistribution.autocompoundDisabled(sender));
         assertEq(slippage, multiFeeDistribution.userSlippage(sender));
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);

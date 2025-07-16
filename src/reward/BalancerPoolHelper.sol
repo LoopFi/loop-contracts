@@ -7,16 +7,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import {IBalancerPoolHelper} from "./interfaces/IPoolHelper.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {IWeightedPoolFactory, IWeightedPool, IAsset, IVault, IBalancerQueries} from "./interfaces/balancer/IWeightedPoolFactory.sol";
 import {VaultReentrancyLib} from "./libraries/VaultReentrancyLib.sol";
 
-/// @title Balance Pool Helper Contract
-/// @author Radiant
-contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgradeable, BNum, DustRefunder {
+/// @title Balancer Pool Helper Contract
+contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgradeable, AccessControlUpgradeable, BNum, DustRefunder {
 	using SafeERC20 for IERC20;
+
+	/// @notice Role for addresses that can call zap functions
+	bytes32 public constant ZAPPER_ROLE = keccak256("ZAPPER_ROLE");
 
 	error AddressZero();
 	error PoolExists();
@@ -31,27 +34,23 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	address public lpTokenAddr;
 	address public vaultAddr;
 	bytes32 public poolId;
-	address public lockZap;
 	IWeightedPoolFactory public poolFactory;
-	uint256 public constant RDNT_WEIGHT = 800000000000000000;
+	uint256 public constant LOOP_WEIGHT = 800000000000000000;
 	uint256 public constant WETH_WEIGHT = 200000000000000000;
 	uint256 public constant INITIAL_SWAP_FEE_PERCENTAGE = 5000000000000000;
 
-	/// @notice In 80/20 pool, RDNT Weight is 4x of WETH weight
+	/// @notice In 80/20 pool, Loop Weight is 4x of WETH weight
 	uint256 public constant POOL_WEIGHT = 4;
 
 	bytes32 public constant WBTC_WETH_USDC_POOL_ID = 0x64541216bafffeec8ea535bb71fbc927831d0595000100000000000000000002;
 	bytes32 public constant DAI_USDT_USDC_POOL_ID = 0x1533a3278f3f9141d5f820a184ea4b017fce2382000000000000000000000016;
-	bytes32 public constant WETH_RDNT_POOL_ID = 0xcf7b51ce5755513d4be016b0e28d6edeffa1d52a000200000000000000000617;
 
 	address public constant BALANCER_QUERIES = 0xE39B5e3B6D74016b2F6A9673D7d7493B6DF549d5;
 
-	address public constant USDT_ADDRESS = address(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9);
-	address public constant DAI_ADDRESS = address(0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1);
-	address public constant USDC_ADDRESS = address(0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8);
-	address public constant RDNT_ADDRESS = address(0x137dDB47Ee24EaA998a535Ab00378d6BFa84F893);
+	address public immutable loopToken;
 
-	constructor() {
+	constructor(address loopToken_) {
+		loopToken = loopToken_;
 		_disableInitializers();
 	}
 
@@ -77,6 +76,12 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 		if (address(_poolFactory) == address(0)) revert AddressZero();
 
 		__Ownable_init();
+		__AccessControl_init();
+		
+		// Set up roles
+		_grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+		_grantRole(ZAPPER_ROLE, msg.sender); // Give deployer zapper role initially
+		
 		inTokenAddr = _inTokenAddr;
 		outTokenAddr = _outTokenAddr;
 		wethAddr = _wethAddr;
@@ -105,11 +110,11 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 		uint256[] memory weights = new uint256[](2);
 
 		if (token0 == outTokenAddr) {
-			weights[0] = RDNT_WEIGHT;
+			weights[0] = LOOP_WEIGHT;
 			weights[1] = WETH_WEIGHT;
 		} else {
 			weights[0] = WETH_WEIGHT;
-			weights[1] = RDNT_WEIGHT;
+			weights[1] = LOOP_WEIGHT;
 		}
 
 		lpTokenAddr = poolFactory.create(
@@ -204,35 +209,35 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	/**
 	 * @notice Calculates LP price
 	 * @dev Return value decimal is 8
-	 * @param rdntPriceInEth RDNT price in ETH
+	 * @param loopPriceInEth loop price in ETH
 	 * @return priceInEth LP price in ETH
 	 */
-	function getLpPrice(uint256 rdntPriceInEth) public view returns (uint256 priceInEth) {
+	function getLpPrice(uint256 loopPriceInEth) public view returns (uint256 priceInEth) {
 		IWeightedPool pool = IWeightedPool(lpTokenAddr);
 		(address token0, ) = _sortTokens(inTokenAddr, outTokenAddr);
-		(uint256 rdntBalance, uint256 wethBalance, ) = getReserves();
+		(uint256 loopBalance, uint256 wethBalance, ) = getReserves();
 		uint256[] memory weights = pool.getNormalizedWeights();
 
-		uint256 rdntWeight;
+		uint256 loopWeight;
 		uint256 wethWeight;
 
 		if (token0 == outTokenAddr) {
-			rdntWeight = weights[0];
+			loopWeight = weights[0];
 			wethWeight = weights[1];
 		} else {
-			rdntWeight = weights[1];
+			loopWeight = weights[1];
 			wethWeight = weights[0];
 		}
 
-		// RDNT in eth, 8 decis
-		uint256 pxA = rdntPriceInEth;
+		// loop in eth, 8 decis
+		uint256 pxA = loopPriceInEth;
 		// ETH in eth, 8 decis
 		uint256 pxB = 100000000;
 
 		(uint256 fairResA, uint256 fairResB) = _computeFairReserves(
-			rdntBalance,
+			loopBalance,
 			wethBalance,
-			rdntWeight,
+			loopWeight,
 			wethWeight,
 			pxA,
 			pxB
@@ -243,33 +248,33 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	}
 
 	/**
-	 * @notice Returns RDNT price in WETH
-	 * @return RDNT price
+	 * @notice Returns loop price in WETH
+	 * @return loop price
 	 */
 	function getPrice() public view returns (uint256) {
 		address vaultAddress = vaultAddr;
 		VaultReentrancyLib.ensureNotInVaultContext(IVault(vaultAddress));
 		(IERC20[] memory tokens, uint256[] memory balances, ) = IVault(vaultAddress).getPoolTokens(poolId);
-		uint256 rdntBalance = address(tokens[0]) == outTokenAddr ? balances[0] : balances[1];
+		uint256 loopBalance = address(tokens[0]) == outTokenAddr ? balances[0] : balances[1];
 		uint256 wethBalance = address(tokens[0]) == outTokenAddr ? balances[1] : balances[0];
 
-		return (wethBalance * 1e8) / (rdntBalance / POOL_WEIGHT);
+		return (wethBalance * 1e8) / (loopBalance / POOL_WEIGHT);
 	}
 
 	/**
 	 * @notice Returns reserve information.
-	 * @return rdnt RDNT amount
+	 * @return loop loop amount
 	 * @return weth WETH amount
 	 * @return lpTokenSupply LP token supply
 	 */
-	function getReserves() public view returns (uint256 rdnt, uint256 weth, uint256 lpTokenSupply) {
+	function getReserves() public view returns (uint256 loop, uint256 weth, uint256 lpTokenSupply) {
 		IERC20 lpToken = IERC20(lpTokenAddr);
 
 		address vaultAddress = vaultAddr;
 		VaultReentrancyLib.ensureNotInVaultContext(IVault(vaultAddress));
 		(IERC20[] memory tokens, uint256[] memory balances, ) = IVault(vaultAddress).getPoolTokens(poolId);
 
-		rdnt = address(tokens[0]) == outTokenAddr ? balances[0] : balances[1];
+		loop = address(tokens[0]) == outTokenAddr ? balances[0] : balances[1];
 		weth = address(tokens[0]) == outTokenAddr ? balances[1] : balances[0];
 
 		lpTokenSupply = lpToken.totalSupply();
@@ -278,10 +283,10 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	/**
 	 * @notice Add liquidity
 	 * @param _wethAmt WETH amount
-	 * @param _rdntAmt RDNT amount
+	 * @param _loopAmt loop amount
 	 * @return liquidity amount of LP token
 	 */
-	function _joinPool(uint256 _wethAmt, uint256 _rdntAmt) internal returns (uint256 liquidity) {
+	function _joinPool(uint256 _wethAmt, uint256 _loopAmt) internal returns (uint256 liquidity) {
 		(address token0, address token1) = _sortTokens(outTokenAddr, inTokenAddr);
 		IAsset[] memory assets = new IAsset[](2);
 		assets[0] = IAsset(token0);
@@ -290,9 +295,9 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 		uint256[] memory maxAmountsIn = new uint256[](2);
 		if (token0 == inTokenAddr) {
 			maxAmountsIn[0] = _wethAmt;
-			maxAmountsIn[1] = _rdntAmt;
+			maxAmountsIn[1] = _loopAmt;
 		} else {
-			maxAmountsIn[0] = _rdntAmt;
+			maxAmountsIn[0] = _loopAmt;
 			maxAmountsIn[1] = _wethAmt;
 		}
 
@@ -348,7 +353,7 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	 * @return liquidity token amount
 	 */
 	function zapWETH(uint256 amount) public returns (uint256 liquidity) {
-		if (msg.sender != lockZap) revert InsufficientPermission();
+		if (!hasRole(ZAPPER_ROLE, msg.sender)) revert InsufficientPermission();
 		IWETH(wethAddr).transferFrom(msg.sender, address(this), amount);
 		liquidity = _joinPool(amount, 0);
 		IERC20 lp = IERC20(lpTokenAddr);
@@ -357,17 +362,17 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	}
 
 	/**
-	 * @notice Zap WETH and RDNT
+	 * @notice Zap WETH and loop
 	 * @param _wethAmt WETH amount
-	 * @param _rdntAmt RDNT amount
+	 * @param _loopAmt loop amount
 	 * @return liquidity token amount
 	 */
-	function zapTokens(uint256 _wethAmt, uint256 _rdntAmt) public returns (uint256 liquidity) {
-		if (msg.sender != lockZap) revert InsufficientPermission();
+	function zapTokens(uint256 _wethAmt, uint256 _loopAmt) public returns (uint256 liquidity) {
+		if (!hasRole(ZAPPER_ROLE, msg.sender)) revert InsufficientPermission();
 		IWETH(wethAddr).transferFrom(msg.sender, address(this), _wethAmt);
-		IERC20(outTokenAddr).safeTransferFrom(msg.sender, address(this), _rdntAmt);
+		IERC20(outTokenAddr).safeTransferFrom(msg.sender, address(this), _loopAmt);
 
-		liquidity = _joinPool(_wethAmt, _rdntAmt);
+		liquidity = _joinPool(_wethAmt, _loopAmt);
 		IERC20 lp = IERC20(lpTokenAddr);
 		lp.safeTransfer(msg.sender, liquidity);
 
@@ -385,22 +390,40 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 
 	/**
 	 * @notice Calculate quote in WETH from token
-	 * @param tokenAmount RDNT amount
+	 * @param tokenAmount loop amount
 	 * @return optimalWETHAmount WETH amount
 	 */
 	function quoteFromToken(uint256 tokenAmount) public view returns (uint256 optimalWETHAmount) {
-		uint256 rdntPriceInEth = getPrice();
-		uint256 p1 = rdntPriceInEth * 1e10;
+		uint256 loopPriceInEth = getPrice();
+		uint256 p1 = loopPriceInEth * 1e10;
 		uint256 ethRequiredBeforeWeight = (tokenAmount * p1) / 1e18;
 		optimalWETHAmount = ethRequiredBeforeWeight / POOL_WEIGHT;
 	}
 
 	/**
-	 * @notice Set lockzap contract
+	 * @notice Grant zapper role to an address
+	 * @param zapper Address to grant the zapper role to
 	 */
-	function setLockZap(address _lockZap) external onlyOwner {
-		if (_lockZap == address(0)) revert AddressZero();
-		lockZap = _lockZap;
+	function grantZapperRole(address zapper) external onlyRole(DEFAULT_ADMIN_ROLE) {
+		if (zapper == address(0)) revert AddressZero();
+		_grantRole(ZAPPER_ROLE, zapper);
+	}
+
+	/**
+	 * @notice Revoke zapper role from an address
+	 * @param zapper Address to revoke the zapper role from
+	 */
+	function revokeZapperRole(address zapper) external onlyRole(DEFAULT_ADMIN_ROLE) {
+		_revokeRole(ZAPPER_ROLE, zapper);
+	}
+
+	/**
+	 * @notice Check if an address has the zapper role
+	 * @param account Address to check
+	 * @return bool True if the address has the zapper role
+	 */
+	function isZapper(address account) external view returns (bool) {
+		return hasRole(ZAPPER_ROLE, account);
 	}
 
 	/**
@@ -433,29 +456,29 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	}
 
 	/**
-	 * @notice Swaps WETH to RDNT
-	 * @param _wethAmount the amount of RDNT to sell
-	 * @param _minAmountOut the minimum RDNT amount to accept without reverting
+	 * @notice Swaps WETH to loop
+	 * @param _wethAmount the amount of WETH to swap
+	 * @param _minAmountOut the minimum loop amount to accept without reverting
 	 */
-	function swapWethToRdnt(uint256 _wethAmount, uint256 _minAmountOut) external returns (uint256) {
+	function swapWethToLoop(uint256 _wethAmount, uint256 _minAmountOut) external returns (uint256) {
 		if (_wethAmount == 0) revert ZeroAmount();
-		return _swap(wethAddr, RDNT_ADDRESS, _wethAmount, _minAmountOut, WETH_RDNT_POOL_ID, msg.sender);
+		return _swap(wethAddr, loopToken, _wethAmount, _minAmountOut, poolId, msg.sender);
 	}
 
 	/**
-	 * @notice Provides a quote of how much RDNT one would receive for a given amount of WETH
-	 * @param _wethAmount the amount of RDNT to sell
-	 * @return amount of RDNT to be received for the given input amount
+	 * @notice Provides a quote of how much loop one would receive for a given amount of WETH
+	 * @param _wethAmount the amount of WETH to swap
+	 * @return amount of loop to be received for the given input amount
 	 */
-	function quoteWethToRdnt(uint256 _wethAmount) external view returns (uint256) {
+	function quoteWethToLoop(uint256 _wethAmount) external view returns (uint256) {
 		if (_wethAmount == 0) revert ZeroAmount();
-		return _quote(wethAddr, RDNT_ADDRESS, _wethAmount, WETH_RDNT_POOL_ID);
+		return _quote(wethAddr, loopToken, _wethAmount, poolId);
 	}
 
 	/**
 	 * @notice Swaps tokens using the Balancer swap function
 	 * @param _inToken address of the asset to swap
-	 * @param _outToken address of the asset to receieve
+	 * @param _outToken address of the asset to receive
 	 * @param _amount the amount of asset to swap
 	 * @param _minAmountOut the minimum WETH amount to accept without reverting
 	 * @param _poolId The ID of the pool to use for swapping
@@ -491,12 +514,12 @@ contract BalancerPoolHelper is IBalancerPoolHelper, Initializable, OwnableUpgrad
 	}
 
 	/**
-	 * @notice Receive an amount of tokens that would be recieved for a specified swap
-	 * @param _inToken token to be solds
+	 * @notice Receive an amount of tokens that would be received for a specified swap
+	 * @param _inToken token to be sold
 	 * @param _outToken token to be received
 	 * @param _inAmount amount of _inToken to be sold
 	 * @param _poolId id of the pool to quote from
-	 * @return amountOut amount of _outTokens to be received for the given input amount
+	 * @return amountOut amount of _outToken to be received for the given input amount
 	 */
 	function _quote(
 		address _inToken,

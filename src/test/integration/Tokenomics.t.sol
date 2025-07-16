@@ -8,6 +8,8 @@ import {IVaultRegistry} from "../../interfaces/IVaultRegistry.sol";
 import {IMultiFeeDistribution} from "../../reward/interfaces/IMultiFeeDistribution.sol";
 import {IPriceProvider} from "../../reward/interfaces/IPriceProvider.sol";
 import {IChefIncentivesController} from "../../reward/interfaces/IChefIncentivesController.sol";
+import {BalancerPoolHelper} from "../../reward/BalancerPoolHelper.sol";
+import {IWeightedPoolFactory, IWeightedPool} from "../../reward/interfaces/balancer/IWeightedPoolFactory.sol";
 import {wdiv} from "../../utils/Math.sol";
 import {IVault as IBalancerVault, JoinKind, JoinPoolRequest} from "../../vendor/IBalancerVault.sol";
 import {IntegrationTestBase, IComposableStablePool} from "../integration/IntegrationTestBase.sol";
@@ -19,53 +21,7 @@ import {MultiFeeDistribution} from "../../reward/MultiFeeDistribution.sol";
 import {LockedBalance, EarnedBalance} from "../../reward/interfaces/LockedBalance.sol";
 import {VaultRegistry} from "../../VaultRegistry.sol";
 import {MockChainlinkOracle} from "../MockChainlinkOracle.sol";
-
-contract MockPriceProvider is IPriceProvider {
-    // Returns the latest price in ether.
-    function getTokenPrice() external pure returns (uint256) {
-        return 1e18;
-    }
-
-    // Returns the latest price in usd.
-    function getTokenPriceUsd() external pure returns (uint256) {
-        return 2400 ether;
-    }
-
-    function getLpTokenPrice() external pure returns (uint256) {
-        return 1e18;
-    }
-
-    function getLpTokenPriceUsd() external pure returns (uint256) {
-        return 2400 ether;
-    }
-
-    function getStablecoinUsd() external pure returns (uint256) {
-        return 2400 ether;
-    }
-
-    function decimals() external pure returns (uint256) {
-        return 18;
-    }
-
-    function update() external {}
-
-    function getRewardTokenPrice(address /*rewardToken*/, uint256 /*amount*/) external pure returns (uint256) {
-        return 1e18;
-    }
-
-    function baseAssetChainlinkAdapter() external view returns (address) {}
-}
-
-interface IWeightedPoolFactory {
-    function create(
-        string memory name,
-        string memory symbol,
-        address[] memory tokens,
-        uint256[] memory normalizedWeights,
-        uint256 swapFeePercentage,
-        address owner
-    ) external returns (IComposableStablePool);
-}
+import {MockPriceProvider} from "../MockPriceProvider.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -74,19 +30,19 @@ interface IWETH {
 contract RadiantDeployHelper {
     event LoopTokenDeployed(address indexed tokenAddress);
     event PriceProviderDeployed(address indexed priceProviderAddress);
-    event WeightedPoolDeployed(address indexed poolAddress);
+    event PoolHelperDeployed(address indexed poolHelperAddress);
+    event WeightedPoolInitialized(address indexed poolAddress);
 
     using SafeERC20 for ERC20;
 
     address internal constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-
-    IBalancerVault internal constant balancerVault = IBalancerVault(BALANCER_VAULT);
-    IWeightedPoolFactory internal constant weightedPoolFactory =
-        IWeightedPoolFactory(0x8E9aa87E45e92bad84D5F8DD1bff34Fb92637dE9);
+    IWeightedPoolFactory internal constant WEIGHTED_POOL_FACTORY = 
+        IWeightedPoolFactory(0x897888115Ada5773E02aA29F775430BFB5F34c51);
 
     address public loopToken;
     IWETH public weth = IWETH(address(WETH));
+    BalancerPoolHelper public poolHelper;
 
     uint256 public loopIndex = 0;
     uint256 public wethIndex = 1;
@@ -107,68 +63,58 @@ contract RadiantDeployHelper {
         emit PriceProviderDeployed(address(priceProvider_));
     }
 
-    // Assumes we have WETH and loopToken, will join the whole balance of the contract
-    function createWeightedPool() external returns (IComposableStablePool pool_) {
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        address[] memory assets = new address[](2);
-        assets[0] = address(WETH);
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 500000000000000000;
-        weights[1] = 500000000000000000;
-
-        bool loopTokenPlaced;
-        address tempAsset;
-        for (uint256 i; i < assets.length; i++) {
-            if (!loopTokenPlaced) {
-                // check if we can to insert at this position
-                if (uint160(assets[i]) > uint160(loopToken)) {
-                    loopTokenPlaced = true;
-                    tempAsset = assets[i];
-                    assets[i] = address(loopToken);
-                } else if (i == assets.length - 1) {
-                    // still not inserted, but we are at the end of the list, insert it here
-                    assets[i] = loopToken;
-                }
-            } else {
-                // token has been inserted, move every asset index up
-                address placeholder = assets[i];
-                assets[i] = tempAsset;
-                tempAsset = placeholder;
-            }
-        }
-
-        // set maxAmountIn and approve balancer vault
-        for (uint256 i; i < assets.length; i++) {
-            maxAmountsIn[i] = ERC20(assets[i]).balanceOf(address(this));
-            ERC20(assets[i]).safeApprove(address(balancerVault), maxAmountsIn[i]);
-        }
-
-        loopIndex = assets[0] == address(loopToken) ? 0 : 1;
-        wethIndex = loopIndex == 0 ? 1 : 0;
-
-        // create the pool
-        pool_ = weightedPoolFactory.create(
-            "50WETH-50LOOP",
-            "50WETH-50LOOP",
-            assets,
-            weights,
-            3e14, // swapFee (0.03%)
-            address(this) // owner
+        function deployPoolHelper() external returns (BalancerPoolHelper poolHelper_) {
+        require(loopToken != address(0), "Loop token must be deployed first");
+        
+        poolHelper_ = BalancerPoolHelper(
+            address(
+                new ERC1967Proxy(
+                    address(new BalancerPoolHelper(loopToken)),
+                    abi.encodeWithSelector(
+                        BalancerPoolHelper.initialize.selector,
+                        address(WETH),     // inTokenAddr (WETH)
+                        loopToken,         // outTokenAddr (Loop token)
+                        address(WETH),     // wethAddr
+                        BALANCER_VAULT,    // vault (Balancer Vault)
+                        WEIGHTED_POOL_FACTORY  // poolFactory
+                    )
+                )
+            )
         );
+        poolHelper = poolHelper_;
+        emit PoolHelperDeployed(address(poolHelper_));
+    }
 
-        // send liquidity to the stable pool
-        balancerVault.joinPool(
-            pool_.getPoolId(),
-            address(this),
-            address(this),
-            JoinPoolRequest({
-                assets: assets,
-                maxAmountsIn: maxAmountsIn,
-                userData: abi.encode(JoinKind.INIT, maxAmountsIn),
-                fromInternalBalance: false
-            })
-        );
-        emit WeightedPoolDeployed(address(pool_));
+    // Assumes we have WETH and loopToken, will initialize pool using BalancerPoolHelper
+    function initializePoolWithHelper() external returns (address pool_) {
+        require(address(poolHelper) != address(0), "Pool helper must be deployed first");
+        
+        uint256 wethBalance = WETH.balanceOf(address(this));
+        uint256 loopBalance = ERC20(loopToken).balanceOf(address(this));
+        
+        require(wethBalance > 0 && loopBalance > 0, "Must have both WETH and Loop tokens");
+
+        // Transfer tokens to the pool helper for initialization
+        WETH.safeTransfer(address(poolHelper), wethBalance);
+        ERC20(loopToken).safeTransfer(address(poolHelper), loopBalance);
+
+        // Initialize the pool using the pool helper (we are the owner)
+        poolHelper.initializePool("80LOOP-20WETH", "80LOOP-20WETH");
+        
+        // Get the pool address
+        pool_ = poolHelper.lpTokenAddr();
+        
+        // Set indices for compatibility with existing tests
+        // In an 80/20 pool, Loop is first (higher weight)
+        loopIndex = 0;
+        wethIndex = 1;
+        
+        emit WeightedPoolInitialized(pool_);
+    }
+
+    function grantPoolHelperZapperRole(address zapperAddress) external {
+        require(address(poolHelper) != address(0), "Pool helper must be deployed first");
+        poolHelper.grantZapperRole(zapperAddress);
     }
 
     receive() external payable {}
@@ -185,6 +131,7 @@ contract TokenomicsTest is IntegrationTestBase {
 
     ERC20Mock public loopToken;
     MockChainlinkOracle public mockCollateralOracle;
+    BalancerPoolHelper public poolHelper;
 
     RadiantDeployHelper public radiantDeployHelper;
 
@@ -221,10 +168,17 @@ contract TokenomicsTest is IntegrationTestBase {
         lockZap = vm.addr(uint256(keccak256("lockZap")));
         dao = vm.addr(uint256(keccak256("dao")));
 
+        // Deploy and initialize the pool helper
+        poolHelper = radiantDeployHelper.deployPoolHelper();
+        
+        // Provide liquidity for pool initialization
         deal(address(WETH), address(radiantDeployHelper), 5_000_000 ether);
-        govWeightedPool = radiantDeployHelper.createWeightedPool();
+        
+        // Initialize the pool using the BalancerPoolHelper
+        address poolAddress = radiantDeployHelper.initializePoolWithHelper();
+        govWeightedPool = IComposableStablePool(poolAddress);
         govWeightedPoolId = govWeightedPool.getPoolId();
-        lpToken = ERC20(address(govWeightedPool));
+        lpToken = ERC20(poolAddress);
 
         // setup the vault registry
         vault = createCDPVault(token, 100_000 ether, 10 ether, 1 ether, 1 ether, 0);
@@ -609,5 +563,49 @@ contract TokenomicsTest is IntegrationTestBase {
             assertEq(balanceAfter - balanceBefore, lockedAmount);
             vm.stopPrank();
         }
+    }
+
+    function test_poolHelperFunctionality() public {
+        // Test that the pool helper was properly initialized
+        assertEq(poolHelper.lpTokenAddr(), address(lpToken), "LP token address should match");
+        assertEq(poolHelper.inTokenAddr(), address(WETH), "Input token should be WETH");
+        assertEq(poolHelper.outTokenAddr(), address(loopToken), "Output token should be Loop token");
+
+        // Grant this test contract the zapper role to allow calling zap functions
+        // The radiantDeployHelper is the admin, so we need to call from there
+        radiantDeployHelper.grantPoolHelperZapperRole(address(this));
+
+        // Test pool deposit functionality (zapWETH)
+        uint256 wethAmount = 2 ether;
+        deal(address(WETH), address(this), wethAmount);
+        WETH.approve(address(poolHelper), wethAmount);
+
+        // Get LP token for balance tracking
+        ERC20 poolLpToken = ERC20(poolHelper.lpTokenAddr());
+        uint256 lpBalanceBefore = poolLpToken.balanceOf(address(this));
+
+        // Test zapWETH - deposit WETH into the pool to get LP tokens
+        uint256 lpReceived = poolHelper.zapWETH(wethAmount);
+        
+        uint256 lpBalanceAfter = poolLpToken.balanceOf(address(this));
+        assertTrue(lpReceived > 0, "Should receive LP tokens from WETH deposit");
+        assertEq(lpBalanceAfter - lpBalanceBefore, lpReceived, "LP balance increase should match returned amount");
+
+        // Test zapTokens - deposit both WETH and Loop tokens
+        uint256 additionalWeth = 1 ether;
+        uint256 loopAmount = 100 ether; // Provide some loop tokens
+        
+        deal(address(WETH), address(this), additionalWeth);
+        deal(address(loopToken), address(this), loopAmount);
+        
+        WETH.approve(address(poolHelper), additionalWeth);
+        loopToken.approve(address(poolHelper), loopAmount);
+
+        uint256 lpBalanceBeforeZap = poolLpToken.balanceOf(address(this));
+        uint256 lpFromBothTokens = poolHelper.zapTokens(additionalWeth, loopAmount);
+        uint256 lpBalanceAfterZap = poolLpToken.balanceOf(address(this));
+        
+        assertTrue(lpFromBothTokens > 0, "Should receive LP tokens from both token deposit");
+        assertEq(lpBalanceAfterZap - lpBalanceBeforeZap, lpFromBothTokens, "LP balance should increase correctly");
     }
 }

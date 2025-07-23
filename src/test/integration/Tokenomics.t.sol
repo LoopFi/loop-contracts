@@ -608,4 +608,175 @@ contract TokenomicsTest is IntegrationTestBase {
         assertTrue(lpFromBothTokens > 0, "Should receive LP tokens from both token deposit");
         assertEq(lpBalanceAfterZap - lpBalanceBeforeZap, lpFromBothTokens, "LP balance should increase correctly");
     }
+    
+    function test_chefIncentivesController_tracksCollateralNotDebt() public {
+        uint256 rewardAmount = 1_000_000 ether;
+        _registerRewards(rewardAmount);
+        
+        address user = vm.addr(uint256(keccak256("userCollateralTest")));
+        
+        // Create position with DIFFERENT debt and collateral amounts
+        uint256 collateralAmount = 200 ether;    // Higher collateral
+        uint256 debtAmount = 80 ether;           // Lower debt (40% LTV)
+        
+        _borrow(user, collateralAmount, debtAmount);
+        
+        // Verify vault has the expected different amounts
+        (uint256 vaultCollateral, uint256 vaultDebt, , , , ) = vault.positions(user);
+        assertEq(vaultCollateral, collateralAmount, "Vault should have expected collateral");
+        assertEq(vaultDebt, debtAmount, "Vault should have expected debt");
+        assertNotEq(vaultCollateral, vaultDebt, "Collateral and debt should be different");
+        
+        // Make user eligible for rewards (this triggers the reward tracking logic)
+        uint256 depositNeededForReward = 2.51 ether / 2;
+        _depositInPool(user, depositNeededForReward);
+        
+        vm.startPrank(user);
+        uint256 lpBalance = ERC20(address(govWeightedPool)).balanceOf(user);
+        ERC20(address(govWeightedPool)).approve(address(multiFeeDistribution), lpBalance);
+        multiFeeDistribution.stake(lpBalance, user, 0);
+        vm.stopPrank();
+        
+        // Verify user is eligible
+        bool isEligible = eligibilityDataProvider.isEligibleForRewards(user);
+        assertTrue(isEligible, "User should be eligible for rewards");
+        
+        // Get the tracked amount in ChefIncentivesController
+        (uint256 trackedAmount, , ) = incentivesController.userInfo(address(vault), user);
+        
+        assertEq(trackedAmount, vaultCollateral, "ChefIncentivesController should track collateral");
+        assertNotEq(trackedAmount, vaultDebt, "ChefIncentivesController should NOT track debt");
+        
+        // Verify pool total also reflects collateral tracking
+        (uint256 poolTotalSupply, , , ) = incentivesController.vaultInfo(address(vault));
+        assertEq(poolTotalSupply, vaultCollateral, "Pool total should reflect collateral");
+    }
+    
+    function test_chefIncentivesController_multipleUsersCollateralTracking() public {
+        // Test with multiple users having different debt/collateral ratios
+        uint256 rewardAmount = 1_000_000 ether;
+        _registerRewards(rewardAmount);
+        
+        address user1 = vm.addr(uint256(keccak256("user1CollateralTest")));
+        address user2 = vm.addr(uint256(keccak256("user2CollateralTest")));
+        address user3 = vm.addr(uint256(keccak256("user3CollateralTest")));
+        
+        // Create positions with VERY different debt/collateral ratios
+        uint256 user1Collateral = 300 ether;
+        uint256 user1Debt = 60 ether;    // 20% LTV
+        
+        uint256 user2Collateral = 150 ether;  
+        uint256 user2Debt = 120 ether;   // 80% LTV
+        
+        uint256 user3Collateral = 500 ether;
+        uint256 user3Debt = 400 ether;   // 80% LTV
+        
+        _borrow(user1, user1Collateral, user1Debt);
+        _borrow(user2, user2Collateral, user2Debt);
+        _borrow(user3, user3Collateral, user3Debt);
+        
+        // Make all users eligible for rewards
+        uint256 depositNeededForReward = 2.51 ether / 2;
+        _depositInPool(user1, depositNeededForReward);
+        _depositInPool(user2, depositNeededForReward);
+        _depositInPool(user3, depositNeededForReward);
+        
+        // Stake for all users
+        for (uint i = 0; i < 3; i++) {
+            address currentUser = i == 0 ? user1 : (i == 1 ? user2 : user3);
+            vm.startPrank(currentUser);
+            uint256 lpBalance = ERC20(address(govWeightedPool)).balanceOf(currentUser);
+            ERC20(address(govWeightedPool)).approve(address(multiFeeDistribution), lpBalance);
+            multiFeeDistribution.stake(lpBalance, currentUser, 0);
+            vm.stopPrank();
+        }
+        
+        // Verify all users are eligible
+        assertTrue(eligibilityDataProvider.isEligibleForRewards(user1), "User1 should be eligible");
+        assertTrue(eligibilityDataProvider.isEligibleForRewards(user2), "User2 should be eligible");
+        assertTrue(eligibilityDataProvider.isEligibleForRewards(user3), "User3 should be eligible");
+        
+        // Get tracked amounts for all users
+        (uint256 tracked1, , ) = incentivesController.userInfo(address(vault), user1);
+        (uint256 tracked2, , ) = incentivesController.userInfo(address(vault), user2);
+        (uint256 tracked3, , ) = incentivesController.userInfo(address(vault), user3);
+        
+        assertEq(tracked1, user1Collateral, "User1: Should track collateral");
+        assertEq(tracked2, user2Collateral, "User2: Should track collateral");
+        assertEq(tracked3, user3Collateral, "User3: Should track collateral");
+        
+        assertNotEq(tracked1, user1Debt, "User1: Should NOT track debt");
+        assertNotEq(tracked2, user2Debt, "User2: Should NOT track debt");
+        assertNotEq(tracked3, user3Debt, "User3: Should NOT track debt");
+        
+        // Verify pool total is sum of collaterals, not debts
+        (uint256 poolTotalSupply, , , ) = incentivesController.vaultInfo(address(vault));
+        uint256 expectedTotal = user1Collateral + user2Collateral + user3Collateral;
+        uint256 wrongTotal = user1Debt + user2Debt + user3Debt;
+        
+        assertEq(poolTotalSupply, expectedTotal, "Pool total should be sum of collaterals");
+        assertNotEq(poolTotalSupply, wrongTotal, "Pool total should NOT be sum of debts");
+        
+        emit log_named_uint("Expected total (collaterals)", expectedTotal);
+        emit log_named_uint("Wrong total (debts)", wrongTotal);
+        emit log_named_uint("Actual tracked total", poolTotalSupply);
+    }
+    
+    function test_chefIncentivesController_collateralTrackingAfterPositionChanges() public {
+        // Test that tracking remains correct after position modifications
+        uint256 rewardAmount = 1_000_000 ether;
+        _registerRewards(rewardAmount);
+        
+        address user = vm.addr(uint256(keccak256("userPositionChanges")));
+        
+        // Initial position
+        uint256 initialCollateral = 100 ether;
+        uint256 initialDebt = 30 ether;
+        _borrow(user, initialCollateral, initialDebt);
+        
+        // Make user eligible
+        uint256 depositNeededForReward = 2.51 ether / 2;
+        _depositInPool(user, depositNeededForReward);
+        
+        vm.startPrank(user);
+        uint256 lpBalance = ERC20(address(govWeightedPool)).balanceOf(user);
+        ERC20(address(govWeightedPool)).approve(address(multiFeeDistribution), lpBalance);
+        multiFeeDistribution.stake(lpBalance, user, 0);
+        vm.stopPrank();
+        
+        // Verify initial tracking
+        (uint256 initialTracked, , ) = incentivesController.userInfo(address(vault), user);
+        (uint256 vaultCollateral1, uint256 vaultDebt1, , , , ) = vault.positions(user);
+        assertEq(initialTracked, vaultCollateral1, "Initial: Should track collateral");
+        
+        // Modify position - add more collateral and debt
+        uint256 additionalCollateral = 50 ether;
+        uint256 additionalDebt = 40 ether;
+        
+        token.mint(user, additionalCollateral);
+        vm.startPrank(user);
+        token.approve(address(vault), additionalCollateral);
+        vault.modifyCollateralAndDebt(
+            user, user, user, 
+            int256(additionalCollateral), 
+            int256(additionalDebt)
+        );
+        vm.stopPrank();
+        
+        // Verify updated tracking after position change
+        (uint256 updatedTracked, , ) = incentivesController.userInfo(address(vault), user);
+        (uint256 vaultCollateral2, uint256 vaultDebt2, , , , ) = vault.positions(user);
+        
+        // Final position should have different collateral vs debt
+        uint256 expectedFinalCollateral = initialCollateral + additionalCollateral;
+        uint256 expectedFinalDebt = initialDebt + additionalDebt;
+        
+        assertEq(vaultCollateral2, expectedFinalCollateral, "Vault should have updated collateral");
+        assertEq(vaultDebt2, expectedFinalDebt, "Vault should have updated debt");
+        assertNotEq(vaultCollateral2, vaultDebt2, "Final collateral should differ from debt");
+        
+        // Tracking should still follow collateral, not debt
+        assertEq(updatedTracked, vaultCollateral2, "After changes: Should track collateral");
+        assertNotEq(updatedTracked, vaultDebt2, "After changes: Should NOT track debt");
+    }
 }

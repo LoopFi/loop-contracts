@@ -18,7 +18,7 @@ module.exports = {
     "WeightedPoolFactory": "0x897888115Ada5773E02aA29F775430BFB5F34c51",
     // Tokenomics contract addresses (will be populated during deployment)
     "LoopToken": "0x51Ebe928EDc7b9a937899B7bf17a76Be1f88367E",
-    "BalancerPoolHelper": "0x7e785bb5122a30f55d45B8EFa87305007DeD5BA7",  
+    "BalancerPoolHelper": null,  
     "MultiFeeDistribution": null, // Will be set during deployment
     "PriceProvider": null, // Will be set during deployment
     // Governance addresses

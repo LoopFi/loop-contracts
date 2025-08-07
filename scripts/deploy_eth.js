@@ -1489,6 +1489,16 @@ async function deployCompleteTokenomicsSystem() {
     console.log('Step 1.5: Deploying VaultRegistry...');
     const vaultRegistry = await deployVaultRegistryOnly();
 
+    console.log('Updating CONFIG_NETWORK with deployed tokenomics contract addresses...');
+    CONFIG_NETWORK.Core.LoopToken = loopToken.address;
+    CONFIG_NETWORK.Core.BalancerPoolHelper = poolHelper.address;
+    CONFIG_NETWORK.Core.VaultRegistry = vaultRegistry.address;
+    
+    console.log('Updated CONFIG_NETWORK with:');
+    console.log('- LoopToken:', loopToken.address);
+    console.log('- BalancerPoolHelper:', poolHelper.address);
+    console.log('- VaultRegistry:', vaultRegistry.address);
+
     // Step 1.6: Deploy reward contracts (now that VaultRegistry exists)
     console.log('Step 1.6: Deploying reward contracts...');
     const rewardContracts = await deployRewardContracts();

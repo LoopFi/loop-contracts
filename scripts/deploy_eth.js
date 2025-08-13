@@ -9,6 +9,7 @@ const {
   getSignerAddress,
   getDeploymentFilePath,
   storeContractDeployment,
+  cleanupDeploymentFileAddressKeys,
   deployContract,
   isContractDeployed,
   getDeployedContract,
@@ -668,17 +669,14 @@ async function deployLiquidityPool() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  let loopToken = await getDeployedContract('LoopToken');
-  if (!loopToken) {
+  let loopTokenInfo = await getDeployedContract('LoopToken');
+  if (!loopTokenInfo) {
     throw new Error('Loop Token must be deployed first');
   }
   
-  // Ensure we have a contract instance, not just deployment info
-  if (!loopToken.balanceOf) {
-    console.log('Converting loopToken address to contract instance...');
-    const loopTokenAddress = loopToken.address || loopToken;
-    loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenAddress);
-  }
+  // Convert to contract instance
+  console.log('Converting loopToken address to contract instance...');
+  const loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenInfo.address);
 
   const signer = await getSignerAddress();
   const WETH = CONFIG_NETWORK.Core.WETH;
@@ -738,6 +736,8 @@ async function deployLiquidityPool() {
       loopToken: loopToken.address
     }
   );
+  
+  console.log('✅ BalancerPoolHelper proxy stored with name: BalancerPoolHelper');
 
   // Initialize the pool if configured to do so
   const poolConfig = CONFIG_NETWORK.LiquidityPool;
@@ -820,10 +820,13 @@ async function initializePoolManually() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  const poolHelper = await getDeployedContract('BalancerPoolHelper');
-  if (!poolHelper) {
+  const poolHelperInfo = await getDeployedContract('BalancerPoolHelper');
+  if (!poolHelperInfo) {
     throw new Error('BalancerPoolHelper must be deployed first');
   }
+  
+  // Convert to contract instance
+  const poolHelper = await ethers.getContractAt('BalancerPoolHelper', poolHelperInfo.address);
 
   const poolConfig = CONFIG_NETWORK.LiquidityPool;
   
@@ -847,11 +850,14 @@ async function initializePoolManually() {
   // Get required amounts
   const wethAmount = poolConfig.initialLiquidity.wethAmount;
   const loopAmount = poolConfig.initialLiquidity.loopAmount;
-  const loopToken = await getDeployedContract('LoopToken');
+  const loopTokenInfo = await getDeployedContract('LoopToken');
   
-  if (!loopToken) {
+  if (!loopTokenInfo) {
     throw new Error('Loop Token must be deployed before manual pool initialization');
   }
+  
+  // Convert to contract instance
+  const loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenInfo.address);
   
   // Prepare tokens for pool initialization
   await prepareTokensForPoolInitialization(poolHelper, loopToken, wethAmount, loopAmount);
@@ -907,14 +913,29 @@ async function deployRewardContracts() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  let loopToken = await getDeployedContract('LoopToken');
-  let poolHelper = await getDeployedContract('BalancerPoolHelper');
-  let vaultRegistry = await getDeployedContract('VaultRegistry');
+  let loopTokenInfo = await getDeployedContract('LoopToken');
+  let poolHelperInfo = await getDeployedContract('BalancerPoolHelper');
+  let vaultRegistryInfo = await getDeployedContract('VaultRegistry');
   
   console.log('Checking deployed contracts:');
-  console.log('- LoopToken:', loopToken ? loopToken.address : 'NOT FOUND');
-  console.log('- BalancerPoolHelper:', poolHelper ? poolHelper.address : 'NOT FOUND');
-  console.log('- VaultRegistry:', vaultRegistry ? vaultRegistry.address : 'NOT FOUND');
+  console.log('- LoopToken:', loopTokenInfo ? loopTokenInfo.address : 'NOT FOUND');
+  console.log('- BalancerPoolHelper:', poolHelperInfo ? poolHelperInfo.address : 'NOT FOUND');
+  console.log('- VaultRegistry:', vaultRegistryInfo ? vaultRegistryInfo.address : 'NOT FOUND');
+  
+  // Convert deployment info to contract instances
+  let loopToken, poolHelper, vaultRegistry;
+  
+  if (loopTokenInfo) {
+    loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenInfo.address);
+  }
+  
+  if (poolHelperInfo) {
+    poolHelper = await ethers.getContractAt('BalancerPoolHelper', poolHelperInfo.address);
+  }
+  
+  if (vaultRegistryInfo) {
+    vaultRegistry = await ethers.getContractAt('VaultRegistry', vaultRegistryInfo.address);
+  }
   
   // If contracts not found via getDeployedContract, try to attach from config addresses
   if (!loopToken || !poolHelper || !vaultRegistry) {
@@ -950,6 +971,11 @@ async function deployRewardContracts() {
     console.log('- BalancerPoolHelper:', poolHelper ? poolHelper.address : 'STILL NOT FOUND');
     console.log('- VaultRegistry:', vaultRegistry ? vaultRegistry.address : 'STILL NOT FOUND');
   }
+  
+  console.log('After creating contract instances:');
+  console.log('- LoopToken:', loopToken ? loopToken.address : 'FINAL NOT FOUND');
+  console.log('- BalancerPoolHelper:', poolHelper ? poolHelper.address : 'FINAL NOT FOUND');
+  console.log('- VaultRegistry:', vaultRegistry ? vaultRegistry.address : 'FINAL NOT FOUND');
   
   if (!loopToken || !poolHelper || !vaultRegistry) {
     throw new Error('Loop Token, Pool Helper, and Vault Registry must be deployed first');
@@ -1023,6 +1049,8 @@ async function deployRewardContracts() {
       implementation: multiFeeDistributionImpl.address
     }
   );
+  
+  console.log('✅ MultiFeeDistribution proxy stored with name: MultiFeeDistribution');
 
   console.log('MultiFeeDistribution deployed at:', multiFeeDistribution.address);
 
@@ -1059,6 +1087,8 @@ async function deployRewardContracts() {
       implementation: eligibilityDataProviderImpl.address
     }
   );
+  
+  console.log('✅ EligibilityDataProvider proxy stored with name: EligibilityDataProvider');
 
   console.log('EligibilityDataProvider deployed at:', eligibilityDataProvider.address);
 
@@ -1098,6 +1128,8 @@ async function deployRewardContracts() {
       implementation: chefIncentivesControllerImpl.address
     }
   );
+  
+  console.log('✅ ChefIncentivesController proxy stored with name: ChefIncentivesController');
 
   console.log('ChefIncentivesController deployed at:', chefIncentivesController.address);
 
@@ -1238,7 +1270,10 @@ async function setupRewardPools(deployedContracts = null) {
     chefIncentivesController = deployedContracts.chefIncentivesController;
   } else {
     // Try to get from deployment files
-    chefIncentivesController = await getDeployedContract('ChefIncentivesController');
+    const chefIncentivesControllerInfo = await getDeployedContract('ChefIncentivesController');
+    if (chefIncentivesControllerInfo) {
+      chefIncentivesController = await ethers.getContractAt('ChefIncentivesController', chefIncentivesControllerInfo.address);
+    }
   }
   
   if (!chefIncentivesController) {
@@ -1322,10 +1357,16 @@ async function redeployPositionActionsOnly(deployedContracts = null) {
     vaultRegistry = deployedContracts.vaultRegistry;
   } else {
     // Try to get from deployment files
-    loopToken = await getDeployedContract('LoopToken');
-    poolHelper = await getDeployedContract('BalancerPoolHelper');
-    multiFeeDistribution = await getDeployedContract('MultiFeeDistribution');
-    vaultRegistry = await getDeployedContract('VaultRegistry');
+    const loopTokenInfo = await getDeployedContract('LoopToken');
+    const poolHelperInfo = await getDeployedContract('BalancerPoolHelper');
+    const multiFeeDistributionInfo = await getDeployedContract('MultiFeeDistribution');
+    const vaultRegistryInfo = await getDeployedContract('VaultRegistry');
+    
+    // Convert to contract instances
+    if (loopTokenInfo) loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenInfo.address);
+    if (poolHelperInfo) poolHelper = await ethers.getContractAt('BalancerPoolHelper', poolHelperInfo.address);
+    if (multiFeeDistributionInfo) multiFeeDistribution = await ethers.getContractAt('MultiFeeDistribution', multiFeeDistributionInfo.address);
+    if (vaultRegistryInfo) vaultRegistry = await ethers.getContractAt('VaultRegistry', vaultRegistryInfo.address);
   }
   
   console.log('Contract validation:');
@@ -1429,9 +1470,15 @@ async function redeployVaultRegistryAndPositionActions() {
   }
 
   // 3. Get required contracts for position actions
-  const loopToken = await getDeployedContract('LoopToken');
-  const poolHelper = await getDeployedContract('BalancerPoolHelper');
-  const multiFeeDistribution = await getDeployedContract('MultiFeeDistribution');
+  const loopTokenInfo = await getDeployedContract('LoopToken');
+  const poolHelperInfo = await getDeployedContract('BalancerPoolHelper');
+  const multiFeeDistributionInfo = await getDeployedContract('MultiFeeDistribution');
+  
+  // Convert to contract instances
+  let loopToken, poolHelper, multiFeeDistribution;
+  if (loopTokenInfo) loopToken = await ethers.getContractAt('ERC20PresetMinterPauser', loopTokenInfo.address);
+  if (poolHelperInfo) poolHelper = await ethers.getContractAt('BalancerPoolHelper', poolHelperInfo.address);
+  if (multiFeeDistributionInfo) multiFeeDistribution = await ethers.getContractAt('MultiFeeDistribution', multiFeeDistributionInfo.address);
   
   if (!loopToken || !poolHelper || !multiFeeDistribution) {
     throw new Error('Tokenomics contracts (LoopToken, BalancerPoolHelper, MultiFeeDistribution) must be deployed first');
@@ -1605,6 +1652,159 @@ function showLocalDeploymentSummary() {
   console.log('');
 }
 
+// Function to deploy mock Chainlink oracles for all vault collateral tokens
+async function deployMockOraclesForVaultTokens() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+              DEPLOYING MOCK ORACLES FOR VAULT TOKENS
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Get the VaultRegistry contract
+  let vaultRegistry;
+  const vaultRegistryInfo = await getDeployedContract('VaultRegistry');
+  
+  if (vaultRegistryInfo) {
+    vaultRegistry = await ethers.getContractAt('VaultRegistry', vaultRegistryInfo.address);
+  } else if (CONFIG_NETWORK.Core.VaultRegistry) {
+    console.log('Attaching VaultRegistry from config address...');
+    vaultRegistry = await attachContract('VaultRegistry', CONFIG_NETWORK.Core.VaultRegistry);
+  } else {
+    throw new Error('VaultRegistry not found. Please deploy it first.');
+  }
+
+  console.log('Using VaultRegistry at:', vaultRegistry.address);
+
+  // Get all registered vaults
+  const vaults = await vaultRegistry.getVaults();
+  console.log(`Found ${vaults.length} registered vaults`);
+
+  if (vaults.length === 0) {
+    console.log('No vaults registered. Nothing to do.');
+    return;
+  }
+
+  // Set to track unique token addresses
+  const uniqueTokens = new Set();
+  const tokenToVaultMap = new Map();
+
+  // Extract token addresses from all vaults
+  for (let i = 0; i < vaults.length; i++) {
+    const vaultAddress = vaults[i];
+    console.log(`\nProcessing vault ${i + 1}/${vaults.length}: ${vaultAddress}`);
+    
+    try {
+      // Get vault contract instance
+      const vault = await ethers.getContractAt('CDPVault', vaultAddress);
+      
+      // Get the collateral token address
+      const tokenAddress = await vault.token();
+      console.log(`  - Collateral token: ${tokenAddress}`);
+      
+      // Add to our tracking
+      uniqueTokens.add(tokenAddress);
+      
+      if (!tokenToVaultMap.has(tokenAddress)) {
+        tokenToVaultMap.set(tokenAddress, []);
+      }
+      tokenToVaultMap.get(tokenAddress).push(vaultAddress);
+      
+    } catch (error) {
+      console.error(`  ❌ Error processing vault ${vaultAddress}:`, error.message);
+    }
+  }
+
+  console.log(`\nFound ${uniqueTokens.size} unique collateral tokens:`);
+  uniqueTokens.forEach(token => {
+    const vaultCount = tokenToVaultMap.get(token).length;
+    console.log(`  - ${token} (used by ${vaultCount} vault${vaultCount > 1 ? 's' : ''})`);
+  });
+
+  // Deploy mock oracles for each unique token
+  const deployedOracles = new Map();
+  const signer = await getSignerAddress();
+  
+  console.log('\n🔧 Deploying mock Chainlink oracles...');
+  
+  for (const tokenAddress of uniqueTokens) {
+    console.log(`\nDeploying mock oracle for token: ${tokenAddress}`);
+    
+    try {
+      // Deploy MockChainlinkOracle with 18 decimals and price of 1e18 (1 USD)
+      const mockOracle = await deployContract(
+        'src/test/MockChainlinkOracle.sol:MockChainlinkOracle',
+        `MockChainlinkOracle_${tokenAddress.slice(-8)}`, // Use last 8 chars of address for unique name
+        false,
+        18, // decimals
+        ethers.utils.parseEther("1") // price: 1e18 (1 USD)
+      );
+      
+      deployedOracles.set(tokenAddress, mockOracle.address);
+      console.log(`  ✅ Deployed at: ${mockOracle.address}`);
+      
+    } catch (error) {
+      console.error(`  ❌ Failed to deploy oracle for ${tokenAddress}:`, error.message);
+    }
+  }
+
+  // Grant VAULT_MANAGER_ROLE to deployer if needed
+  console.log('\n🔑 Checking permissions...');
+  const VAULT_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("VAULT_MANAGER_ROLE"));
+  const hasRole = await vaultRegistry.hasRole(VAULT_MANAGER_ROLE, signer);
+  
+  if (!hasRole) {
+    console.log('Granting VAULT_MANAGER_ROLE to deployer...');
+    try {
+      await vaultRegistry.grantRole(VAULT_MANAGER_ROLE, signer);
+      console.log('✅ VAULT_MANAGER_ROLE granted');
+    } catch (error) {
+      console.error('❌ Failed to grant VAULT_MANAGER_ROLE:', error.message);
+      console.log('Please ensure the deployer has DEFAULT_ADMIN_ROLE on VaultRegistry');
+      return;
+    }
+  } else {
+    console.log('✅ Deployer already has VAULT_MANAGER_ROLE');
+  }
+
+  // Set oracles for all tokens
+  console.log('\n🔗 Setting token oracles in VaultRegistry...');
+  
+  for (const [tokenAddress, oracleAddress] of deployedOracles) {
+    console.log(`Setting oracle for token ${tokenAddress}...`);
+    
+    try {
+      await vaultRegistry.setTokenOracle(tokenAddress, oracleAddress);
+      console.log(`  ✅ Oracle set: ${tokenAddress} -> ${oracleAddress}`);
+      
+      // Verify the oracle was set correctly
+      const setOracle = await vaultRegistry.getTokenOracle(tokenAddress);
+      if (setOracle.toLowerCase() === oracleAddress.toLowerCase()) {
+        console.log(`  ✅ Verified oracle is set correctly`);
+      } else {
+        console.log(`  ⚠️  Warning: Oracle verification failed`);
+      }
+      
+    } catch (error) {
+      console.error(`  ❌ Failed to set oracle for ${tokenAddress}:`, error.message);
+    }
+  }
+
+  // Summary
+  console.log('\n📊 SUMMARY:');
+  console.log(`- Processed ${vaults.length} vaults`);
+  console.log(`- Found ${uniqueTokens.size} unique collateral tokens`);
+  console.log(`- Deployed ${deployedOracles.size} mock oracles`);
+  console.log(`- All oracles return a fixed price of 1.0 USD (1e18)`);
+  
+  console.log('\n✅ Mock oracle deployment completed!');
+  
+  return {
+    vaultRegistry: vaultRegistry.address,
+    vaultCount: vaults.length,
+    tokenCount: uniqueTokens.size,
+    deployedOracles: Object.fromEntries(deployedOracles)
+  };
+}
 // Main execution function
 ((async () => {
   try {
@@ -1616,6 +1816,9 @@ function showLocalDeploymentSummary() {
     // await impersonateDeployer();
 
     await deployCompleteTokenomicsSystem();
+
+    // Debug/Testing options:
+    await deployMockOraclesForVaultTokens(); // Deploy mock Chainlink oracles for all vault tokens
     
     // Alternative deployment options:
     // await deployLoopToken();
@@ -1633,6 +1836,8 @@ function showLocalDeploymentSummary() {
     // await deployVaults();
     // await registerVaults(CONFIG_NETWORK);
     // await deployGauge(CONFIG_NETWORK.Core.PoolV3_LpETH, CONFIG_NETWORK, false);
+    
+
     
     // Finalize and clean up if needed
     // await finalizeDeployment();

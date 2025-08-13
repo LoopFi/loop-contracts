@@ -18,8 +18,21 @@ async function getDeploymentFilePath() {
   return path.join(__dirname, '..', `deployment-${hre.network.name}.json`);
 }
 
-async function storeContractDeployment(isVault, name, address, artifactName, constructorArgs = [], rewardManagerData = null) {
+async function storeContractDeployment(isVault, name, address, artifactName, constructorArgs = [], metadata = null) {
   const deploymentFilePath = await getDeploymentFilePath();
+  
+  // CRITICAL: Validate that name is not an address (to prevent address-based storage)
+  if (typeof name === 'string' && name.match(/^0x[a-fA-F0-9]{40}$/)) {
+    console.error(`❌ CRITICAL ERROR: Attempted to store contract with address as name: ${name}`);
+    console.error(`   This is a serious deployment issue that must be fixed in the calling code!`);
+    console.error(`   Artifact: ${artifactName}, Address: ${address}`);
+    throw new Error(`Invalid contract name: ${name}. Contract names must be descriptive, not addresses!`);
+  }
+  
+  // Validate that we have a proper descriptive name
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error(`Invalid contract name: "${name}". Must be a non-empty descriptive string.`);
+  }
   
   // Initialize with all required sections when file doesn't exist or is empty
   const deployment = fs.existsSync(deploymentFilePath) ? 
@@ -30,6 +43,18 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
   deployment.core = deployment.core || {};
   deployment.vaults = deployment.vaults || {};
   deployment.rewardManagers = deployment.rewardManagers || {};
+  
+  // Clean up any existing entries that use address as key in core section
+  // This helps fix existing deployment files
+  if (!isVault && (!metadata || !metadata.vaultName)) {
+    const addressPattern = /^0x[a-fA-F0-9]{40}$/;
+    Object.keys(deployment.core).forEach(key => {
+      if (addressPattern.test(key) && deployment.core[key].address === address) {
+        console.log(`🧹 Cleaning up address-based entry: ${key} -> ${name}`);
+        delete deployment.core[key];
+      }
+    });
+  }
   
   // Properly serialize constructor arguments
   const serializedArgs = [];
@@ -62,17 +87,19 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
     address,
     artifactName,
     constructorArgs: serializedArgs,
-    addedToRegistry: false
+    addedToRegistry: false,
+    // Include any additional metadata
+    ...(metadata && typeof metadata === 'object' ? metadata : {})
   };
 
   if (isVault) {
     deployment.vaults[name] = contractData;
-  } else if (rewardManagerData) {
+  } else if (metadata && metadata.vaultName && metadata.vaultAddress) {
     // Store reward manager with reference to its vault
     deployment.rewardManagers[address] = {
       ...contractData,
-      vaultName: rewardManagerData.vaultName,
-      vaultAddress: rewardManagerData.vaultAddress
+      vaultName: metadata.vaultName,
+      vaultAddress: metadata.vaultAddress
     };
   } else {
     deployment.core[name] = contractData;
@@ -82,6 +109,87 @@ async function storeContractDeployment(isVault, name, address, artifactName, con
   
   // Verify the file was written correctly
   const verifyDeployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+  
+  // Log the storage action for debugging
+  console.log(`📝 Stored ${isVault ? 'vault' : 'contract'}: ${name} at ${address}`);
+  
+  // Additional debug logging for proxy contracts
+  if (artifactName === 'ERC1967Proxy') {
+    console.log(`   📍 Proxy stored with name: ${name} (not address: ${address})`);
+    console.log(`   🔍 Metadata:`, metadata);
+  }
+}
+
+/**
+ * Cleanup function to fix existing deployment files with address-based keys
+ * This should be called manually when needed to clean up deployment files
+ */
+async function cleanupDeploymentFileAddressKeys() {
+  const deploymentFilePath = await getDeploymentFilePath();
+  
+  if (!fs.existsSync(deploymentFilePath)) {
+    console.log('No deployment file found to clean up');
+    return;
+  }
+  
+  const deployment = JSON.parse(fs.readFileSync(deploymentFilePath));
+  const addressPattern = /^0x[a-fA-F0-9]{40}$/;
+  let cleanupCount = 0;
+  
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                    CLEANING UP DEPLOYMENT FILE
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  // Clean up core section
+  if (deployment.core) {
+    Object.keys(deployment.core).forEach(key => {
+      if (addressPattern.test(key)) {
+        const contract = deployment.core[key];
+        let newName;
+        
+        // Generate descriptive names for proxy types by looking up implementation contracts
+        if (contract.artifactName === 'ERC1967Proxy') {
+          // Try to infer the proxy type from implementation address in constructor args
+          const implementationAddress = contract.constructorArgs && contract.constructorArgs[0];
+          let inferredName = null;
+          
+          if (implementationAddress) {
+            // Look for the implementation contract in the deployment file
+            Object.keys(deployment.core).forEach(implKey => {
+              const implContract = deployment.core[implKey];
+              if (implContract.address === implementationAddress) {
+                // Found the implementation, use its name to infer proxy name
+                if (implKey.endsWith('_Impl')) {
+                  inferredName = implKey.replace('_Impl', '');
+                } else {
+                  inferredName = implKey + '_Proxy';
+                }
+              }
+            });
+          }
+          
+          // Use inferred name or fallback to generic name
+          newName = inferredName || `Proxy_${key.slice(-8)}`;
+        } else {
+          newName = contract.artifactName;
+        }
+        
+        console.log(`🧹 Moving: ${key} -> ${newName}`);
+        deployment.core[newName] = contract;
+        delete deployment.core[key];
+        cleanupCount++;
+      }
+    });
+  }
+  
+  if (cleanupCount > 0) {
+    fs.writeFileSync(deploymentFilePath, JSON.stringify(deployment, null, 2));
+    console.log(`✅ Cleaned up ${cleanupCount} address-based entries`);
+  } else {
+    console.log('✅ No cleanup needed - deployment file already uses descriptive names');
+  }
 }
 
 /**
@@ -971,6 +1079,7 @@ module.exports = {
   getSignerAddress,
   getDeploymentFilePath,
   storeContractDeployment,
+  cleanupDeploymentFileAddressKeys,
   deployContract,
   isContractDeployed,
   getDeployedContract,

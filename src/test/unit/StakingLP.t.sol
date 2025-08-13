@@ -184,7 +184,7 @@ contract StakingLPEthTest is TestBase {
         liquidityPool.approve(address(stakingLpEth), depositAmount);
         stakingLpEth.deposit(depositAmount, whitelistedUser);
         
-        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        stakingLpEth.cooldownAssets(depositAmount);
         
         // Try to unstake immediately (should work for whitelisted user)
         stakingLpEth.unstake(whitelistedUser);
@@ -206,7 +206,7 @@ contract StakingLPEthTest is TestBase {
         liquidityPool.approve(address(stakingLpEth), depositAmount);
         stakingLpEth.deposit(depositAmount, nonWhitelistedUser);
         
-        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        stakingLpEth.cooldownAssets(depositAmount);
         
         // Try to unstake immediately (should fail for non-whitelisted user)
         vm.expectRevert(StakingLPEth.InvalidCooldown.selector);
@@ -229,7 +229,7 @@ contract StakingLPEthTest is TestBase {
         liquidityPool.approve(address(stakingLpEth), depositAmount);
         stakingLpEth.deposit(depositAmount, user);
         
-        uint256 shares = stakingLpEth.cooldownAssets(depositAmount);
+        stakingLpEth.cooldownAssets(depositAmount);
         
         // Remove from whitelist
         vm.stopPrank();

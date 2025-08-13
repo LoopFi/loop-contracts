@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -87,7 +87,12 @@ contract MultiFeeDistribution is
     mapping(address => Balances) private _balances;
     mapping(address => LockedBalance[]) internal _userLocks;
     mapping(address => LockedBalance[]) private _userEarnings;
-    mapping(address => bool) public autocompoundEnabled;
+	/**
+	 * @dev The following slot `autocompoundEnabled` was deprecated in an upgrade.
+	 * Was: it allowed to know "who opted into autocompounding"
+	 * Is: Autocompounded is enabled for all users by default and it can be disabled by the user
+	 */
+	mapping(address => bool) private _deprecatedAutocompoundEnabledSlot;
     mapping(address => uint256) public lastAutocompound;
 
     /// @notice Total locked value
@@ -154,6 +159,7 @@ contract MultiFeeDistribution is
     /// @notice Stores whether a token is being destibuted to dLP lockers
     mapping(address => bool) public isRewardToken;
 
+	mapping(address => bool) public autocompoundDisabled;
     /********************** Events ***********************/
 
     event Locked(address indexed user, uint256 amount, uint256 lockedBalance, uint256 indexed lockLength, bool isLP);
@@ -178,6 +184,8 @@ contract MultiFeeDistribution is
     event RevenueEarned(address indexed asset, uint256 assetAmount);
     event OperationExpensesUpdated(address indexed _operationExpenses, uint256 _operationExpenseRatio);
     event NewTransferAdded(address indexed asset, uint256 lpUsdValue);
+	event UserAutocompoundUpdated(address indexed user, bool indexed disabled);
+	event UserSlippageUpdated(address indexed user, uint256 slippage);
 
     /********************** Errors ***********************/
     error AddressZero();
@@ -185,7 +193,6 @@ contract MultiFeeDistribution is
     error InvalidBurn();
     error InvalidRatio();
     error InvalidLookback();
-    error MintersSet();
     error InvalidLockPeriod();
     error InsufficientPermission();
     error AlreadyAdded();
@@ -407,34 +414,36 @@ contract MultiFeeDistribution is
     }
 
     /**
-     * @notice Sets option if auto compound is enabled.
-     * @param status true if auto compounding is enabled.
+	 * @notice Sets the autocompound status and the desired max slippage.
+	 * @param enable true if autocompound is to be enabled
      * @param slippage the maximum amount of slippage that the user will incur for each compounding trade
      */
-    function setAutocompound(bool status, uint256 slippage) external {
-        autocompoundEnabled[msg.sender] = status;
-        if (slippage < MAX_SLIPPAGE || slippage >= PERCENT_DIVISOR) {
-            revert InvalidAmount();
+	function setAutocompound(bool enable, uint256 slippage) external {
+		if (enable == autocompoundDisabled[msg.sender]) {
+			toggleAutocompound();
         }
-        userSlippage[msg.sender] = slippage;
+		setUserSlippage(slippage);
     }
 
     /**
      * @notice Set what slippage to use for tokens traded during the auto compound process on behalf of the user
      * @param slippage the maximum amount of slippage that the user will incur for each compounding trade
      */
-    function setUserSlippage(uint256 slippage) external {
+	function setUserSlippage(uint256 slippage) public {
         if (slippage < MAX_SLIPPAGE || slippage >= PERCENT_DIVISOR) {
             revert InvalidAmount();
         }
         userSlippage[msg.sender] = slippage;
+		emit UserSlippageUpdated(msg.sender, slippage);
     }
 
     /**
-     * @notice Toggle a users autocompound status
+	 * @notice Toggle a users autocompound status.
      */
-    function toggleAutocompound() external {
-        autocompoundEnabled[msg.sender] = !autocompoundEnabled[msg.sender];
+	function toggleAutocompound() public {
+		bool newStatus = !autocompoundDisabled[msg.sender];
+		autocompoundDisabled[msg.sender] = newStatus;
+		emit UserAutocompoundUpdated(msg.sender, newStatus);
     }
 
     /**

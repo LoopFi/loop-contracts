@@ -292,7 +292,8 @@ contract MultiFeeDistributionTest is TestBase {
         vm.prank(sender);
         multiFeeDistribution.setAutocompound(value, slippage);
 
-        assertEq(value, multiFeeDistribution.autocompoundEnabled(sender));
+        // If value is true (enable autocompound), then autocompoundDisabled should be false
+        assertEq(!value, multiFeeDistribution.autocompoundDisabled(sender));
         assertEq(slippage, multiFeeDistribution.userSlippage(sender));
 
         vm.expectRevert(MultiFeeDistribution.InvalidAmount.selector);
@@ -325,18 +326,18 @@ contract MultiFeeDistributionTest is TestBase {
     function test_toggleAutocompound(address sender) public {
         vm.prank(sender);
         multiFeeDistribution.toggleAutocompound();
-        assertTrue(multiFeeDistribution.autocompoundEnabled(sender));
+        assertTrue(multiFeeDistribution.autocompoundDisabled(sender));
 
         vm.prank(sender);
         multiFeeDistribution.toggleAutocompound();
-        assertFalse(multiFeeDistribution.autocompoundEnabled(sender));
+        assertFalse(multiFeeDistribution.autocompoundDisabled(sender));
     }
 
     function test_setRelock(address sender, bool status) public {
         vm.prank(sender);
         multiFeeDistribution.setRelock(status);
         assertEq(status, !multiFeeDistribution.autoRelockDisabled(sender));
-    }
+    }   
 
     function test_setLookback(uint256 lookback) public {
         uint256 duration = multiFeeDistribution.rewardsDuration();

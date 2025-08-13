@@ -16,6 +16,7 @@ import {IChefIncentivesController} from "../../reward/interfaces/IChefIncentives
 import {IEligibilityDataProvider} from "../../reward/interfaces/IEligibilityDataProvider.sol";
 import {EligibilityDataProvider} from "../../reward/EligibilityDataProvider.sol";
 import {ChefIncentivesController} from "../../reward/ChefIncentivesController.sol";
+import {ICDPVault} from "../../interfaces/ICDPVault.sol";
 
 contract ChefIncentivesControllerTest is TestBase {
     ChefIncentivesController public incentivesController;
@@ -23,12 +24,14 @@ contract ChefIncentivesControllerTest is TestBase {
 
     address public mockEligibilityDataProvider;
     address public mockMultiFeeDistribution;
+    address public user;
 
     uint256 public rewardsPerSecond = 0.01 ether;
     uint256 public endingTimeCadence = 2 days;
 
     function setUp() public virtual override {
         super.setUp();
+        user = vm.addr(uint256(keccak256("testUser")));
         loopToken = new ERC20Mock();
         mockEligibilityDataProvider = vm.addr(uint256(keccak256("mockEligibilityDataProvider")));
         mockMultiFeeDistribution = vm.addr(uint256(keccak256("mockMultiFeeDistribution")));
@@ -54,6 +57,7 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.label(mockMultiFeeDistribution, "mockMultiFeeDistribution");
         vm.label(address(incentivesController), "incentivesController");
         vm.label(address(loopToken), "loopToken");
+        vm.label(user, "testUser");
     }
 
     function _excludeContracts(address contract_) internal view {
@@ -327,6 +331,7 @@ contract ChefIncentivesControllerTest is TestBase {
         );
 
         vm.expectRevert(ChefIncentivesController.NothingToVest.selector);
+        vm.prank(user);
         incentivesController.claim(user, vaults);
 
         vm.mockCall(
@@ -344,6 +349,7 @@ contract ChefIncentivesControllerTest is TestBase {
             abi.encodeWithSelector(IMultiFeeDistribution.vestTokens.selector, user, 1000 ether),
             abi.encode(true)
         );
+        vm.prank(user);
         incentivesController.claim(user, vaults);
     }
 
@@ -590,5 +596,173 @@ contract ChefIncentivesControllerTest is TestBase {
         vm.prank(address(0x1));
         vm.expectRevert("Ownable: caller is not the owner");
         incentivesController.unpause();
+    }
+
+    function test_updateRegisteredBalance_tracksCollateralNotDebt() public {
+        // Create a mock vault that returns different debt vs collateral
+        address mockVault = address(0x999);
+        uint256 userCollateral = 1000 ether;  // Different from debt
+        uint256 userDebt = 500 ether;         // Different from collateral
+        uint256 allocPoint = 100;
+        
+        // Mock the vault to return specific collateral and debt values
+        vm.mockCall(
+            mockVault,
+            abi.encodeWithSignature("positions(address)", user),
+            abi.encode(userCollateral, userDebt, 0, 0, 0, 0)
+        );
+        
+        // Add the vault to the system
+        incentivesController.addPool(mockVault, allocPoint);
+        
+        // Mock eligibility provider responses to trigger _updateRegisteredBalance
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
+            abi.encode(false) // User was NOT eligible before
+        );
+        
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
+            abi.encode(true) // User IS eligible now
+        );
+        
+        // This should trigger _updateRegisteredBalance via the eligibility path
+        vm.prank(mockVault);
+        incentivesController.handleActionAfter(user, userCollateral, userCollateral);
+        
+        // Verify that the tracked amount is COLLATERAL (1000), not DEBT (500)
+        (uint256 trackedAmount, , ) = incentivesController.userInfo(mockVault, user);
+        
+        // CRITICAL: This should be collateral (1000), not debt (500)
+        assertEq(trackedAmount, userCollateral, "Should track collateral, not debt");
+        assertNotEq(trackedAmount, userDebt, "Should NOT track debt");
+        
+        // Also verify via pool info
+        (uint256 totalSupply, , , ) = incentivesController.vaultInfo(mockVault);
+        assertEq(totalSupply, userCollateral, "Pool total should reflect collateral");
+    }
+    
+    function test_updateRegisteredBalance_multipleUsers() public {
+        // Test with multiple users having different debt/collateral ratios
+        address mockVault = address(0x888);
+        address user1 = address(0x1001);
+        address user2 = address(0x1002);
+        
+        uint256 user1Collateral = 2000 ether;
+        uint256 user1Debt = 800 ether;  // 40% LTV
+        
+        uint256 user2Collateral = 1500 ether; 
+        uint256 user2Debt = 1200 ether; // 80% LTV
+        
+        // Mock vault responses for both users
+        vm.mockCall(
+            mockVault,
+            abi.encodeWithSignature("positions(address)", user1),
+            abi.encode(user1Collateral, user1Debt, 0, 0, 0, 0)
+        );
+        
+        vm.mockCall(
+            mockVault,
+            abi.encodeWithSignature("positions(address)", user2),
+            abi.encode(user2Collateral, user2Debt, 0, 0, 0, 0)
+        );
+        
+        incentivesController.addPool(mockVault, 100);
+        
+        // Setup eligibility for both users
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user1),
+            abi.encode(false)
+        );
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user1),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user2),
+            abi.encode(false)
+        );
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user2),
+            abi.encode(true)
+        );
+        
+        // Process both users
+        vm.prank(mockVault);
+        incentivesController.handleActionAfter(user1, user1Collateral, user1Collateral);
+        
+        vm.prank(mockVault);
+        incentivesController.handleActionAfter(user2, user2Collateral, user2Collateral);
+        
+        // Verify individual tracking
+        (uint256 tracked1, , ) = incentivesController.userInfo(mockVault, user1);
+        (uint256 tracked2, , ) = incentivesController.userInfo(mockVault, user2);
+        
+        assertEq(tracked1, user1Collateral, "User1 should track collateral");
+        assertEq(tracked2, user2Collateral, "User2 should track collateral");
+        
+        // Verify total pool reflects collateral sum, not debt sum
+        (uint256 totalSupply, , , ) = incentivesController.vaultInfo(mockVault);
+        uint256 expectedTotal = user1Collateral + user2Collateral;
+        uint256 wrongTotal = user1Debt + user2Debt; // What it would be if tracking debt
+        
+        assertEq(totalSupply, expectedTotal, "Total should be sum of collaterals");
+        assertNotEq(totalSupply, wrongTotal, "Total should NOT be sum of debts");
+    }
+
+    function test_handleActionAfter_withRealVaultInteraction() public {
+        // Test that simulates the bug scenario more realistically
+        address mockVault = address(0x777);
+        uint256 collateralAmount = 1000 ether;
+        uint256 debtAmount = 300 ether;
+        
+        // Mock vault.positions() to return different collateral vs debt
+        vm.mockCall(
+            mockVault,
+            abi.encodeWithSignature("positions(address)", user),
+            abi.encode(collateralAmount, debtAmount, 0, 0, 0, 0)
+        );
+        
+        incentivesController.addPool(mockVault, 100);
+        
+        // User starts ineligible, becomes eligible (triggers _updateRegisteredBalance)
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
+            abi.encode(false)
+        );
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(EligibilityDataProvider.refresh.selector, user),
+            abi.encode(true)
+        );
+        
+        // Initially call handleActionAfter with some amount
+        vm.prank(mockVault);
+        incentivesController.handleActionAfter(user, 500 ether, 1000 ether);
+        
+        // Now call again - this should trigger _updateRegisteredBalance path
+        // because isCurrentlyEligible=true but lastEligibleStatus was false
+        vm.mockCall(
+            mockEligibilityDataProvider,
+            abi.encodeWithSelector(IEligibilityDataProvider.lastEligibleStatus.selector, user),
+            abi.encode(true) // Now they were eligible before
+        );
+        
+        vm.prank(mockVault);
+        incentivesController.handleActionAfter(user, 800 ether, 1500 ether);
+        
+        // The key test: internal tracking should match vault's collateral, not debt
+        (uint256 registeredAmount, , ) = incentivesController.userInfo(mockVault, user);
+        
+        // This is the critical assertion that would have caught the bug
+        assertEq(registeredAmount, collateralAmount, "Must track vault collateral amount");
+        assertNotEq(registeredAmount, debtAmount, "Must NOT track vault debt amount");
     }
 }

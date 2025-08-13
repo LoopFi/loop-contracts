@@ -25,8 +25,20 @@ contract PositionAction20 is PositionAction {
         address swapAction_,
         address poolAction_,
         address vaultRegistry_,
-        address weth_
-    ) PositionAction(flashlender_, swapAction_, poolAction_, vaultRegistry_, weth_) {}
+        address weth_,
+        address multiFeeDistribution_,
+        address loopToken_,
+        address poolHelper_
+    ) PositionAction(
+        flashlender_,
+        swapAction_,
+        poolAction_,
+        vaultRegistry_,
+        weth_,
+        multiFeeDistribution_,
+        loopToken_,
+        poolHelper_
+    ) {}
 
     /*//////////////////////////////////////////////////////////////
                          VIRTUAL IMPLEMENTATION

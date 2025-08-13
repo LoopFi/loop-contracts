@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -50,7 +50,7 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
     }
 
     enum EligibilityModes {
-        // check on al0l rToken transfers
+        // check on all rToken transfers
         FULL,
         // only check on Claim
         LIMITED,
@@ -521,6 +521,10 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
             checkAndProcessEligibility(_user, true, true);
         }
 
+        if (msg.sender != _user) {
+            revert NotAllowed();
+        }
+
         _updateEmissions();
 
         uint256 currentTimestamp = block.timestamp;
@@ -690,7 +694,7 @@ contract ChefIncentivesController is Initializable, PausableUpgradeable, Ownable
     function _updateRegisteredBalance(address _user) internal {
         uint256 length = poolLength();
         for (uint256 i; i < length; ) {
-            (, uint256 newBal, , , , ) = ICDPVault(registeredTokens[i]).positions(_user);
+            (uint256 newBal, , , , , ) = ICDPVault(registeredTokens[i]).positions(_user);
             uint256 registeredBal = userInfo[registeredTokens[i]][_user].amount;
             if (newBal != 0 && newBal != registeredBal) {
                 _handleActionAfterForToken(

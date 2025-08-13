@@ -13,6 +13,18 @@ module.exports = {
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     "PenpieHelper": "0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4",
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+    // Balancer infrastructure for tokenomics
+    "BalancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "WeightedPoolFactory": "0x897888115Ada5773E02aA29F775430BFB5F34c51",
+    // Tokenomics contract addresses (will be populated during deployment)
+    "LoopToken": "0x51Ebe928EDc7b9a937899B7bf17a76Be1f88367E",
+    "BalancerPoolHelper": null,  
+    "MultiFeeDistribution": null, // Will be set during deployment
+    "PriceProvider": null, // Will be set during deployment
+    // Governance addresses
+    "LockZap": "deployer", // Will use deployer address ( also all actions will be added )
+    "DAO": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", // Dao Treasury
+    "Treasury": "0xE5e0898121C0F978f2fde415c1579CeDD04FEB95", // Using existing treasury
     "PoolV3_LpUSD": "0x0eecBDbF7331B8a50FCd0Bf2C267Bf47BD876054",
     "PoolV3_LpETH": "0xa684EAf215ad323452e2B2bF6F817d4aa5C116ab",
     "FlashlenderLPEth": "0x6670CC1d4DEbe29eC12F1dA6D66a2A487431B3D5",
@@ -170,6 +182,36 @@ module.exports = {
     },
   },
  
-  "Tokenomics":{
+  "Tokenomics": {
+    "LoopToken": {
+      "name": "Loop Token",
+      "symbol": "LOOP", 
+      "totalSupply": toWad("1000000000") // 1 billion tokens
+    }
+  },
+  "Rewards": {
+    "rewardsDuration": 30 * 24 * 60 * 60, // 30 days
+    "rewardsLookback": 5 * 24 * 60 * 60,  // 5 days
+    "lockDuration": 30 * 24 * 60 * 60,     // 30 days
+    "burnRatio": 50000,                    // 50%
+    "vestDuration": 30 * 24 * 60 * 60,     // 30 days
+    "rewardsPerSecond": toWad("0.01"),     // 0.01 tokens per second
+    "endingTimeCadence": 2 * 24 * 60 * 60, // 2 days
+    "lockDurations": [
+      30 * 24 * 60 * 60,  // 30 days
+      90 * 24 * 60 * 60,  // 90 days  
+      180 * 24 * 60 * 60, // 180 days
+      365 * 24 * 60 * 60  // 365 days
+    ],
+    "rewardMultipliers": [1, 4, 10, 25] // Multipliers for each lock duration
+  },
+  "LiquidityPool": {
+    "initializeOnDeploy": true,
+    "poolName": "80LOOP-20WETH",
+    "poolSymbol": "80LOOP-20WETH",
+    "initialLiquidity": {
+      "wethAmount": toWad("1000"),   // 1000 WETH
+      "loopAmount": toWad("100000")  // 100,000 LOOP tokens (80/20 ratio)
+    }
   }
 };

@@ -36,4 +36,5 @@ number_underscore = "preserve"
 [profile.default.rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
 scroll = "${SCROLL_RPC_URL}"
+xdc = "${XDC_RPC_URL}"
 tenderly = "${TENDERLY_FORK_URL}"

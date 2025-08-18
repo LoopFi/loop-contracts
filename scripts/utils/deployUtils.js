@@ -427,6 +427,24 @@ async function loadDeployedRewardManagers() {
  * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
  */
 async function deployPoolCore(config, poolType, poolKey, customPositionActions) {
+  return await deployPoolCoreSelective(config, poolType, poolKey, customPositionActions, {});
+}
+
+/**
+ * Deploys core contracts with selective deployment options
+ * @param {Object} config - The network configuration object
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {string} poolKey - The key of the pool in config.Core (e.g., 'PoolV3_LpUSD')
+ * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
+ * @param {Object} [options] - Deployment options
+ * @param {boolean} [options.skipStaking] - Skip staking contract deployment
+ * @param {boolean} [options.skipLocking] - Skip locking contract deployment
+ * @param {boolean} [options.skipTreasury] - Skip treasury deployment
+ * @param {boolean} [options.skipVaultRegistry] - Skip vault registry deployment
+ * @param {boolean} [options.skipActions] - Skip actions deployment
+ * @param {Object} [options.existingContracts] - Existing contract addresses to use instead of deploying
+ */
+async function deployPoolCoreSelective(config, poolType, poolKey, customPositionActions, options = {}) {
   const signer = await getSignerAddress();
   
   if (hre.network.name == 'tenderly') {
@@ -442,21 +460,89 @@ async function deployPoolCore(config, poolType, poolKey, customPositionActions) 
   const pool = await attachContract('PoolV3', config.Core[poolKey]);
   console.log(`Using pool ${poolKey} at address: ${pool.address}`);
 
-  const { stakingLp, lockLp } = await deployStakingAndLockingLP(pool, poolType);
+  let stakingLp, lockLp;
+  
+  // Deploy or attach staking and locking contracts
+  if (options.skipStaking && options.skipLocking) {
+    console.log('Skipping staking and locking contract deployment');
+    // Use existing contracts if provided
+    if (options.existingContracts?.stakingLp) {
+      stakingLp = await attachContract('StakingLPEth', options.existingContracts.stakingLp);
+      console.log(`Using existing staking contract at: ${stakingLp.address}`);
+    }
+    if (options.existingContracts?.lockLp) {
+      lockLp = await attachContract('Locking', options.existingContracts.lockLp);
+      console.log(`Using existing locking contract at: ${lockLp.address}`);
+    }
+  } else {
+    const deployed = await deployStakingAndLockingLP(pool, poolType);
+    stakingLp = deployed.stakingLp;
+    lockLp = deployed.lockLp;
+  }
+  
   console.log('staking lp property name', `stakingLp${poolType.toUpperCase()}`);
   
-  const treasuryReplaceParams = {
-    'deployer': signer,
-    [`stakingLp${poolType.toUpperCase()}`]: stakingLp.address
-  };
+  let treasury;
+  if (options.skipTreasury) {
+    console.log('Skipping treasury deployment');
+    if (options.existingContracts?.treasury) {
+      treasury = await attachContract('Treasury', options.existingContracts.treasury);
+      console.log(`Using existing treasury at: ${treasury.address}`);
+    }
+  } else {
+    // Use pool-specific treasury config if available, otherwise fall back to default
+    const treasuryConfigKey = `Treasury_${poolType}`;
+    const treasuryConfig = config.Core[treasuryConfigKey] || config.Core.Treasury;
+    
+    if (!treasuryConfig) {
+      throw new Error(`No treasury configuration found for pool type "${poolType}". Expected "${treasuryConfigKey}" or "Treasury" in config.Core`);
+    }
+    
+    const treasuryReplaceParams = {
+      'deployer': signer,
+      [`stakingLp${poolType.toUpperCase()}`]: stakingLp?.address || options.existingContracts?.stakingLp || ethers.constants.AddressZero,
+      'stakingLpToken': stakingLp?.address || options.existingContracts?.stakingLp || ethers.constants.AddressZero
+    };
 
-  const { payees, shares, admin } = replaceParams(config.Core.Treasury.constructorArguments, treasuryReplaceParams);
-  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
-  
-  await pool.setTreasury(treasury.address);
+    const { payees, shares, admin } = replaceParams(treasuryConfig.constructorArguments, treasuryReplaceParams);
+    treasury = await deployContract('Treasury', `Treasury_${poolType}`, false, payees, shares, admin);
+    
+    await pool.setTreasury(treasury.address);
+    console.log(`Treasury deployed and set in pool`);
+  }
 
-  const vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
-  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, poolType, config, customPositionActions);
+  let vaultRegistry;
+  if (options.skipVaultRegistry) {
+    console.log('Skipping vault registry deployment');
+    if (options.existingContracts?.vaultRegistry) {
+      vaultRegistry = await attachContract('VaultRegistry', options.existingContracts.vaultRegistry);
+      console.log(`Using existing vault registry at: ${vaultRegistry.address}`);
+    } else if (config.Core.VaultRegistry) {
+      vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
+      console.log(`Using vault registry from config at: ${vaultRegistry.address}`);
+    }
+  } else {
+    // Deploy new vault registry
+    vaultRegistry = await deployContract('VaultRegistry', `VaultRegistry_${poolType}`, false);
+    console.log(`VaultRegistry deployed at: ${vaultRegistry.address}`);
+  }
+
+  let flashlender, proxyRegistry;
+  if (options.skipActions) {
+    console.log('Skipping actions deployment');
+    if (options.existingContracts?.flashlender) {
+      flashlender = await attachContract('Flashlender', options.existingContracts.flashlender);
+      console.log(`Using existing flashlender at: ${flashlender.address}`);
+    }
+    if (options.existingContracts?.proxyRegistry) {
+      proxyRegistry = await attachContract('PRBProxyRegistry', options.existingContracts.proxyRegistry);
+      console.log(`Using existing proxy registry at: ${proxyRegistry.address}`);
+    }
+  } else {
+    const deployed = await deployActions(pool, vaultRegistry, poolType, config, customPositionActions);
+    flashlender = deployed.flashlender;
+    proxyRegistry = deployed.proxyRegistry;
+  }
 
   return {
     stakingLp,
@@ -986,6 +1072,7 @@ module.exports = {
   getPoolAddress,
   loadDeployedRewardManagers,
   deployPoolCore,
+  deployPoolCoreSelective,
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,

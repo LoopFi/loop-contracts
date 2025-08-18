@@ -23,6 +23,7 @@ const {
   getVaultMetadata,
   getPoolAddress,
   deployPoolCore,
+  deployPoolCoreSelective,
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,
@@ -237,6 +238,63 @@ async function deployCore() {
   return deployedCore;
 }
 
+async function deployUSDCePoolCore() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                    DEPLOYING USDC.e POOL CORE
+//////////////////////////////////////////////////////////////*/
+  `);
+
+  // Load existing contract addresses from deployment file
+  const deploymentFilePath = await getDeploymentFilePath();
+  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+  
+  const existingStakingAddress = deployment.core?.['StakingLPUSDCE']?.address;
+  const existingLockingAddress = deployment.core?.['LockingLpUSDCE']?.address;
+  
+  if (!existingStakingAddress || !existingLockingAddress) {
+    console.error('ERROR: Could not find existing staking or locking contracts for USDC.e');
+    console.log('Available contracts:', Object.keys(deployment.core || {}));
+    return null;
+  }
+  
+  console.log(`Using existing StakingLPUSDCE at: ${existingStakingAddress}`);
+  console.log(`Using existing LockingLpUSDCE at: ${existingLockingAddress}`);
+
+  // Custom position actions list excluding PositionActionPenpie (not available on XDC)
+  const customPositionActions = [
+    'PositionAction20',
+    'PositionAction4626',
+    'PositionActionPendle',
+    'PositionActionTranchess'
+    // Skip PositionActionPenpie - not available on XDC
+  ];
+
+  // Deploy core contracts for USDC.e pool with selective deployment
+  // Skip staking and locking (already deployed), but deploy treasury, vault registry, flashlender, and actions
+  const deployedCore = await deployPoolCoreSelective(
+    CONFIG_NETWORK, 
+    'usdce', // pool type
+    'PoolV3_lpUSDCe', // pool key from config
+    customPositionActions, // custom position actions excluding Penpie
+    {
+      skipStaking: true,
+      skipLocking: true,
+      skipTreasury: false, // Deploy treasury
+      skipVaultRegistry: false, // Deploy vault registry
+      skipActions: false, // Deploy flashlender, proxy registry, and position actions
+      existingContracts: {
+        // Use existing staking and locking contracts from deployment file
+        stakingLp: existingStakingAddress,
+        lockLp: existingLockingAddress
+      }
+    }
+  );
+  
+  console.log('USDC.e Pool Core deployment completed');
+  return deployedCore;
+}
+
 async function deployVaults() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
@@ -262,6 +320,64 @@ async function deployVaults() {
           ...Object.values(oracleConfig)
         );
         return deployedOracle.address;
+      },
+      'Oracle_scrvUSD': async (key, config) => {
+        // Deploy AggregatorV3CurveScrvUSD oracle for scrvUSD
+        const oracleConfig = config.oracle.deploymentArguments;
+        console.log(`Deploying AggregatorV3CurveScrvUSD oracle for ${key}`);
+        
+        // Deploy the AggregatorV3CurveScrvUSD contract
+        const curveOracle = await deployContract(
+          'AggregatorV3CurveScrvUSD',
+          `AggregatorV3CurveScrvUSD_${key}`,
+          false,
+          oracleConfig.curvePool,  // _pool
+          oracleConfig.k,          // _k
+          true,                    // _invert
+          oracleConfig.scrvUSDRateXDC // _scrvUSDOracle
+        );
+        
+        console.log(`AggregatorV3CurveScrvUSD deployed at: ${curveOracle.address}`);
+        
+        // Deploy ChainlinkOracle implementation
+        const chainlinkOracleImpl = await deployContract(
+          'ChainlinkOracle',
+          `ChainlinkOracle_Impl_${key}`,
+          false
+        );
+        
+        console.log(`ChainlinkOracle implementation deployed at: ${chainlinkOracleImpl.address}`);
+        
+        // Deploy ERC1967Proxy for ChainlinkOracle
+        const signer = await getSignerAddress();
+        const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+        
+        // Create initialization data for the proxy
+        const initData = chainlinkOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+        
+        // Deploy the proxy
+        const proxy = await ERC1967Proxy.deploy(
+          chainlinkOracleImpl.address,
+          initData
+        );
+        await proxy.deployed();
+        
+        const chainlinkOracle = await ethers.getContractAt('ChainlinkOracle', proxy.address);
+        
+        console.log(`ChainlinkOracle proxy deployed at: ${chainlinkOracle.address}`);
+        
+        // Set up the oracle mapping
+        const tokens = [config.token]; // scrvUSD token address
+        const oracles = [{
+          aggregator: curveOracle.address,
+          stalePeriod: 1, // 1 second stale period (very fresh)
+          aggregatorScale: ethers.utils.parseEther('1') // 1e18 scale
+        }];
+        
+        await chainlinkOracle.setOracles(tokens, oracles);
+        console.log(`Oracle configured for token ${config.token}`);
+        
+        return chainlinkOracle.address;
       }
     }, CONFIG_NETWORK);
     
@@ -414,6 +530,42 @@ async function performTransactions() {
   console.log('Pool unlocked');
 }
 
+async function storeVaultMetadataForGauge() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                     STORING VAULT METADATA
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  // Load deployed vaults to get their addresses
+  const deployedVaults = await loadDeployedVaults();
+  
+  for (const [vaultName, vault] of Object.entries(deployedVaults)) {
+    // Find corresponding vault config
+    const vaultKey = vaultName.replace('CDPVault_', '');
+    const vaultConfig = CONFIG_NETWORK.Vaults[vaultKey];
+    
+    if (!vaultConfig) {
+      console.log(`No config found for vault ${vaultName}, skipping metadata storage`);
+      continue;
+    }
+    
+    // Store metadata including pool address and quotas
+    const metadata = {
+      pool: CONFIG_NETWORK.Core.PoolV3_lpUSDCe, // Pool address this vault is associated with
+      quotas: vaultConfig.quotas, // Min and max rates from config
+      tokenSymbol: vaultConfig.tokenSymbol,
+      token: vaultConfig.token
+    };
+    
+    await storeVaultMetadata(vault.address, metadata);
+    console.log(`Stored metadata for vault ${vaultName} at ${vault.address}`);
+    console.log(`  Pool: ${metadata.pool}`);
+    console.log(`  Min Rate: ${metadata.quotas.minRate}`);
+    console.log(`  Max Rate: ${metadata.quotas.maxRate}`);
+  }
+}
+
 async function main() {
   try {
     // Initialize deployment with account impersonation
@@ -422,10 +574,24 @@ async function main() {
     // Deploy pools (XDC and USDC)
     // await deployPool();
 
-    await performTransactions();
+    // await performTransactions();
     
-    // Deploy core contracts
-    // const deployedCore = await deployCore();
+    // Deploy USDC.e pool core contracts (treasury, vault registry, flashlender, actions)
+    const deployedUSDCeCore = await deployUSDCePoolCore();
+    
+    // Deploy vaults
+    await deployVaults();
+    
+    // Store vault metadata (needed for gauge configuration)
+    await storeVaultMetadataForGauge();
+    
+    // Register vaults in the vault registry (use the one we just deployed)
+    const tempConfig = { ...CONFIG_NETWORK };
+    tempConfig.Core.VaultRegistry = deployedUSDCeCore.vaultRegistry.address;
+    await registerVaults(tempConfig);
+    
+    // Configure gauge (set min/max rates for vaults)
+    await deployGauge(CONFIG_NETWORK.Core.PoolV3_lpUSDCe, CONFIG_NETWORK, true);
     
     // // Finalize deployment
     // await finalizeDeployment();

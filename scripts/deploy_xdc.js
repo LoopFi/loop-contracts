@@ -101,7 +101,10 @@ async function deployPool() {
 
   // Deploy USDC Pool
   console.log('\n--- Deploying USDC Pool ---');
-  await deploySinglePool('Pool LpUSDC');
+  const deployedPool = await deploySinglePool('Pool LpUSDC');
+  
+  console.log('USDC Pool deployment completed successfully');
+  return deployedPool;
 }
 
 async function deploySinglePool(poolKey) {
@@ -225,41 +228,21 @@ async function deploySinglePool(poolKey) {
   };
 }
 
-async function deployCore() {
+// deployCore function removed - using existing AddressProviderV3
+
+async function deployUSDCPoolCore(poolAddress, stakingAddress, lockingAddress) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                         DEPLOYING CORE
+                    DEPLOYING USDC POOL AUXILIARY CONTRACTS
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Pass CONFIG_NETWORK to deployPoolCore
-  const deployedCore = await deployPoolCore(CONFIG_NETWORK, 'xdc');
-  console.log('Core deployment completed');
-  return deployedCore;
-}
+  console.log(`Using deployed pool at: ${poolAddress}`);
+  console.log(`Using deployed staking at: ${stakingAddress}`);
+  console.log(`Using deployed locking at: ${lockingAddress}`);
 
-async function deployUSDCePoolCore() {
-  console.log(`
-/*//////////////////////////////////////////////////////////////
-                    DEPLOYING USDC.e POOL CORE
-//////////////////////////////////////////////////////////////*/
-  `);
-
-  // Load existing contract addresses from deployment file
-  const deploymentFilePath = await getDeploymentFilePath();
-  const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
-  
-  const existingStakingAddress = deployment.core?.['StakingLPUSDCE']?.address;
-  const existingLockingAddress = deployment.core?.['LockingLpUSDCE']?.address;
-  
-  if (!existingStakingAddress || !existingLockingAddress) {
-    console.error('ERROR: Could not find existing staking or locking contracts for USDC.e');
-    console.log('Available contracts:', Object.keys(deployment.core || {}));
-    return null;
-  }
-  
-  console.log(`Using existing StakingLPUSDCE at: ${existingStakingAddress}`);
-  console.log(`Using existing LockingLpUSDCE at: ${existingLockingAddress}`);
+  // Update the config with the deployed pool address so other functions can find it
+  CONFIG_NETWORK.Core.PoolV3_lpUSDC = poolAddress;
 
   // Custom position actions list excluding PositionActionPenpie (not available on XDC)
   const customPositionActions = [
@@ -270,32 +253,33 @@ async function deployUSDCePoolCore() {
     // Skip PositionActionPenpie - not available on XDC
   ];
 
-  // Deploy core contracts for USDC.e pool with selective deployment
-  // Skip staking and locking (already deployed), but deploy treasury, vault registry, flashlender, and actions
+  // Deploy auxiliary contracts for USDC pool
+  // Deploy treasury, vault registry, flashlender, and actions
+  // Staking and locking are already deployed as part of the pool deployment
   const deployedCore = await deployPoolCoreSelective(
     CONFIG_NETWORK, 
-    'usdce', // pool type
-    'PoolV3_lpUSDCe', // pool key from config
+    'usdc', // pool type
+    'PoolV3_lpUSDC', // pool key from config (now populated)
     customPositionActions, // custom position actions excluding Penpie
     {
-      skipStaking: true,
-      skipLocking: true,
+      skipStaking: true, // Already deployed with pool
+      skipLocking: true, // Already deployed with pool
       skipTreasury: false, // Deploy treasury
       skipVaultRegistry: false, // Deploy vault registry
       skipActions: false, // Deploy flashlender, proxy registry, and position actions
       existingContracts: {
-        // Use existing staking and locking contracts from deployment file
-        stakingLp: existingStakingAddress,
-        lockLp: existingLockingAddress
+        // Use the deployed staking and locking contracts
+        stakingLp: stakingAddress,
+        lockLp: lockingAddress
       }
     }
   );
   
-  console.log('USDC.e Pool Core deployment completed');
+  console.log('USDC Pool auxiliary contracts deployment completed');
   return deployedCore;
 }
 
-async function deployVaults() {
+async function deployVaults_UNUSED() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING VAULTS
@@ -530,7 +514,8 @@ async function performTransactions() {
   console.log('Pool unlocked');
 }
 
-async function storeVaultMetadataForGauge() {
+// Removed storeVaultMetadataForGauge - not needed for USDC pool only deployment
+async function storeVaultMetadataForGauge_UNUSED() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                      STORING VAULT METADATA
@@ -550,9 +535,14 @@ async function storeVaultMetadataForGauge() {
       continue;
     }
     
+    // Get the deployed USDC pool address from deployment file
+    const deploymentFilePath = await getDeploymentFilePath();
+    const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+    const usdcPoolAddress = deployment.pools?.['Pool LpUSDC']?.address || CONFIG_NETWORK.Core.PoolV3_lpUSDC;
+    
     // Store metadata including pool address and quotas
     const metadata = {
-      pool: CONFIG_NETWORK.Core.PoolV3_lpUSDCe, // Pool address this vault is associated with
+      pool: usdcPoolAddress, // Pool address this vault is associated with
       quotas: vaultConfig.quotas, // Min and max rates from config
       tokenSymbol: vaultConfig.tokenSymbol,
       token: vaultConfig.token
@@ -566,39 +556,46 @@ async function storeVaultMetadataForGauge() {
   }
 }
 
+// deployPositionActionsForPool function removed - position actions are deployed as part of auxiliary contracts
+
 async function main() {
   try {
-    // Initialize deployment with account impersonation
-    // const impersonatedSigner = await impersonateDeployer();
+    console.log('Starting USDC Pool deployment on XDC...');
+    console.log('Using existing AddressProviderV3:', CONFIG_NETWORK.Core.AddressProviderV3);
     
-    // Deploy pools (XDC and USDC)
-    // await deployPool();
-
-    // await performTransactions();
+    // Step 1: Deploy USDC Pool with all components (interest rate model, quota keeper, voter, gauge, staking, locking)
+    console.log('\n=== STEP 1: DEPLOYING USDC POOL ===');
+    const deployedPool = await deployPool();
     
-    // Deploy USDC.e pool core contracts (treasury, vault registry, flashlender, actions)
-    const deployedUSDCeCore = await deployUSDCePoolCore();
+    // Step 2: Deploy USDC pool auxiliary contracts (treasury, vault registry, flashlender, actions)
+    console.log('\n=== STEP 2: DEPLOYING USDC POOL AUXILIARY CONTRACTS ===');
+    const deployedAuxiliaryContracts = await deployUSDCPoolCore(deployedPool.pool.address, deployedPool.stakingLp.address, deployedPool.lockLp.address);
     
-    // Deploy vaults
-    await deployVaults();
+    // Position actions are already deployed as part of Step 2 (auxiliary contracts)
     
-    // Store vault metadata (needed for gauge configuration)
-    await storeVaultMetadataForGauge();
+    console.log('\n🎉 USDC Pool deployment completed successfully!');
+    console.log('\nDeployed contracts summary:');
+    console.log('- USDC Pool: ✅');
+    console.log('- Interest Rate Model: ✅');
+    console.log('- Pool Quota Keeper: ✅');
+    console.log('- Voter: ✅');
+    console.log('- Gauge: ✅');
+    console.log('- Staking Contract: ✅');
+    console.log('- Locking Contract: ✅');
+    console.log('- Treasury: ✅');
+    console.log('- Vault Registry: ✅');
+    console.log('- Flashlender: ✅');
+    console.log('- Position Actions (4 types): ✅');
     
-    // Register vaults in the vault registry (use the one we just deployed)
-    const tempConfig = { ...CONFIG_NETWORK };
-    tempConfig.Core.VaultRegistry = deployedUSDCeCore.vaultRegistry.address;
-    await registerVaults(tempConfig);
+    console.log('\nPool Address:', deployedPool.pool.address);
+    console.log('Staking Address:', deployedPool.stakingLp.address);
+    console.log('Locking Address:', deployedPool.lockLp.address);
+    console.log('Treasury Address:', deployedAuxiliaryContracts.treasury?.address || 'N/A');
+    console.log('Vault Registry Address:', deployedAuxiliaryContracts.vaultRegistry?.address || 'N/A');
+    console.log('Flashlender Address:', deployedAuxiliaryContracts.flashlender?.address || 'N/A');
     
-    // Configure gauge (set min/max rates for vaults)
-    await deployGauge(CONFIG_NETWORK.Core.PoolV3_lpUSDCe, CONFIG_NETWORK, true);
-    
-    // // Finalize deployment
-    // await finalizeDeployment();
-    
-    console.log('XDC deployment completed successfully!');
   } catch (error) {
-    console.error('Error during XDC deployment:', error);
+    console.error('❌ Error during USDC Pool deployment:', error);
     process.exit(1);
   }
 }

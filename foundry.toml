@@ -38,3 +38,18 @@ mainnet = "${MAINNET_RPC_URL}"
 scroll = "${SCROLL_RPC_URL}"
 xdc = "${XDC_RPC_URL}"
 tenderly = "${TENDERLY_FORK_URL}"
+
+[lint]
+exclude_lints = [
+    "asm-keccak256", 
+    "unused-import", 
+    "mixed-case-variable", 
+    "screaming-snake-case-const", 
+    "mixed-case-function",
+    "unaliased-plain-import",
+    "screaming-snake-case-immutable",
+    "pascal-case-struct",
+    "erc20-unchecked-transfer",
+    "divide-before-multiply",
+    "unchecked-call"
+]

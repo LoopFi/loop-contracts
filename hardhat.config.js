@@ -91,5 +91,9 @@ module.exports = {
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
       chainId: 51,
     },
+    bitlayer: {
+      url: process.env.BITLAYER_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY]
+    }
   }
 };

@@ -25,7 +25,7 @@ module.exports = {
     "PoolV3_lpWBTC": "", // To be filled after WBTC pool deployment
     "FlashlenderLPWBTC": "", // To be filled after deployment
     "VaultRegistry": "", // To be filled after deployment
-    "ProxyRegistry": "", // To be filled after deployment
+    "ProxyRegistry": "", // To be filled after deployment (PRBProxyRegistry)
     "PoolQuotaKeeperV3": "", // To be filled after deployment
     "GaugeV3": "", // To be filled after deployment
     "Actions": {
@@ -91,17 +91,21 @@ module.exports = {
       type: "CDPVault",
       collateralType: "ERC20",
       oracle: {
-        type: "Oracle_BLBTC",
+        type: "PushOracle",
         deploymentArguments: {
-          // Oracle configuration for BLBTC 
+          // PushOracle configuration for BLBTC
+          "admin": "deployer", // Deployer as admin
+          "manager": "deployer" // Deployer as manager for now
+        },
+        oracleConfig: {
           "token": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014", // BLBTC address
           "stalePeriod": 3600, // 1 hour stale period
           "twapWindow": 1800, // 30 minutes TWAP window
           "twapEnabled": true
-        },
+        }
       },
       token: "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014", // BLBTC collateral token
-      poolAddress: "", // Will be filled with WBTC pool address after deployment
+      poolAddress: "PoolV3_lpWBTC", // Reference to deployed WBTC pool
       tokenSymbol: "LOOP-BLBTC",
       tokenScale: toWad("1.0"),
       protocolIcon: null,

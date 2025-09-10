@@ -175,7 +175,7 @@ async function deploySinglePool(poolKey) {
   const pool = await deployContract(
     'PoolV3',
     `PoolV3_${poolConfig.symbol}`,
-    true,
+    false, // isVault = false for pools
     poolConfig.wrappedToken, // weth_ (using WBTC for gas payments)
     CONFIG_NETWORK.Core.AddressProviderV3, // addressProvider_
     poolConfig.underlier, // underlyingToken_
@@ -189,6 +189,9 @@ async function deploySinglePool(poolKey) {
 
   // Store the pool address in the config for future reference
   CONFIG_NETWORK.Pools[poolKey].poolAddress = pool.address;
+  
+  // Store the pool address in Core config for vault deployment
+  CONFIG_NETWORK.Core.PoolV3_lpWBTC = pool.address;
 
   // Deploy and set up the pool quota keeper
   const poolQuotaKeeper = await deployContract(
@@ -203,6 +206,9 @@ async function deploySinglePool(poolKey) {
   // Set the pool quota keeper in the pool
   await pool.setPoolQuotaKeeper(poolQuotaKeeper.address);
   console.log(`Pool quota keeper set in ${poolConfig.symbol} pool`);
+  
+  // Store PoolQuotaKeeperV3 address in config for gauge deployment
+  CONFIG_NETWORK.Core.PoolQuotaKeeperV3 = poolQuotaKeeper.address;
 
   // Get current block timestamp
   const blockNumber = await ethers.provider.getBlockNumber();
@@ -240,6 +246,9 @@ async function deploySinglePool(poolKey) {
   // Set the gauge in the pool quota keeper
   await poolQuotaKeeper.setGauge(gauge.address);
   console.log(`Gauge set in ${poolConfig.symbol} pool quota keeper`);
+  
+  // Store GaugeV3 address in config for gauge deployment
+  CONFIG_NETWORK.Core.GaugeV3 = gauge.address;
 
   // Deploy staking and locking contracts
   const { stakingLp, lockLp } = await deployStakingAndLockingLP(
@@ -285,11 +294,13 @@ async function deployWBTCPoolCore(poolAddress, stakingAddress, lockingAddress) {
   // Update the config with the deployed pool address so other functions can find it
   CONFIG_NETWORK.Core.PoolV3_lpWBTC = poolAddress;
 
-  // Custom position actions list excluding unavailable actions on Bitlayer
+  // Custom position actions list for Bitlayer
   const customPositionActions = [
     'PositionAction20',
-    'PositionAction4626'
-    // Skip other position actions that may not be available on Bitlayer
+    'PositionAction4626',
+    'PositionActionPendle',
+    'PositionActionTranchess'
+    // Skip PositionActionPenpie - not available on Bitlayer
   ];
 
   // Deploy auxiliary contracts for WBTC pool
@@ -314,6 +325,12 @@ async function deployWBTCPoolCore(poolAddress, stakingAddress, lockingAddress) {
     }
   );
   
+  // Store ProxyRegistry address in config for vault deployment
+  if (deployedCore.proxyRegistry) {
+    CONFIG_NETWORK.Core.ProxyRegistry = deployedCore.proxyRegistry.address;
+    console.log('ProxyRegistry address stored in config:', deployedCore.proxyRegistry.address);
+  }
+  
   console.log('WBTC Pool auxiliary contracts deployment completed');
   return deployedCore;
 }
@@ -325,8 +342,122 @@ async function deployVaults() {
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Deploy vaults using the config
-  await deployPools(CONFIG_NETWORK, 'bitlayer');
+  const signer = await getSignerAddress();
+  const prbProxyRegistry = await attachContract('PRBProxyRegistry', CONFIG_NETWORK.Core.ProxyRegistry);
+  
+  for (const [key, config] of Object.entries(CONFIG_NETWORK.Vaults)) {
+    const vaultName = `CDPVault_${key}`;
+    console.log('Deploying vault:', vaultName);
+
+    // Deploy oracle using the common function with PushOracle support
+    const oracleAddress = await deployVaultOracle(key, config, {
+      'PushOracle': async (key, config) => {
+        // Deploy PushOracle for BLBTC
+        const oracleConfig = config.oracle.deploymentArguments;
+        console.log(`Deploying PushOracle for ${key}`);
+        
+        // Deploy PushOracle implementation
+        const pushOracleImpl = await deployContract(
+          'PushOracle',
+          `PushOracle_Impl_${key}`,
+          false
+        );
+        
+        console.log(`PushOracle implementation deployed at: ${pushOracleImpl.address}`);
+        
+        // Deploy ERC1967Proxy for upgradeable PushOracle
+        const initData = pushOracleImpl.interface.encodeFunctionData('initialize', [
+          oracleConfig.admin === 'deployer' ? signer : oracleConfig.admin,
+          oracleConfig.manager === 'deployer' ? signer : oracleConfig.manager
+        ]);
+        
+        const pushOracleProxy = await deployContract(
+          'ERC1967Proxy',
+          `PushOracle_${key}`,
+          false,
+          pushOracleImpl.address,
+          initData
+        );
+        
+        console.log(`PushOracle proxy deployed at: ${pushOracleProxy.address}`);
+        
+        // Attach to the proxy with PushOracle interface
+        const pushOracle = await ethers.getContractAt('PushOracle', pushOracleProxy.address);
+        
+        // Configure the oracle for BLBTC token
+        const oracleTokenConfig = config.oracle.oracleConfig;
+        await pushOracle.setOracleConfigs(
+          [oracleTokenConfig.token],
+          [{
+            stalePeriod: oracleTokenConfig.stalePeriod,
+            twapWindow: oracleTokenConfig.twapWindow,
+            twapEnabled: oracleTokenConfig.twapEnabled
+          }]
+        );
+        
+        console.log(`PushOracle configured for token: ${oracleTokenConfig.token}`);
+        
+        // Grant PRICE_UPDATER_ROLE to deployer
+        const PRICE_UPDATER_ROLE = await pushOracle.PRICE_UPDATER_ROLE();
+        await pushOracle.grantRole(PRICE_UPDATER_ROLE, signer);
+        console.log(`Granted PRICE_UPDATER_ROLE to deployer: ${signer}`);
+        
+        return pushOracleProxy.address;
+      }
+    });
+
+    if (!oracleAddress) {
+      console.log(`Failed to deploy oracle for ${key}, skipping vault deployment`);
+      continue;
+    }
+
+    // Resolve pool address from config reference
+    let poolAddress;
+    if (config.poolAddress.startsWith('Pool')) {
+      // It's a reference to a pool config key, resolve it
+      poolAddress = CONFIG_NETWORK.Core[config.poolAddress];
+    } else {
+      poolAddress = config.poolAddress;
+    }
+
+    if (!poolAddress) {
+      console.log(`Pool address not found for vault ${key}, skipping deployment`);
+      continue;
+    }
+
+    const tokenAddress = config.token;
+    const tokenScale = config.tokenScale;
+
+    console.log(`Deploying ${vaultName} with:`);
+    console.log(`  Pool: ${poolAddress}`);
+    console.log(`  Oracle: ${oracleAddress}`);
+    console.log(`  Token: ${tokenAddress}`);
+
+    // Deploy CDPVault
+    const cdpVault = await deployContract(
+      'CDPVault',
+      vaultName,
+      true, // isVault = true
+      [
+        poolAddress,
+        oracleAddress,
+        tokenAddress,
+        tokenScale
+      ],
+      [
+        ...Object.values(config.deploymentArguments.configs).map((v) => v === "deployer" ? signer : v)
+      ]
+    );
+
+    console.log('CDPVault deployed for', vaultName, 'at', cdpVault.address);
+
+    console.log('Set debtCeiling to', fromWad(config.deploymentArguments.debtCeiling), 'for', vaultName);
+    const pool = await attachContract('PoolV3', poolAddress);
+    await pool.setCreditManagerDebtLimit(cdpVault.address, config.deploymentArguments.debtCeiling);
+    
+    console.log('------------------------------------');
+  }
+  
   console.log('Vaults deployment completed');
 }
 
@@ -346,9 +477,11 @@ async function storeVaultMetadataForGauge() {
     console.log(`Processing vault: ${vaultName}`);
     
     // Get vault config from CONFIG_NETWORK
-    const vaultConfig = CONFIG_NETWORK.Vaults[vaultName];
+    // Strip "CDPVault_" prefix to match config key
+    const configKey = vaultName.replace('CDPVault_', '');
+    const vaultConfig = CONFIG_NETWORK.Vaults[configKey];
     if (!vaultConfig) {
-      console.log(`No config found for vault ${vaultName}, skipping metadata storage`);
+      console.log(`No config found for vault ${vaultName} (config key: ${configKey}), skipping metadata storage`);
       continue;
     }
     
@@ -408,23 +541,23 @@ async function main() {
     console.log('\n=== STEP 3: DEPLOYING WBTC POOL AUXILIARY CONTRACTS ===');
     const deployedAuxiliaryContracts = await deployWBTCPoolCore(deployedPool.pool.address, deployedPool.stakingLp.address, deployedPool.lockLp.address);
     
-    // // Step 4: Deploy vaults
-    // console.log('\n=== STEP 4: DEPLOYING VAULTS ===');
-    // await deployVaults();
+    // Step 4: Deploy vaults
+    console.log('\n=== STEP 4: DEPLOYING VAULTS ===');
+    await deployVaults();
     
-    // // Step 5: Store vault metadata (needed for gauge configuration)
-    // console.log('\n=== STEP 5: STORING VAULT METADATA ===');
-    // await storeVaultMetadataForGauge();
+    // Step 5: Store vault metadata (needed for gauge configuration)
+    console.log('\n=== STEP 5: STORING VAULT METADATA ===');
+    await storeVaultMetadataForGauge();
     
-    // // Step 6: Register vaults in the vault registry
-    // console.log('\n=== STEP 6: REGISTERING VAULTS ===');
-    // const tempConfig = { ...CONFIG_NETWORK };
-    // tempConfig.Core.VaultRegistry = deployedAuxiliaryContracts.vaultRegistry.address;
-    // await registerVaults(tempConfig);
+    // Step 6: Register vaults in the vault registry
+    console.log('\n=== STEP 6: REGISTERING VAULTS ===');
+    const tempConfig = { ...CONFIG_NETWORK };
+    tempConfig.Core.VaultRegistry = deployedAuxiliaryContracts.vaultRegistry.address;
+    await registerVaults(tempConfig);
     
     // Step 7: Configure gauge (set min/max rates for vaults)
-    // console.log('\n=== STEP 7: CONFIGURING GAUGE ===');
-    // await deployGauge(deployedPool.pool.address, CONFIG_NETWORK, true);
+    console.log('\n=== STEP 7: CONFIGURING GAUGE ===');
+    await deployGauge(deployedPool.pool.address, CONFIG_NETWORK, true);
     
     console.log('\n🎉 Bitlayer deployment completed successfully!');
     console.log('\nDeployed contracts summary:');
@@ -441,7 +574,7 @@ async function main() {
     console.log('- Treasury: ✅');
     console.log('- Vault Registry: ✅');
     console.log('- Flashlender: ✅');
-    console.log('- Position Actions (2 types): ✅');
+    console.log('- Position Actions (4 types): ✅');
     console.log('- BLBTC Vault: ✅');
     console.log('- Gauge Configuration: ✅');
     

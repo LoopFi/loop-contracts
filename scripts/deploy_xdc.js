@@ -23,6 +23,7 @@ const {
   getVaultMetadata,
   getPoolAddress,
   deployPoolCore,
+  deployPoolCoreSelective,
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,
@@ -100,7 +101,10 @@ async function deployPool() {
 
   // Deploy USDC Pool
   console.log('\n--- Deploying USDC Pool ---');
-  await deploySinglePool('Pool LpUSDC');
+  const deployedPool = await deploySinglePool('Pool LpUSDC');
+  
+  console.log('USDC Pool deployment completed successfully');
+  return deployedPool;
 }
 
 async function deploySinglePool(poolKey) {
@@ -224,20 +228,58 @@ async function deploySinglePool(poolKey) {
   };
 }
 
-async function deployCore() {
+// deployCore function removed - using existing AddressProviderV3
+
+async function deployUSDCPoolCore(poolAddress, stakingAddress, lockingAddress) {
   console.log(`
 /*//////////////////////////////////////////////////////////////
-                         DEPLOYING CORE
+                    DEPLOYING USDC POOL AUXILIARY CONTRACTS
 //////////////////////////////////////////////////////////////*/
   `);
 
-  // Pass CONFIG_NETWORK to deployPoolCore
-  const deployedCore = await deployPoolCore(CONFIG_NETWORK, 'xdc');
-  console.log('Core deployment completed');
+  console.log(`Using deployed pool at: ${poolAddress}`);
+  console.log(`Using deployed staking at: ${stakingAddress}`);
+  console.log(`Using deployed locking at: ${lockingAddress}`);
+
+  // Update the config with the deployed pool address so other functions can find it
+  CONFIG_NETWORK.Core.PoolV3_lpUSDC = poolAddress;
+
+  // Custom position actions list excluding PositionActionPenpie (not available on XDC)
+  const customPositionActions = [
+    'PositionAction20',
+    'PositionAction4626',
+    'PositionActionPendle',
+    'PositionActionTranchess'
+    // Skip PositionActionPenpie - not available on XDC
+  ];
+
+  // Deploy auxiliary contracts for USDC pool
+  // Deploy treasury, vault registry, flashlender, and actions
+  // Staking and locking are already deployed as part of the pool deployment
+  const deployedCore = await deployPoolCoreSelective(
+    CONFIG_NETWORK, 
+    'usdc', // pool type
+    'PoolV3_lpUSDC', // pool key from config (now populated)
+    customPositionActions, // custom position actions excluding Penpie
+    {
+      skipStaking: true, // Already deployed with pool
+      skipLocking: true, // Already deployed with pool
+      skipTreasury: false, // Deploy treasury
+      skipVaultRegistry: false, // Deploy vault registry
+      skipActions: false, // Deploy flashlender, proxy registry, and position actions
+      existingContracts: {
+        // Use the deployed staking and locking contracts
+        stakingLp: stakingAddress,
+        lockLp: lockingAddress
+      }
+    }
+  );
+  
+  console.log('USDC Pool auxiliary contracts deployment completed');
   return deployedCore;
 }
 
-async function deployVaults() {
+async function deployVaults_UNUSED() {
   console.log(`
 /*//////////////////////////////////////////////////////////////
                         DEPLOYING VAULTS
@@ -262,6 +304,64 @@ async function deployVaults() {
           ...Object.values(oracleConfig)
         );
         return deployedOracle.address;
+      },
+      'Oracle_scrvUSD': async (key, config) => {
+        // Deploy AggregatorV3CurveScrvUSD oracle for scrvUSD
+        const oracleConfig = config.oracle.deploymentArguments;
+        console.log(`Deploying AggregatorV3CurveScrvUSD oracle for ${key}`);
+        
+        // Deploy the AggregatorV3CurveScrvUSD contract
+        const curveOracle = await deployContract(
+          'AggregatorV3CurveScrvUSD',
+          `AggregatorV3CurveScrvUSD_${key}`,
+          false,
+          oracleConfig.curvePool,  // _pool
+          oracleConfig.k,          // _k
+          true,                    // _invert
+          oracleConfig.scrvUSDRateXDC // _scrvUSDOracle
+        );
+        
+        console.log(`AggregatorV3CurveScrvUSD deployed at: ${curveOracle.address}`);
+        
+        // Deploy ChainlinkOracle implementation
+        const chainlinkOracleImpl = await deployContract(
+          'ChainlinkOracle',
+          `ChainlinkOracle_Impl_${key}`,
+          false
+        );
+        
+        console.log(`ChainlinkOracle implementation deployed at: ${chainlinkOracleImpl.address}`);
+        
+        // Deploy ERC1967Proxy for ChainlinkOracle
+        const signer = await getSignerAddress();
+        const ERC1967Proxy = await ethers.getContractFactory('ERC1967Proxy');
+        
+        // Create initialization data for the proxy
+        const initData = chainlinkOracleImpl.interface.encodeFunctionData('initialize', [signer, signer]);
+        
+        // Deploy the proxy
+        const proxy = await ERC1967Proxy.deploy(
+          chainlinkOracleImpl.address,
+          initData
+        );
+        await proxy.deployed();
+        
+        const chainlinkOracle = await ethers.getContractAt('ChainlinkOracle', proxy.address);
+        
+        console.log(`ChainlinkOracle proxy deployed at: ${chainlinkOracle.address}`);
+        
+        // Set up the oracle mapping
+        const tokens = [config.token]; // scrvUSD token address
+        const oracles = [{
+          aggregator: curveOracle.address,
+          stalePeriod: 1, // 1 second stale period (very fresh)
+          aggregatorScale: ethers.utils.parseEther('1') // 1e18 scale
+        }];
+        
+        await chainlinkOracle.setOracles(tokens, oracles);
+        console.log(`Oracle configured for token ${config.token}`);
+        
+        return chainlinkOracle.address;
       }
     }, CONFIG_NETWORK);
     
@@ -414,25 +514,88 @@ async function performTransactions() {
   console.log('Pool unlocked');
 }
 
+// Removed storeVaultMetadataForGauge - not needed for USDC pool only deployment
+async function storeVaultMetadataForGauge_UNUSED() {
+  console.log(`
+/*//////////////////////////////////////////////////////////////
+                     STORING VAULT METADATA
+//////////////////////////////////////////////////////////////*/
+  `);
+  
+  // Load deployed vaults to get their addresses
+  const deployedVaults = await loadDeployedVaults();
+  
+  for (const [vaultName, vault] of Object.entries(deployedVaults)) {
+    // Find corresponding vault config
+    const vaultKey = vaultName.replace('CDPVault_', '');
+    const vaultConfig = CONFIG_NETWORK.Vaults[vaultKey];
+    
+    if (!vaultConfig) {
+      console.log(`No config found for vault ${vaultName}, skipping metadata storage`);
+      continue;
+    }
+    
+    // Get the deployed USDC pool address from deployment file
+    const deploymentFilePath = await getDeploymentFilePath();
+    const deployment = fs.existsSync(deploymentFilePath) ? JSON.parse(fs.readFileSync(deploymentFilePath)) : {};
+    const usdcPoolAddress = deployment.pools?.['Pool LpUSDC']?.address || CONFIG_NETWORK.Core.PoolV3_lpUSDC;
+    
+    // Store metadata including pool address and quotas
+    const metadata = {
+      pool: usdcPoolAddress, // Pool address this vault is associated with
+      quotas: vaultConfig.quotas, // Min and max rates from config
+      tokenSymbol: vaultConfig.tokenSymbol,
+      token: vaultConfig.token
+    };
+    
+    await storeVaultMetadata(vault.address, metadata);
+    console.log(`Stored metadata for vault ${vaultName} at ${vault.address}`);
+    console.log(`  Pool: ${metadata.pool}`);
+    console.log(`  Min Rate: ${metadata.quotas.minRate}`);
+    console.log(`  Max Rate: ${metadata.quotas.maxRate}`);
+  }
+}
+
+// deployPositionActionsForPool function removed - position actions are deployed as part of auxiliary contracts
+
 async function main() {
   try {
-    // Initialize deployment with account impersonation
-    // const impersonatedSigner = await impersonateDeployer();
+    console.log('Starting USDC Pool deployment on XDC...');
+    console.log('Using existing AddressProviderV3:', CONFIG_NETWORK.Core.AddressProviderV3);
     
-    // Deploy pools (XDC and USDC)
-    // await deployPool();
-
-    await performTransactions();
+    // Step 1: Deploy USDC Pool with all components (interest rate model, quota keeper, voter, gauge, staking, locking)
+    console.log('\n=== STEP 1: DEPLOYING USDC POOL ===');
+    const deployedPool = await deployPool();
     
-    // Deploy core contracts
-    // const deployedCore = await deployCore();
+    // Step 2: Deploy USDC pool auxiliary contracts (treasury, vault registry, flashlender, actions)
+    console.log('\n=== STEP 2: DEPLOYING USDC POOL AUXILIARY CONTRACTS ===');
+    const deployedAuxiliaryContracts = await deployUSDCPoolCore(deployedPool.pool.address, deployedPool.stakingLp.address, deployedPool.lockLp.address);
     
-    // // Finalize deployment
-    // await finalizeDeployment();
+    // Position actions are already deployed as part of Step 2 (auxiliary contracts)
     
-    console.log('XDC deployment completed successfully!');
+    console.log('\n🎉 USDC Pool deployment completed successfully!');
+    console.log('\nDeployed contracts summary:');
+    console.log('- USDC Pool: ✅');
+    console.log('- Interest Rate Model: ✅');
+    console.log('- Pool Quota Keeper: ✅');
+    console.log('- Voter: ✅');
+    console.log('- Gauge: ✅');
+    console.log('- Staking Contract: ✅');
+    console.log('- Locking Contract: ✅');
+    console.log('- Treasury: ✅');
+    console.log('- Vault Registry: ✅');
+    console.log('- Flashlender: ✅');
+    console.log('- Position Actions (4 types): ✅');
+    
+    console.log('\nPool Address:', deployedPool.pool.address);
+    console.log('Staking Address:', deployedPool.stakingLp.address);
+    console.log('Locking Address:', deployedPool.lockLp.address);
+    console.log('Treasury Address:', deployedAuxiliaryContracts.treasury?.address || 'N/A');
+    console.log('Vault Registry Address:', deployedAuxiliaryContracts.vaultRegistry?.address || 'N/A');
+    console.log('Flashlender Address:', deployedAuxiliaryContracts.flashlender?.address || 'N/A');
+    
   } catch (error) {
-    console.error('Error during XDC deployment:', error);
+    console.error('❌ Error during USDC Pool deployment:', error);
     process.exit(1);
   }
 }

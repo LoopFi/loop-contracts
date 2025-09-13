@@ -3,6 +3,48 @@ const path = require('path');
 const { ethers } = require('hardhat');
 const hre = require('hardhat');
 
+// Helper function to get gas price from Bitlayer RPC
+async function getBitlayerGasPrice() {
+  try {
+    const rpcUrls = [
+      'https://rpc.bitlayer.org',
+      'https://rpc.bitlayer-rpc.com', 
+      'https://rpc.ankr.com/bitlayer'
+    ];
+    
+    for (const rpcUrl of rpcUrls) {
+      try {
+        // Use ethers provider to make RPC call
+        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+        const gasPrice = await provider.getGasPrice();
+        const gasPriceWei = gasPrice.toNumber();
+        console.log(`📡 Got gas price from ${rpcUrl}: ${gasPriceWei} wei`);
+        return gasPriceWei;
+      } catch (error) {
+        console.log(`⚠️  Failed to get gas price from ${rpcUrl}:`, error.message);
+        continue;
+      }
+    }
+    
+    // Fallback to 7 wei if all RPCs fail
+    console.log('⚠️  All RPC calls failed, using fallback gas price: 7 wei');
+    return 7;
+  } catch (error) {
+    console.log('⚠️  Error getting Bitlayer gas price, using fallback: 7 wei');
+    return 7;
+  }
+}
+
+// Helper function to get gas options for the current network
+async function getGasOptions() {
+  if (hre.network.name === 'bitlayer' || hre.network.name === 'local') {
+    // For local network testing Bitlayer or actual Bitlayer network
+    const gasPrice = await getBitlayerGasPrice();
+    return { gasPrice };
+  }
+  return {}; // Use default gas estimation for other networks
+}
+
 async function getSignerAddress() {
   // Check if we have an override from impersonation
   if (global.getSignerAddressOverride) {
@@ -106,7 +148,8 @@ async function deployContract(name, artifactName, isVault, ...args) {
   console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
   
   try {
-    const contract = await Contract.deploy(...args);
+    const gasOptions = await getGasOptions();
+    const contract = await Contract.deploy(...args, gasOptions);
     
     // The contract address is available immediately after deployment
     console.log(`Transaction hash: ${contract.deployTransaction.hash}`);
@@ -116,6 +159,21 @@ async function deployContract(name, artifactName, isVault, ...args) {
     try {
       const receipt = await contract.deployTransaction.wait();
       console.log(`Contract confirmed in block ${receipt.blockNumber}`);
+      
+      // Log transaction cost
+      const gasUsed = receipt.gasUsed;
+      const gasPrice = receipt.effectiveGasPrice || contract.deployTransaction.gasPrice;
+      const txCost = gasUsed.mul(gasPrice);
+      const txCostBTC = ethers.utils.formatEther(txCost);
+      
+      console.log(`💸 Gas used: ${gasUsed.toString()} | Cost: ${txCostBTC} BTC`);
+      
+      // Check remaining balance
+      const signer = await ethers.getSigner();
+      const remainingBalance = await signer.getBalance();
+      const remainingBTC = ethers.utils.formatEther(remainingBalance);
+      console.log(`💰 Remaining balance: ${remainingBTC} BTC`);
+      
     } catch (waitError) {
       if (waitError.message.includes('invalid address')) {
         console.log('Warning: Transaction response parsing failed, but contract was deployed successfully');
@@ -1061,6 +1119,7 @@ module.exports = {
   isContractDeployed,
   getDeployedContract,
   attachContract,
+  getGasOptions,
   loadDeployedContracts,
   loadDeployedVaults,
   verifyOnTenderly,

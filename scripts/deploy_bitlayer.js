@@ -30,9 +30,8 @@ const {
   deployVaultOracle,
   registerVaults,
   deployPools,
-  impersonateAccount,
-  stopImpersonatingAccount,
-  deployGauge
+  deployGauge,
+  getGasOptions
 } = require('./utils/deployUtils');
 const { 
   getNetworkName, 
@@ -53,33 +52,80 @@ const fromWad = ethers.utils.formatEther;
                          HELPER FUNCTIONS
 //////////////////////////////////////////////////////////////*/
 
-async function impersonateDeployer() {
-  // For local testing, impersonate a specific account
-  const accountToImpersonate = '0x9B2205E4E62e333141117Fc895DC77B558E2a2BC';
+async function checkNetworkConnection() {
+  console.log('\n=== CHECKING NETWORK CONNECTION ===');
   
-  // Fund the account with native token (BTC on Bitlayer) for gas
-  await hre.network.provider.send('hardhat_setBalance', [
-    accountToImpersonate,
-    '0x21E19E0C9BAB2400000', // 10000 BTC (in wei equivalent)
-  ]);
-
-  // Impersonate the account
-  await impersonateAccount(accountToImpersonate);
-  console.log(`Impersonating account: ${accountToImpersonate}`);
-
-  // Set the signer to the impersonated account
-  const signer = await ethers.getSigner(accountToImpersonate);
-  console.log(`Signer address: ${signer.address}`);
-  console.log(`Signer balance: ${fromWad(await signer.getBalance())} BTC`);
-
-  return signer;
+  try {
+    const network = await ethers.provider.getNetwork();
+    const blockNumber = await ethers.provider.getBlockNumber();
+    
+    // Get accurate gas price using our helper
+    const gasOptions = await getGasOptions();
+    const actualGasPrice = gasOptions.gasPrice || (await ethers.provider.getGasPrice()).toNumber();
+    
+    console.log(`✅ Connected to network: ${network.name} (Chain ID: ${network.chainId})`);
+    console.log(`📦 Current block: ${blockNumber}`);
+    console.log(`⛽ Actual gas price: ${actualGasPrice} wei (${ethers.utils.formatUnits(actualGasPrice, 'gwei')} gwei)`);
+    
+    // Check deployer balance
+    const signer = await ethers.getSigner();
+    const balance = await signer.getBalance();
+    const balanceBTC = ethers.utils.formatEther(balance);
+    
+    console.log(`💰 Deployer: ${signer.address}`);
+    console.log(`💰 Balance: ${balance.toString()} wei (${balanceBTC} BTC)`);
+    
+    // Estimate if we have enough funds for Step 1 deployment (Address Provider only)
+    const estimatedGasNeeded = 5000000; // ~5M gas for Step 1 only (ACL + AddressProvider + ContractsRegister)
+    const estimatedCost = ethers.BigNumber.from(actualGasPrice).mul(estimatedGasNeeded);
+    const estimatedCostBTC = ethers.utils.formatEther(estimatedCost);
+    
+    console.log(`📊 Estimated Step 1 cost: ${estimatedCost.toString()} wei (${estimatedCostBTC} BTC)`);
+    
+    if (balance.lt(estimatedCost)) {
+      console.log(`⚠️  WARNING: Balance may be insufficient for Step 1 deployment!`);
+      console.log(`   Need: ${estimatedCostBTC} BTC`);
+      console.log(`   Have: ${balanceBTC} BTC`);
+    } else {
+      console.log(`✅ Sufficient balance for Step 1 deployment`);
+    }
+    
+    return { network, gasPrice: actualGasPrice, blockNumber, balance };
+  } catch (error) {
+    console.error('❌ Network connection failed:', error.message);
+    throw error;
+  }
 }
 
-async function finalizeDeployment() {
-  // Stop impersonating
-  const accountToImpersonate = '0x9B2205E4E62e333141117Fc895DC77B558E2a2BC';
-  await stopImpersonatingAccount(accountToImpersonate);
-  console.log(`Stopped impersonating account: ${accountToImpersonate}`);
+async function finalizeDeployment(initialBalance) {
+  console.log('\n=== DEPLOYMENT SUMMARY ===');
+  
+  try {
+    // Get final balance
+    const signer = await ethers.getSigner();
+    const finalBalance = await signer.getBalance();
+    const finalBalanceBTC = ethers.utils.formatEther(finalBalance);
+    
+    // Calculate total spent
+    const totalSpent = initialBalance.sub(finalBalance);
+    const totalSpentBTC = ethers.utils.formatEther(totalSpent);
+    const initialBalanceBTC = ethers.utils.formatEther(initialBalance);
+    
+    console.log(`💰 Deployer: ${signer.address}`);
+    console.log(`💰 Initial balance: ${initialBalanceBTC} BTC`);
+    console.log(`💰 Final balance: ${finalBalanceBTC} BTC`);
+    console.log(`💸 Total spent: ${totalSpentBTC} BTC`);
+    
+    // Calculate USD value (approximate)
+    const btcPriceUSD = 95000; // Update as needed
+    const totalSpentUSD = parseFloat(totalSpentBTC) * btcPriceUSD;
+    console.log(`💵 Total cost: ~$${totalSpentUSD.toFixed(6)} USD (at $${btcPriceUSD.toLocaleString()} BTC)`);
+    
+    console.log('\n🎉 Deployment completed successfully!');
+  } catch (error) {
+    console.error('❌ Error getting final balance:', error.message);
+    console.log('Deployment finalized with errors');
+  }
 }
 
 async function deployAddressProvider() {
@@ -392,15 +438,22 @@ async function deployVaults() {
             stalePeriod: oracleTokenConfig.stalePeriod,
             twapWindow: oracleTokenConfig.twapWindow,
             twapEnabled: oracleTokenConfig.twapEnabled
-          }]
+          }],
+          await getGasOptions()
         );
         
         console.log(`PushOracle configured for token: ${oracleTokenConfig.token}`);
         
         // Grant PRICE_UPDATER_ROLE to deployer
         const PRICE_UPDATER_ROLE = await pushOracle.PRICE_UPDATER_ROLE();
-        await pushOracle.grantRole(PRICE_UPDATER_ROLE, signer);
+        await pushOracle.grantRole(PRICE_UPDATER_ROLE, signer, await getGasOptions());
         console.log(`Granted PRICE_UPDATER_ROLE to deployer: ${signer}`);
+        
+        // Grant PRICE_UPDATER_ROLE to pusher if specified
+        if (oracleConfig.pusher) {
+          await pushOracle.grantRole(PRICE_UPDATER_ROLE, oracleConfig.pusher, await getGasOptions());
+          console.log(`Granted PRICE_UPDATER_ROLE to pusher: ${oracleConfig.pusher}`);
+        }
         
         return pushOracleProxy.address;
       }
@@ -509,14 +562,14 @@ async function storeVaultMetadataForGauge() {
 // deployPositionActionsForPool function removed - position actions are deployed as part of auxiliary contracts
 
 async function main() {
+  let initialBalance;
+  
   try {
-    console.log('Starting Bitlayer deployment...');
+    console.log('🚀 Starting Bitlayer deployment...');
     
-    // For local testing, impersonate and fund the deployer account
-    if (hre.network.name === 'local' || hre.network.name === 'localhost' || hre.network.name === 'bitlayer_local') {
-      console.log('\n=== SETTING UP LOCAL DEPLOYER ===');
-      await impersonateDeployer();
-    }
+    // Check network connection and capture initial balance
+    const connectionInfo = await checkNetworkConnection();
+    initialBalance = connectionInfo.balance;
     
     // Step 1: Deploy AddressProviderV3 with ACL and ContractsRegister if not exists
     console.log('\n=== STEP 1: DEPLOYING ADDRESS PROVIDER ===');
@@ -532,6 +585,12 @@ async function main() {
       };
       console.log('Using existing AddressProviderV3 at:', deployedCore.addressProvider.address);
     }
+
+    // Core infrastructure deployed successfully
+    console.log('✅ Core Infrastructure deployed:');
+    console.log('- ACL:', deployedCore.acl?.address || 'N/A');
+    console.log('- AddressProviderV3:', deployedCore.addressProvider.address);
+    console.log('- ContractsRegister:', deployedCore.contractsRegister?.address || 'N/A');
     
     // Step 2: Deploy WBTC Pool with all components
     console.log('\n=== STEP 2: DEPLOYING WBTC POOL ===');
@@ -590,21 +649,18 @@ async function main() {
     console.log('Vault Registry Address:', deployedAuxiliaryContracts.vaultRegistry?.address || 'N/A');
     console.log('Flashlender Address:', deployedAuxiliaryContracts.flashlender?.address || 'N/A');
     
-    // Cleanup for local testing
-    if (hre.network.name === 'local' || hre.network.name === 'localhost' || hre.network.name === 'bitlayer_local') {
-      console.log('\n=== CLEANING UP LOCAL DEPLOYER ===');
-      await finalizeDeployment();
-    }
+    // Show deployment summary
+    await finalizeDeployment(initialBalance);
     
   } catch (error) {
     console.error('❌ Error during Bitlayer deployment:', error);
     
-    // Cleanup even on error for local testing
-    if (hre.network.name === 'local' || hre.network.name === 'localhost' || hre.network.name === 'bitlayer_local') {
+    // Show deployment summary even on error (if we have initial balance)
+    if (initialBalance) {
       try {
-        await finalizeDeployment();
-      } catch (cleanupError) {
-        console.error('Error during cleanup:', cleanupError);
+        await finalizeDeployment(initialBalance);
+      } catch (summaryError) {
+        console.error('Error showing deployment summary:', summaryError);
       }
     }
     

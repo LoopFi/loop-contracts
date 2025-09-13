@@ -1,0 +1,13 @@
+{
+  "vaults": {
+    "0xe1987f6cD0b8823a033c29d640596757492479BD": {
+      "pool": "0x796e374f741AfA9205B61328363404DA047CB5bC",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 5000
+      },
+      "tokenSymbol": "LOOP-BLBTC",
+      "token": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014"
+    }
+  }
+}

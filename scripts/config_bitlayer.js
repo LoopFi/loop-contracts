@@ -19,9 +19,9 @@ module.exports = {
     "BLBTC": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014", // BLBTC collateral asset
     "WETH": "0x0000000000000000000000000000000000000000", // WETH not available on Bitlayer (placeholder)
     "PenpieHelper": "0x0000000000000000000000000000000000000000", // PenpieHelper not available on Bitlayer
-    "ACL": "", // To be filled after core deployment
-    "AddressProviderV3": "", // To be filled after core deployment
-    "ContractsRegister": "", // To be filled after core deployment
+    "ACL": "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3", // 
+    "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D", // 
+    "ContractsRegister": "0x0aB39D2DA8160E64117C9B5CE88efD68FB8Bf693", //
     "PoolV3_lpWBTC": "", // To be filled after WBTC pool deployment
     "FlashlenderLPWBTC": "", // To be filled after deployment
     "VaultRegistry": "", // To be filled after deployment
@@ -95,12 +95,13 @@ module.exports = {
         deploymentArguments: {
           // PushOracle configuration for BLBTC
           "admin": "deployer", // Deployer as admin
-          "manager": "deployer" // Deployer as manager for now
+          "manager": "deployer", // Deployer as manager for now
+          "pusher": "0x5f73012306334eB1D49E4980B9121dedEAe25129"
         },
         oracleConfig: {
           "token": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014", // BLBTC address
-          "stalePeriod": 3600, // 1 hour stale period
-          "twapWindow": 1800, // 30 minutes TWAP window
+          "stalePeriod": 86400, // 24 hours stale period (6 hour updates + buffer)
+          "twapWindow": 43200, // 12 hours TWAP window (2x update frequency)
           "twapEnabled": true
         }
       },

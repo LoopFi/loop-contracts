@@ -37,12 +37,23 @@ async function getBitlayerGasPrice() {
 
 // Helper function to get gas options for the current network
 async function getGasOptions() {
-  if (hre.network.name === 'bitlayer' || hre.network.name === 'local') {
-    // For local network testing Bitlayer or actual Bitlayer network
+  // Only use Bitlayer gas pricing for actual Bitlayer network
+  if (hre.network.name === 'bitlayer') {
     const gasPrice = await getBitlayerGasPrice();
     return { gasPrice };
   }
-  return {}; // Use default gas estimation for other networks
+  
+  // For all other networks (including local forks), use ethers provider gas price with buffer
+  try {
+    const gasPrice = await ethers.provider.getGasPrice();
+    // Add a small buffer to ensure transaction goes through
+    const bufferedGasPrice = gasPrice.mul(110).div(100); // 10% buffer
+    console.log(`📡 ${hre.network.name} gas price: ${gasPrice.toString()} wei, buffered: ${bufferedGasPrice.toString()} wei`);
+    return { gasPrice: bufferedGasPrice };
+  } catch (error) {
+    console.log(`⚠️  Error getting ${hre.network.name} gas price, using fallback: 1 gwei`);
+    return { gasPrice: ethers.utils.parseUnits('1', 'gwei') };
+  }
 }
 
 async function getSignerAddress() {

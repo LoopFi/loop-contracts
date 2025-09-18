@@ -762,6 +762,8 @@ async function deployCustomPositionActions(flashlender, swapAction, poolAction, 
 
     if (action === 'PositionActionPenpie') {
       args.push(config.Core.PenpieHelper);
+    } else if (action === 'PositionActionBLBTC') {
+      args.push(config.Core.WBTC);
     }
 
     await deployContract(

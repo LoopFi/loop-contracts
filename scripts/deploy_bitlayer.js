@@ -345,7 +345,8 @@ async function deployWBTCPoolCore(poolAddress, stakingAddress, lockingAddress) {
     'PositionAction20',
     'PositionAction4626',
     'PositionActionPendle',
-    'PositionActionTranchess'
+    'PositionActionTranchess',
+    'PositionActionBLBTC'
     // Skip PositionActionPenpie - not available on Bitlayer
   ];
 
@@ -633,7 +634,7 @@ async function main() {
     console.log('- Treasury: ✅');
     console.log('- Vault Registry: ✅');
     console.log('- Flashlender: ✅');
-    console.log('- Position Actions (4 types): ✅');
+    console.log('- Position Actions (5 types): ✅');
     console.log('- BLBTC Vault: ✅');
     console.log('- Gauge Configuration: ✅');
     

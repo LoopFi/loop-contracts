@@ -52,6 +52,58 @@ const fromWad = ethers.utils.formatEther;
                          HELPER FUNCTIONS
 //////////////////////////////////////////////////////////////*/
 
+async function fundDeployerIfNeeded() {
+  console.log('\n=== CHECKING DEPLOYER FUNDING ===');
+  
+  try {
+    const network = await ethers.provider.getNetwork();
+    const signer = await ethers.getSigner();
+    const balance = await signer.getBalance();
+    const balanceETH = ethers.utils.formatEther(balance);
+    
+    console.log(`💰 Deployer: ${signer.address}`);
+    console.log(`💰 Current balance: ${balanceETH} ETH`);
+    
+    // Check if we're running on local anvil (chainId 31337 or localhost)
+    const isLocalAnvil = network.chainId === 31337 || network.name === 'unknown';
+    
+    if (isLocalAnvil) {
+      console.log('🔧 Detected local anvil network');
+      
+      // Define minimum balance needed (100 ETH should be more than enough)
+      const minBalance = ethers.utils.parseEther('100');
+      
+      if (balance.lt(minBalance)) {
+        console.log(`⚠️  Low balance detected. Funding deployer with 1000 ETH using anvil_setBalance...`);
+        
+        // Use anvil's setBalance RPC call to directly set the deployer's balance
+        const fundAmount = ethers.utils.parseEther('1000');
+        const fundAmountHex = fundAmount.toHexString();
+        
+        console.log(`🔧 Setting balance for ${signer.address} to ${fundAmountHex}`);
+        await ethers.provider.send("anvil_setBalance", [
+          signer.address,
+          fundAmountHex
+        ]);
+        
+        // Check new balance
+        const newBalance = await signer.getBalance();
+        const newBalanceETH = ethers.utils.formatEther(newBalance);
+        console.log(`✅ Deployer funded! New balance: ${newBalanceETH} ETH`);
+      } else {
+        console.log(`✅ Sufficient balance for deployment`);
+      }
+    } else {
+      console.log('🌐 Running on live network - skipping auto-funding');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error checking/funding deployer:', error.message);
+    console.error('💡 Make sure you are running on anvil with the correct network configuration');
+    // Don't throw - let deployment continue even if funding fails
+  }
+}
+
 async function checkNetworkConnection() {
   console.log('\n=== CHECKING NETWORK CONNECTION ===');
   
@@ -567,6 +619,9 @@ async function main() {
   
   try {
     console.log('🚀 Starting Bitlayer deployment...');
+    
+    // Fund deployer if needed (for anvil)
+    await fundDeployerIfNeeded();
     
     // Check network connection and capture initial balance
     const connectionInfo = await checkNetworkConnection();

@@ -27,7 +27,7 @@ anvil            :; anvil --fork-url $(MAINNET_RPC_URL) --auto-impersonate
 anvil-scroll     :; anvil --fork-url $(SCROLL_RPC_URL) --auto-impersonate
 anvil-bsc        :; anvil --fork-url $(BNB_RPC_URL) --auto-impersonate
 anvil-xdc        :; anvil --fork-url $(XDC_RPC_URL) --auto-impersonate --balance 10000000
-anvil-bitlayer   :; anvil --fork-url $(BITLAYER_RPC_URL)
+anvil-bitlayer   :; anvil --fork-url $(BITLAYER_RPC_URL) --auto-impersonate --balance 10000000
 deploy-clear     :; rm -rf scripts/*-local.json
 deploy-anvil     :; npx hardhat run scripts/deploy_eth.js --network local --show-stack-traces
 deploy-anvil-usdc:; npx hardhat run scripts/deploy_usdc.js --network local --show-stack-traces

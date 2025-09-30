@@ -116,7 +116,7 @@ module.exports = {
           },
           configs: {
               debtFloor: toWad("0.001"), // 0.001 WBTC 
-              liquidationRatio: toWad("1.1"),
+              liquidationRatio: toWad("1.6667"),
               liquidationPenalty: toWad("0.99"),
               liquidationDiscount: toWad("0.98"), 
               roleAdmin: "deployer",

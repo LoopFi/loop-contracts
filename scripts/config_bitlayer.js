@@ -69,7 +69,7 @@ module.exports = {
     "Pool LpWBTC": {
       "name": "Loop Liquidity Pool - WBTC",
       "symbol": "lpWBTC",
-      "wrappedToken": "0x0000000000000000000000000000000000000000", // No wrapped token for WBTC
+      "wrappedToken": "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F", // WBTC
       "treasury": "Treasury_wbtc", // Reference to treasury config key
       "underlier": "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F", // WBTC on Bitlayer
       "interestRateModel": {

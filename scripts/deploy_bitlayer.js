@@ -367,6 +367,10 @@ async function deploySinglePool(poolKey) {
   await lockLp.setCooldownPeriod(SEVEN_DAYS);
   console.log(`Set cooldown period to 7 days for ${poolConfig.symbol} locking contract`);
 
+  // Unlock the pool (it's locked by default on deployment)
+  await pool.setLock(false);
+  console.log(`✅ Pool ${poolConfig.symbol} unlocked and ready for deposits/withdrawals`);
+
   return {
     pool,
     interestRateModel,

@@ -17,7 +17,7 @@ module.exports = {
     },
     "WBTC": "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F", // Wrapped BTC on Bitlayer
     "BLBTC": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014", // BLBTC collateral asset
-    "WETH": "0x0000000000000000000000000000000000000000", // WETH not available on Bitlayer (placeholder)
+    "WETH": "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F", // WETH not available on Bitlayer (placeholder)
     "PenpieHelper": "0x0000000000000000000000000000000000000000", // PenpieHelper not available on Bitlayer
     "ACL": "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3", // 
     "AddressProviderV3": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D", // 
@@ -54,7 +54,7 @@ module.exports = {
     "Treasury_wbtc": {
       "constructorArguments": {
         "payees":[
-          "0xA719A90a173E8F00618596ffb594F5FfA79d915D", // Admin address (update as needed)
+          "0xA719A90a173E8F00618596ffb594F5FfA79d915D", // Admin address
           "stakingLpWBTC" // Reference to staking contract - will be resolved during deployment
         ],
         "shares":[
@@ -123,7 +123,7 @@ module.exports = {
               vaultAdmin: "deployer",
               pauseAdmin: "deployer",
           },
-          debtCeiling: toWad("1000"), // 1000 WBTC debt ceiling (~$30M at $30k BTC)
+          debtCeiling: toWad("1000"), // 1000 WBTC debt ceiling
       },
       quotas: {
           minRate: 100, // 1% minimum rate

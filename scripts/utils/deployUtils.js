@@ -37,13 +37,17 @@ async function getBitlayerGasPrice() {
 
 // Helper function to get gas options for the current network
 async function getGasOptions() {
-  // Only use Bitlayer gas pricing for actual Bitlayer network
-  if (hre.network.name === 'bitlayer') {
+  // Check if we're on Bitlayer (by name or chain ID)
+  const network = await ethers.provider.getNetwork();
+  const isBitlayer = hre.network.name === 'bitlayer' || network.chainId === 200901;
+  
+  if (isBitlayer) {
     const gasPrice = await getBitlayerGasPrice();
+    console.log(`📡 Using Bitlayer gas price: ${gasPrice} wei (${ethers.utils.formatUnits(gasPrice, 'gwei')} gwei)`);
     return { gasPrice };
   }
   
-  // For all other networks (including local forks), use ethers provider gas price with buffer
+  // For all other networks, use ethers provider gas price with buffer
   try {
     const gasPrice = await ethers.provider.getGasPrice();
     // Add a small buffer to ensure transaction goes through

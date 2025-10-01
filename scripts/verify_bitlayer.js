@@ -50,6 +50,7 @@ const CONTRACT_PATHS = {
   'PositionAction4626': 'src/proxy/PositionAction4626.sol:PositionAction4626',
   'PositionActionPendle': 'src/proxy/PositionActionPendle.sol:PositionActionPendle',
   'PositionActionTranchess': 'src/proxy/PositionActionTranchess.sol:PositionActionTranchess',
+  'PositionActionBLBTC': 'src/proxy/PositionActionBLBTC.sol:PositionActionBLBTC',
   
   // OpenZeppelin contracts
   'ERC1967Proxy': '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy'

@@ -231,6 +231,21 @@
         "0x485cc9550000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc0000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc"
       ],
       "addedToRegistry": false
+    },
+    "PushOracle_Impl_Vaults_BLBTC_v2": {
+      "address": "0xCEa1B2a1DDBA3a84C467743a45173f3469579a70",
+      "artifactName": "PushOracle",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "PushOracle_Vaults_BLBTC_v2": {
+      "address": "0xC82cDB0CBF2A19d60b56e0D667dD9f95Eca3F388",
+      "artifactName": "ERC1967Proxy",
+      "constructorArgs": [
+        "0xCEa1B2a1DDBA3a84C467743a45173f3469579a70",
+        "0x485cc9550000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc0000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc"
+      ],
+      "addedToRegistry": false
     }
   },
   "vaults": {

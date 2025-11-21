@@ -16,6 +16,7 @@ sender = '0xf000000000000000000000000000000000000000'
 tx_origin = '0xf000000000000000000000000000000000000000' 
 verbosity = 3 
 allow_internal_expect_revert = true
+# Fork tests should handle their own forking in setUp()
 
 [profile.ci.fuzz]
 runs = 5000

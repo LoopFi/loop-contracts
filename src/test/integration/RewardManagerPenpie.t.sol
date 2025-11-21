@@ -63,7 +63,6 @@ contract RewardManagerPenpieTest is IntegrationTestBase {
     address pendleHolder = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
     address penpieToken = 0x7DEdBce5a2E31E4c75f87FeA60bF796C17718715;
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         // configure permissions and system settings

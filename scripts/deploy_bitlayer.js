@@ -728,8 +728,136 @@ async function main() {
   }
 }
 
+/**
+ * Patch function to redeploy PushOracle and update the BLBTC vault
+ * This can be removed after successful deployment
+ */
+async function patchPushOracle() {
+  console.log('\n🔧 Starting PushOracle patch deployment...');
+  
+  try {
+    const signer = await getSignerAddress();
+    
+    // Addresses from deployment-bitlayer.json
+    const BLBTC_VAULT_ADDRESS = '0x43DC99dA816029b6aBF84D993B2c42C17FF6E0f9';
+    const BLBTC_TOKEN = '0x4e0dd7c16d2bbf873335cc21c72663b3eae23014';
+    const PUSHER_ADDRESS = '0x5f73012306334eB1D49E4980B9121dedEAe25129';
+    
+    console.log(`\n📋 Configuration:`);
+    console.log(`  Vault Address: ${BLBTC_VAULT_ADDRESS}`);
+    console.log(`  BLBTC Token: ${BLBTC_TOKEN}`);
+    console.log(`  Deployer/Admin: ${signer}`);
+    console.log(`  Pusher: ${PUSHER_ADDRESS}`);
+    
+    // Step 1: Deploy new PushOracle implementation
+    console.log('\n=== STEP 1: Deploying PushOracle Implementation ===');
+    const pushOracleImpl = await deployContract(
+      'PushOracle',
+      'PushOracle_Impl_Vaults_BLBTC_v2',
+      false
+    );
+    console.log(`✅ PushOracle implementation deployed at: ${pushOracleImpl.address}`);
+    
+    // Step 2: Deploy ERC1967Proxy for upgradeable PushOracle
+    console.log('\n=== STEP 2: Deploying PushOracle Proxy ===');
+    const initData = pushOracleImpl.interface.encodeFunctionData('initialize', [
+      signer, // admin
+      signer  // manager
+    ]);
+    
+    const pushOracleProxy = await deployContract(
+      'ERC1967Proxy',
+      'PushOracle_Vaults_BLBTC_v2',
+      false,
+      pushOracleImpl.address,
+      initData
+    );
+    console.log(`✅ PushOracle proxy deployed at: ${pushOracleProxy.address}`);
+    
+    // Step 3: Attach to the proxy with PushOracle interface
+    const pushOracle = await ethers.getContractAt('PushOracle', pushOracleProxy.address);
+    
+    // Step 4: Configure the oracle for BLBTC token
+    console.log('\n=== STEP 3: Configuring Oracle ===');
+    const oracleConfig = {
+      stalePeriod: 86400,    // 24 hours
+      twapWindow: 43200,     // 12 hours
+      twapEnabled: true
+    };
+    
+    await pushOracle.setOracleConfigs(
+      [BLBTC_TOKEN],
+      [oracleConfig],
+      await getGasOptions()
+    );
+    console.log(`✅ Oracle configured for BLBTC token`);
+    console.log(`   Stale Period: ${oracleConfig.stalePeriod}s (24h)`);
+    console.log(`   TWAP Window: ${oracleConfig.twapWindow}s (12h)`);
+    console.log(`   TWAP Enabled: ${oracleConfig.twapEnabled}`);
+    
+    // Step 5: Grant PRICE_UPDATER_ROLE to deployer
+    console.log('\n=== STEP 4: Setting up Keepers ===');
+    const PRICE_UPDATER_ROLE = await pushOracle.PRICE_UPDATER_ROLE();
+    await pushOracle.grantRole(PRICE_UPDATER_ROLE, signer, await getGasOptions());
+    console.log(`✅ Granted PRICE_UPDATER_ROLE to deployer: ${signer}`);
+    
+    // Step 6: Grant PRICE_UPDATER_ROLE to pusher
+    await pushOracle.grantRole(PRICE_UPDATER_ROLE, PUSHER_ADDRESS, await getGasOptions());
+    console.log(`✅ Granted PRICE_UPDATER_ROLE to pusher: ${PUSHER_ADDRESS}`);
+    
+    // Step 7: Update oracle in the BLBTC vault
+    console.log('\n=== STEP 5: Updating Vault Oracle ===');
+    const cdpVault = await ethers.getContractAt('CDPVault', BLBTC_VAULT_ADDRESS);
+    
+    // Check current oracle
+    const currentOracle = await cdpVault.oracle();
+    console.log(`   Current Oracle: ${currentOracle}`);
+    console.log(`   New Oracle: ${pushOracleProxy.address}`);
+    
+    // Set new oracle using setParameter function with address parameter (overloaded function)
+    // Use the full function signature to call the correct overload
+    const gasOptions = await getGasOptions();
+    await cdpVault['setParameter(bytes32,address)'](
+      ethers.utils.formatBytes32String('oracle'),
+      pushOracleProxy.address,
+      gasOptions
+    );
+    
+    // Verify the change
+    const newOracle = await cdpVault.oracle();
+    console.log(`✅ Vault oracle updated to: ${newOracle}`);
+    
+    if (newOracle.toLowerCase() !== pushOracleProxy.address.toLowerCase()) {
+      throw new Error('Oracle update verification failed!');
+    }
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('🎉 PushOracle patch completed successfully!');
+    console.log('\n📋 Summary:');
+    console.log(`  New Oracle Implementation: ${pushOracleImpl.address}`);
+    console.log(`  New Oracle Proxy: ${pushOracleProxy.address}`);
+    console.log(`  BLBTC Vault: ${BLBTC_VAULT_ADDRESS}`);
+    console.log(`  Oracle updated in vault: ✅`);
+    console.log('\n💡 Remember to verify the new contracts on Bitlayer explorer');
+    console.log(`   Run: node scripts/verify_bitlayer.js individual PushOracle ${pushOracleImpl.address}`);
+    console.log(`   Run: node scripts/verify_bitlayer.js individual ERC1967Proxy ${pushOracleProxy.address} "${pushOracleImpl.address}" "${initData}"`);
+    
+  } catch (error) {
+    console.error('❌ Error during PushOracle patch:', error);
+    throw error;
+  }
+}
+
 // Execute the main function
-main()
+// main()
+//   .then(() => process.exit(0))
+//   .catch((error) => {
+//     console.error(error);
+//     process.exit(1);
+//   });
+
+// Uncomment to run the patch function instead of main
+patchPushOracle()
   .then(() => process.exit(0))
   .catch((error) => {
     console.error(error);

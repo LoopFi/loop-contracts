@@ -73,6 +73,19 @@ contract PositionActionBLBTCLeverTest is Test {
         vaultRegistry = IVaultRegistry(VAULT_REGISTRY);
         prbProxyRegistry = PRBProxyRegistry(PRB_PROXY_REGISTRY);
         
+        // Set up oracle price for BLBTC (1:1 with BTC)
+        // Get the oracle from the vault and update the price
+        address oracleAddress = address(vault.oracle());
+        // Impersonate the deployer who has PRICE_UPDATER_ROLE
+        address deployer = 0x9B2205E4E62e333141117Fc895DC77B558E2a2BC;
+        vm.startPrank(deployer);
+        // Cast to interface and update BLBTC price to 1 WAD (1:1 with BTC)
+        (bool success,) = oracleAddress.call(
+            abi.encodeWithSignature("updatePrice(address,uint256)", BLBTC, 1e18)
+        );
+        require(success, "Failed to update BLBTC price");
+        vm.stopPrank();
+        
         // Deploy PositionActionBLBTC
         positionAction = new PositionActionBLBTC(
             FLASHLENDER,

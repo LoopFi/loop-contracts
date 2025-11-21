@@ -123,7 +123,6 @@ contract USDVaultTest is TestBase {
 
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 22038422);
-        usePatchedDeal = true;
         super.setUp();
 
         flashlenderUsdc = new Flashlender(usdcPool, 0);

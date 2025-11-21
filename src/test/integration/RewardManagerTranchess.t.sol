@@ -120,7 +120,6 @@ contract RewardManagerTranchessTest is TestBase {
 
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("scroll"), 11743794);
-        usePatchedDeal = true;
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();

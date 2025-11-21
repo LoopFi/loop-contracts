@@ -53,7 +53,6 @@ contract PositionActionPendle_Lever_Test is IntegrationTestBase {
     bytes32 wstETHPoolId = 0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2; // wstETH/WETH
 
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         // configure permissions and system settings

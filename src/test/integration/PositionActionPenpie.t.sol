@@ -47,7 +47,6 @@ contract PositionActionPenpieTest is IntegrationTestBase {
     address pendleDepositHelper = address(0x1C1Fb35334290b5ff1bF7B4c09130885b10Fc0f4);
     address receiptToken = address(0x9dfaacc97aF3b4FcFFf62213F6913E1A848E8881);
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         // configure permissions and system settings

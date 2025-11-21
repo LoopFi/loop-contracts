@@ -47,7 +47,6 @@ contract PositionAction20PendleTest is IntegrationTestBase {
     address weETH = 0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee;
 
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         // configure permissions and system settings

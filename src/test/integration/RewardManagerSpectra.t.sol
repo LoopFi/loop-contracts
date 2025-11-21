@@ -95,7 +95,6 @@ contract RewardManagerSpectraTest is TestBase {
 
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 21272674);
-        usePatchedDeal = true;
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();

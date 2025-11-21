@@ -33,7 +33,6 @@ contract ChainlinkCurveOracleIntegrationTest is IntegrationTestBase {
     ChainlinkCurveOracle internal chainlinkCurveOracle;
 
     function setUp() public override {
-        usePatchedDeal = true;
         super.setUp();
 
         Combined4626AggregatorV3Oracle combined4626AggregatorV3Oracle = new Combined4626AggregatorV3Oracle(

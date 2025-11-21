@@ -31,6 +31,7 @@ module.exports = {
       mainnet: process.env.ETHERSCAN_API_KEY,
       bsc: process.env.BSC_ETHERSCAN_API_KEY,
       arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
+      bitlayer: "1234", // Bitlayer doesn't require real API key yet
     },
     customChains: [
       {
@@ -39,6 +40,14 @@ module.exports = {
         urls: {
           apiURL: "https://api.xdcscan.com/api",
           browserURL: "https://xdcscan.com"
+        }
+      },
+      {
+        network: "bitlayer",
+        chainId: 200901,
+        urls: {
+          apiURL: "https://api.btrscan.com/scan/api",
+          browserURL: "https://www.btrscan.com/"
         }
       }
     ]
@@ -91,5 +100,10 @@ module.exports = {
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
       chainId: 51,
     },
+    bitlayer: {
+      url: process.env.BITLAYER_RPC_URL || 'https://rpc.bitlayer.org',
+      chainId: 200901,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+    }
   }
 };

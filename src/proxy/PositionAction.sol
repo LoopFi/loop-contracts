@@ -422,7 +422,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         uint256 amount,
         uint256 fee,
         bytes calldata data
-    ) external returns (bytes32) {
+    ) external virtual returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onFlashLoan__invalidSender();
 
         (LeverParams memory leverParams, address upFrontToken, uint256 upFrontAmount) = abi.decode(
@@ -475,7 +475,7 @@ abstract contract PositionAction is IERC3156FlashBorrower, ICreditFlashBorrower,
         uint256 /*amount*/,
         uint256 fee,
         bytes calldata data
-    ) external returns (bytes32) {
+    ) external virtual returns (bytes32) {
         if (msg.sender != address(flashlender)) revert PositionAction__onCreditFlashLoan__invalidSender();
         (LeverParams memory leverParams, uint256 subCollateral, address residualRecipient) = abi.decode(
             data,

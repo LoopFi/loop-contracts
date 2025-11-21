@@ -3,6 +3,63 @@ const path = require('path');
 const { ethers } = require('hardhat');
 const hre = require('hardhat');
 
+// Helper function to get gas price from Bitlayer RPC
+async function getBitlayerGasPrice() {
+  try {
+    const rpcUrls = [
+      'https://rpc.bitlayer.org',
+      'https://rpc.bitlayer-rpc.com', 
+      'https://rpc.ankr.com/bitlayer'
+    ];
+    
+    for (const rpcUrl of rpcUrls) {
+      try {
+        // Use ethers provider to make RPC call
+        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+        const gasPrice = await provider.getGasPrice();
+        const gasPriceWei = gasPrice.toNumber();
+        console.log(`📡 Got gas price from ${rpcUrl}: ${gasPriceWei} wei`);
+        return gasPriceWei;
+      } catch (error) {
+        console.log(`⚠️  Failed to get gas price from ${rpcUrl}:`, error.message);
+        continue;
+      }
+    }
+    
+    // Fallback to 7 wei if all RPCs fail
+    console.log('⚠️  All RPC calls failed, using fallback gas price: 7 wei');
+    return 7;
+  } catch (error) {
+    console.log('⚠️  Error getting Bitlayer gas price, using fallback: 7 wei');
+    return 7;
+  }
+}
+
+// Helper function to get gas options for the current network
+async function getGasOptions() {
+  // Check if we're on Bitlayer (by name or chain ID)
+  const network = await ethers.provider.getNetwork();
+  const isBitlayer = hre.network.name === 'bitlayer' || network.chainId === 200901;
+  
+  if (isBitlayer) {
+    const gasPrice = await getBitlayerGasPrice();
+    console.log(`📡 Using Bitlayer gas price: ${gasPrice} wei (${ethers.utils.formatUnits(gasPrice, 'gwei')} gwei)`);
+    return { gasPrice };
+  }
+  
+  // For all other networks, use ethers provider gas price with buffer
+  try {
+    const gasPrice = await ethers.provider.getGasPrice();
+    // Add a small buffer to ensure transaction goes through
+    const bufferedGasPrice = gasPrice.mul(110).div(100); // 10% buffer
+    console.log(`📡 ${hre.network.name} gas price: ${gasPrice.toString()} wei, buffered: ${bufferedGasPrice.toString()} wei`);
+    return { gasPrice: bufferedGasPrice };
+  } catch (error) {
+    console.log(`⚠️  Error getting ${hre.network.name} gas price, using fallback: 1 gwei`);
+    return { gasPrice: ethers.utils.parseUnits('1', 'gwei') };
+  }
+}
+
 async function getSignerAddress() {
   // Check if we have an override from impersonation
   if (global.getSignerAddressOverride) {
@@ -106,7 +163,8 @@ async function deployContract(name, artifactName, isVault, ...args) {
   console.log('Deploying contract', name, 'with args', args.map((v) => v.toString()).join(', '));
   
   try {
-    const contract = await Contract.deploy(...args);
+    const gasOptions = await getGasOptions();
+    const contract = await Contract.deploy(...args, gasOptions);
     
     // The contract address is available immediately after deployment
     console.log(`Transaction hash: ${contract.deployTransaction.hash}`);
@@ -116,6 +174,21 @@ async function deployContract(name, artifactName, isVault, ...args) {
     try {
       const receipt = await contract.deployTransaction.wait();
       console.log(`Contract confirmed in block ${receipt.blockNumber}`);
+      
+      // Log transaction cost
+      const gasUsed = receipt.gasUsed;
+      const gasPrice = receipt.effectiveGasPrice || contract.deployTransaction.gasPrice;
+      const txCost = gasUsed.mul(gasPrice);
+      const txCostBTC = ethers.utils.formatEther(txCost);
+      
+      console.log(`💸 Gas used: ${gasUsed.toString()} | Cost: ${txCostBTC} BTC`);
+      
+      // Check remaining balance
+      const signer = await ethers.getSigner();
+      const remainingBalance = await signer.getBalance();
+      const remainingBTC = ethers.utils.formatEther(remainingBalance);
+      console.log(`💰 Remaining balance: ${remainingBTC} BTC`);
+      
     } catch (waitError) {
       if (waitError.message.includes('invalid address')) {
         console.log('Warning: Transaction response parsing failed, but contract was deployed successfully');
@@ -427,6 +500,24 @@ async function loadDeployedRewardManagers() {
  * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
  */
 async function deployPoolCore(config, poolType, poolKey, customPositionActions) {
+  return await deployPoolCoreSelective(config, poolType, poolKey, customPositionActions, {});
+}
+
+/**
+ * Deploys core contracts with selective deployment options
+ * @param {Object} config - The network configuration object
+ * @param {string} poolType - The pool type ('eth' or 'usdc')
+ * @param {string} poolKey - The key of the pool in config.Core (e.g., 'PoolV3_LpUSD')
+ * @param {Array<string>} [customPositionActions] - Optional custom list of position actions to deploy
+ * @param {Object} [options] - Deployment options
+ * @param {boolean} [options.skipStaking] - Skip staking contract deployment
+ * @param {boolean} [options.skipLocking] - Skip locking contract deployment
+ * @param {boolean} [options.skipTreasury] - Skip treasury deployment
+ * @param {boolean} [options.skipVaultRegistry] - Skip vault registry deployment
+ * @param {boolean} [options.skipActions] - Skip actions deployment
+ * @param {Object} [options.existingContracts] - Existing contract addresses to use instead of deploying
+ */
+async function deployPoolCoreSelective(config, poolType, poolKey, customPositionActions, options = {}) {
   const signer = await getSignerAddress();
   
   if (hre.network.name == 'tenderly') {
@@ -442,21 +533,89 @@ async function deployPoolCore(config, poolType, poolKey, customPositionActions) 
   const pool = await attachContract('PoolV3', config.Core[poolKey]);
   console.log(`Using pool ${poolKey} at address: ${pool.address}`);
 
-  const { stakingLp, lockLp } = await deployStakingAndLockingLP(pool, poolType);
+  let stakingLp, lockLp;
+  
+  // Deploy or attach staking and locking contracts
+  if (options.skipStaking && options.skipLocking) {
+    console.log('Skipping staking and locking contract deployment');
+    // Use existing contracts if provided
+    if (options.existingContracts?.stakingLp) {
+      stakingLp = await attachContract('StakingLPEth', options.existingContracts.stakingLp);
+      console.log(`Using existing staking contract at: ${stakingLp.address}`);
+    }
+    if (options.existingContracts?.lockLp) {
+      lockLp = await attachContract('Locking', options.existingContracts.lockLp);
+      console.log(`Using existing locking contract at: ${lockLp.address}`);
+    }
+  } else {
+    const deployed = await deployStakingAndLockingLP(pool, poolType);
+    stakingLp = deployed.stakingLp;
+    lockLp = deployed.lockLp;
+  }
+  
   console.log('staking lp property name', `stakingLp${poolType.toUpperCase()}`);
   
-  const treasuryReplaceParams = {
-    'deployer': signer,
-    [`stakingLp${poolType.toUpperCase()}`]: stakingLp.address
-  };
+  let treasury;
+  if (options.skipTreasury) {
+    console.log('Skipping treasury deployment');
+    if (options.existingContracts?.treasury) {
+      treasury = await attachContract('Treasury', options.existingContracts.treasury);
+      console.log(`Using existing treasury at: ${treasury.address}`);
+    }
+  } else {
+    // Use pool-specific treasury config if available, otherwise fall back to default
+    const treasuryConfigKey = `Treasury_${poolType}`;
+    const treasuryConfig = config.Core[treasuryConfigKey] || config.Core.Treasury;
+    
+    if (!treasuryConfig) {
+      throw new Error(`No treasury configuration found for pool type "${poolType}". Expected "${treasuryConfigKey}" or "Treasury" in config.Core`);
+    }
+    
+    const treasuryReplaceParams = {
+      'deployer': signer,
+      [`stakingLp${poolType.toUpperCase()}`]: stakingLp?.address || options.existingContracts?.stakingLp || ethers.constants.AddressZero,
+      'stakingLpToken': stakingLp?.address || options.existingContracts?.stakingLp || ethers.constants.AddressZero
+    };
 
-  const { payees, shares, admin } = replaceParams(config.Core.Treasury.constructorArguments, treasuryReplaceParams);
-  const treasury = await deployContract('Treasury', 'Treasury', false, payees, shares, admin);
-  
-  await pool.setTreasury(treasury.address);
+    const { payees, shares, admin } = replaceParams(treasuryConfig.constructorArguments, treasuryReplaceParams);
+    treasury = await deployContract('Treasury', `Treasury_${poolType}`, false, payees, shares, admin);
+    
+    await pool.setTreasury(treasury.address);
+    console.log(`Treasury deployed and set in pool`);
+  }
 
-  const vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
-  const { flashlender, proxyRegistry } = await deployActions(pool, vaultRegistry, poolType, config, customPositionActions);
+  let vaultRegistry;
+  if (options.skipVaultRegistry) {
+    console.log('Skipping vault registry deployment');
+    if (options.existingContracts?.vaultRegistry) {
+      vaultRegistry = await attachContract('VaultRegistry', options.existingContracts.vaultRegistry);
+      console.log(`Using existing vault registry at: ${vaultRegistry.address}`);
+    } else if (config.Core.VaultRegistry) {
+      vaultRegistry = await attachContract('VaultRegistry', config.Core.VaultRegistry);
+      console.log(`Using vault registry from config at: ${vaultRegistry.address}`);
+    }
+  } else {
+    // Deploy new vault registry
+    vaultRegistry = await deployContract('VaultRegistry', `VaultRegistry_${poolType}`, false);
+    console.log(`VaultRegistry deployed at: ${vaultRegistry.address}`);
+  }
+
+  let flashlender, proxyRegistry;
+  if (options.skipActions) {
+    console.log('Skipping actions deployment');
+    if (options.existingContracts?.flashlender) {
+      flashlender = await attachContract('Flashlender', options.existingContracts.flashlender);
+      console.log(`Using existing flashlender at: ${flashlender.address}`);
+    }
+    if (options.existingContracts?.proxyRegistry) {
+      proxyRegistry = await attachContract('PRBProxyRegistry', options.existingContracts.proxyRegistry);
+      console.log(`Using existing proxy registry at: ${proxyRegistry.address}`);
+    }
+  } else {
+    const deployed = await deployActions(pool, vaultRegistry, poolType, config, customPositionActions);
+    flashlender = deployed.flashlender;
+    proxyRegistry = deployed.proxyRegistry;
+  }
 
   return {
     stakingLp,
@@ -607,6 +766,8 @@ async function deployCustomPositionActions(flashlender, swapAction, poolAction, 
 
     if (action === 'PositionActionPenpie') {
       args.push(config.Core.PenpieHelper);
+    } else if (action === 'PositionActionBLBTC') {
+      args.push(config.Core.WBTC);
     }
 
     await deployContract(
@@ -975,6 +1136,7 @@ module.exports = {
   isContractDeployed,
   getDeployedContract,
   attachContract,
+  getGasOptions,
   loadDeployedContracts,
   loadDeployedVaults,
   verifyOnTenderly,
@@ -986,6 +1148,7 @@ module.exports = {
   getPoolAddress,
   loadDeployedRewardManagers,
   deployPoolCore,
+  deployPoolCoreSelective,
   deployStakingAndLockingLP,
   deployActions,
   deployPositionActions,

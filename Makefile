@@ -27,15 +27,19 @@ anvil            :; anvil --fork-url $(MAINNET_RPC_URL) --auto-impersonate
 anvil-scroll     :; anvil --fork-url $(SCROLL_RPC_URL) --auto-impersonate
 anvil-bsc        :; anvil --fork-url $(BNB_RPC_URL) --auto-impersonate
 anvil-xdc        :; anvil --fork-url $(XDC_RPC_URL) --auto-impersonate --balance 10000000
+anvil-bitlayer   :; anvil --fork-url $(BITLAYER_RPC_URL) --auto-impersonate --balance 10000000
 deploy-clear     :; rm -rf scripts/*-local.json
 deploy-anvil     :; npx hardhat run scripts/deploy_eth.js --network local --show-stack-traces
 deploy-anvil-usdc:; npx hardhat run scripts/deploy_usdc.js --network local --show-stack-traces
 deploy-anvil-bsc :;	npx hardhat run scripts/deploy_bsc.js --network local --show-stack-traces
 deploy-anvil-xdc :; npx hardhat run scripts/deploy_xdc.js --network local --show-stack-traces
+deploy-anvil-bitlayer :; npx hardhat run scripts/deploy_bitlayer.js --network local --show-stack-traces
 deploy-tenderly-eth  :; npx hardhat run scripts/deploy_eth.js --network tenderly
 deploy-tenderly-usdc :; npx hardhat run scripts/deploy_usdc.js --network tenderly
 deploy-xdc       :; npx hardhat run scripts/deploy_xdc.js --network xdc --show-stack-traces
 deploy-xdc-testnet:; npx hardhat run scripts/deploy_xdc.js --network xdc_testnet --show-stack-traces
+deploy-bitlayer  :; npx hardhat run scripts/deploy_bitlayer.js --network bitlayer --show-stack-traces
+deploy-bitlayer-testnet:; npx hardhat run scripts/deploy_bitlayer.js --network bitlayer_testnet --show-stack-traces
 
 # deploy-mainnet-usdc   	:; npx hardhat run scripts/deploy_usdc.js --network mainnet
 # deploy-mainnet-eth   	:; npx hardhat run scripts/deploy_eth.js --network mainnet

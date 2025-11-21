@@ -16,7 +16,6 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ICDPVault, ICDPVaultBase, CDPVaultConfig, CDPVaultConstants} from "../interfaces/ICDPVault.sol";
 import {CDPVault} from "../CDPVault.sol";
 import {CDPVaultSpectra} from "../CDPVaultSpectra.sol";
-import {PatchedDeal} from "./utils/PatchedDeal.sol";
 import {Flashlender} from "../Flashlender.sol";
 
 import {MockOracle} from "./MockOracle.sol";
@@ -59,9 +58,6 @@ contract TestBase is Test {
     uint256[] internal timestamps;
     uint256 public currentTimestamp;
 
-    PatchedDeal internal dealManager;
-    bool public usePatchedDeal = false;
-
     uint256 internal constant initialGlobalDebtCeiling = 100_000_000_000 ether;
 
     struct CDPAccessParams {
@@ -78,7 +74,6 @@ contract TestBase is Test {
     }
 
     function setUp() public virtual {
-        dealManager = new PatchedDeal();
         setCurrentTimestamp(block.timestamp);
 
         createAccounts();
@@ -345,13 +340,22 @@ contract TestBase is Test {
     }
 
     function deal(address token_, address to, uint256 amount) internal virtual override {
-        if (usePatchedDeal) {
-            uint256 chainId = block.chainid;
-            vm.chainId(1);
-            dealManager.deal2(token_, to, amount);
-            vm.chainId(chainId);
-        } else {
-            super.deal(token_, to, amount);
+        // Handle proxy tokens that stdStorage cannot automatically find
+        // USDC (FiatTokenProxy) - slot 9 for balances
+        if (token_ == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) {
+            bytes32 slot = keccak256(abi.encode(to, uint256(9)));
+            vm.store(token_, slot, bytes32(amount));
+            return;
         }
+        
+        // USDT (TetherToken) - slot 2 for balances  
+        if (token_ == 0xdAC17F958D2ee523a2206206994597C13D831ec7) {
+            bytes32 slot = keccak256(abi.encode(to, uint256(2)));
+            vm.store(token_, slot, bytes32(amount));
+            return;
+        }
+        
+        // For all other tokens, use standard deal
+        super.deal(token_, to, amount);
     }
 }

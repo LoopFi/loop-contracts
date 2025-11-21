@@ -66,7 +66,6 @@ contract PoolActionPendleTest is ActionMarketCoreStatic, IntegrationTestBase {
     }
 
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         ///  vm.label(BALANCER_VAULT, "balancer");

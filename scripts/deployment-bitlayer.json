@@ -1,0 +1,277 @@
+{
+  "core": {
+    "ACL": {
+      "address": "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3",
+      "artifactName": "ACL",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "AddressProviderV3": {
+      "address": "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+      "artifactName": "AddressProviderV3",
+      "constructorArgs": [
+        "0xE67f77af54EdA6B92f2dBaB272b8C0817ae0bCa3"
+      ],
+      "addedToRegistry": false
+    },
+    "ContractsRegister": {
+      "address": "0x0aB39D2DA8160E64117C9B5CE88efD68FB8Bf693",
+      "artifactName": "ContractsRegister",
+      "constructorArgs": [
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D"
+      ],
+      "addedToRegistry": false
+    },
+    "LinearInterestRateModelV3_lpWBTC": {
+      "address": "0xFB43717E1ea0C10a6cd893B00Baa0fF2482838bE",
+      "artifactName": "LinearInterestRateModelV3",
+      "constructorArgs": [
+        "7000",
+        "9000",
+        "200",
+        "800",
+        "2500",
+        "10000",
+        "false"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolV3_lpWBTC": {
+      "address": "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+      "artifactName": "PoolV3",
+      "constructorArgs": [
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F",
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F",
+        "0xFB43717E1ea0C10a6cd893B00Baa0fF2482838bE",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "Loop Liquidity Pool - WBTC",
+        "lpWBTC"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolQuotaKeeperV3_lpWBTC": {
+      "address": "0x090052C12A5c744542b08006197C6824ACF00187",
+      "artifactName": "PoolQuotaKeeperV3",
+      "constructorArgs": [
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9"
+      ],
+      "addedToRegistry": false
+    },
+    "LoopVoter_lpWBTC": {
+      "address": "0xF3a117e50A4318F676Eb0e712530C5c0210Ccb06",
+      "artifactName": "LoopVoter",
+      "constructorArgs": [
+        "0x9613E12A424B4CbaCF561F0ec54b418c76d6B26D",
+        "1759340122"
+      ],
+      "addedToRegistry": false
+    },
+    "GaugeV3_lpWBTC": {
+      "address": "0xAB86d3bd8370e6c37D37Afb3eB183b2cDA9dca8f",
+      "artifactName": "GaugeV3",
+      "constructorArgs": [
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+        "0xF3a117e50A4318F676Eb0e712530C5c0210Ccb06"
+      ],
+      "addedToRegistry": false
+    },
+    "StakingLPWBTC": {
+      "address": "0xE1B7Bd58Ea097533C0F66e4f6a5d3286984343DB",
+      "artifactName": "StakingLPEth",
+      "constructorArgs": [
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+        "StakingLPWBTC",
+        "slpWBTC",
+        "10000"
+      ],
+      "addedToRegistry": false
+    },
+    "LockingLpWBTC": {
+      "address": "0x5850b15860bfa383d6651993b68bd557531A60B8",
+      "artifactName": "Locking",
+      "constructorArgs": [
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9"
+      ],
+      "addedToRegistry": false
+    },
+    "Treasury_wbtc": {
+      "address": "0xCaf5e9cB6F005ed95F0a00edAdd16593467eE852",
+      "artifactName": "Treasury",
+      "constructorArgs": [
+        [
+          "0xA719A90a173E8F00618596ffb594F5FfA79d915D",
+          "0xE1B7Bd58Ea097533C0F66e4f6a5d3286984343DB"
+        ],
+        [
+          "200",
+          "800"
+        ],
+        "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+      ],
+      "addedToRegistry": false
+    },
+    "VaultRegistry_wbtc": {
+      "address": "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+      "artifactName": "VaultRegistry",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "Flashlender_wbtc": {
+      "address": "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+      "artifactName": "Flashlender",
+      "constructorArgs": [
+        "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+        "0"
+      ],
+      "addedToRegistry": false
+    },
+    "PRBProxyRegistry": {
+      "address": "0x386e6AB368500Ac0D2aAf6Dd797E029bF1C6b71f",
+      "artifactName": "PRBProxyRegistry",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "SwapAction_wbtc": {
+      "address": "0x252d4187A570a212A186f6d18beB6F2C14500961",
+      "artifactName": "SwapAction",
+      "constructorArgs": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "addedToRegistry": false
+    },
+    "PoolAction_wbtc": {
+      "address": "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+      "artifactName": "PoolAction",
+      "constructorArgs": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction20_wbtc": {
+      "address": "0xe42f7d50Ec46685C849A49827DeE3576466C4810",
+      "artifactName": "PositionAction20",
+      "constructorArgs": [
+        "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+        "0x252d4187A570a212A186f6d18beB6F2C14500961",
+        "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionAction4626_wbtc": {
+      "address": "0xa91045c78449eC781699A0c92C81Fc44D178d24F",
+      "artifactName": "PositionAction4626",
+      "constructorArgs": [
+        "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+        "0x252d4187A570a212A186f6d18beB6F2C14500961",
+        "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionPendle_wbtc": {
+      "address": "0x762Ca29e5a83cA5A918FD9cD60Cef7B4B2cdD3AC",
+      "artifactName": "PositionActionPendle",
+      "constructorArgs": [
+        "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+        "0x252d4187A570a212A186f6d18beB6F2C14500961",
+        "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionTranchess_wbtc": {
+      "address": "0xAf66b57344B42181b6cBd80f078f6132C0D3C228",
+      "artifactName": "PositionActionTranchess",
+      "constructorArgs": [
+        "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+        "0x252d4187A570a212A186f6d18beB6F2C14500961",
+        "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F"
+      ],
+      "addedToRegistry": false
+    },
+    "PositionActionBLBTC_wbtc": {
+      "address": "0xf6b57187F0a43D8b9d8dE15C94CAF43FE46A5675",
+      "artifactName": "PositionActionBLBTC",
+      "constructorArgs": [
+        "0xc264E7eDcA021Fba5248E57E3d3A93288a70456a",
+        "0x252d4187A570a212A186f6d18beB6F2C14500961",
+        "0x1e8856b8507c635a9FBbf4c058490eE618C7B3E8",
+        "0x9D793522b546eAF623CD536fC06d2509AB9CE00b",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F",
+        "0xfF204e2681A6fA0e2C3FaDe68a1B28fb90E4Fc5F"
+      ],
+      "addedToRegistry": false
+    },
+    "PushOracle_Impl_Vaults_BLBTC": {
+      "address": "0xfCC370C9cb2b6422E00d75737d53b91922F57c99",
+      "artifactName": "PushOracle",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "PushOracle_Vaults_BLBTC": {
+      "address": "0xD20123D03a3Db1A895a4D017819E733180A64D3A",
+      "artifactName": "ERC1967Proxy",
+      "constructorArgs": [
+        "0xfCC370C9cb2b6422E00d75737d53b91922F57c99",
+        "0x485cc9550000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc0000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc"
+      ],
+      "addedToRegistry": false
+    },
+    "PushOracle_Impl_Vaults_BLBTC_v2": {
+      "address": "0xCEa1B2a1DDBA3a84C467743a45173f3469579a70",
+      "artifactName": "PushOracle",
+      "constructorArgs": [],
+      "addedToRegistry": false
+    },
+    "PushOracle_Vaults_BLBTC_v2": {
+      "address": "0xC82cDB0CBF2A19d60b56e0D667dD9f95Eca3F388",
+      "artifactName": "ERC1967Proxy",
+      "constructorArgs": [
+        "0xCEa1B2a1DDBA3a84C467743a45173f3469579a70",
+        "0x485cc9550000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc0000000000000000000000009b2205e4e62e333141117fc895dc77b558e2a2bc"
+      ],
+      "addedToRegistry": false
+    }
+  },
+  "vaults": {
+    "CDPVault_Vaults_BLBTC": {
+      "address": "0x43DC99dA816029b6aBF84D993B2c42C17FF6E0f9",
+      "artifactName": "CDPVault",
+      "constructorArgs": [
+        [
+          "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+          "0xD20123D03a3Db1A895a4D017819E733180A64D3A",
+          "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014",
+          "1000000000000000000"
+        ],
+        [
+          "1000000000000000",
+          "1666700000000000000",
+          "990000000000000000",
+          "980000000000000000",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC",
+          "0x9B2205E4E62e333141117Fc895DC77B558E2a2BC"
+        ]
+      ],
+      "addedToRegistry": true,
+      "addedToGauge": true
+    }
+  },
+  "rewardManagers": {}
+}

@@ -70,7 +70,6 @@ contract RewardManagerPendleTest is IntegrationTestBase {
     address pendleHolder = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
 
     function setUp() public virtual override {
-        usePatchedDeal = true;
         super.setUp();
 
         // configure permissions and system settings

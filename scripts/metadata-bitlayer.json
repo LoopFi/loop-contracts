@@ -1,0 +1,22 @@
+{
+  "vaults": {
+    "0xe1987f6cD0b8823a033c29d640596757492479BD": {
+      "pool": "0x796e374f741AfA9205B61328363404DA047CB5bC",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 5000
+      },
+      "tokenSymbol": "LOOP-BLBTC",
+      "token": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014"
+    },
+    "0x43DC99dA816029b6aBF84D993B2c42C17FF6E0f9": {
+      "pool": "0xadE9965484cD5f2926e26Cb95b99F183D719AbE9",
+      "quotas": {
+        "minRate": 100,
+        "maxRate": 5000
+      },
+      "tokenSymbol": "LOOP-BLBTC",
+      "token": "0x4e0dd7c16d2bbf873335cc21c72663b3eae23014"
+    }
+  }
+}

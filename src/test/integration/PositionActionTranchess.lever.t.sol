@@ -111,7 +111,6 @@ contract PositionActionLeverTranchessTest is TestBase {
 
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("scroll"), 10610811);
-        usePatchedDeal = true;
         super.setUp();
 
         prbProxyRegistry = new PRBProxyRegistry();

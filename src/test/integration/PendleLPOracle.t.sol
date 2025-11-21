@@ -25,7 +25,6 @@ contract PendleLPOracleTest is IntegrationTestBase {
     address ptOracle = 0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2; // pendle PT oracle
 
     function setUp() public override {
-        usePatchedDeal = true;
         super.setUp();
 
         pendleOracle = PendleLPOracle(
